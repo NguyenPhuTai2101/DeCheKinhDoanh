@@ -13,11 +13,13 @@ import {
   StreetEvent,
   LotteryTicket,
   DeliveryOrder,
+  ActiveOrder,
 } from '../../../shared/types';
 import {
   INITIAL_GAME_STATE,
   INGREDIENTS,
   RECIPES,
+  CUSTOMER_TYPES,
   SHOP_UPGRADES,
   EMPLOYEES,
   SHOP_THEMES,
@@ -82,10 +84,15 @@ export interface GameStoreState {
     userTicket: string;
   } | null;
 
-  // UI Toast message
+  // V0.4 - V0.5: Chế độ quan sát (Quầy quán 'shop' ⇄ Ra đường vỉa hè 'street')
+  currentView: 'shop' | 'street';
+  activeOrders: ActiveOrder[];
   toastMessage: string | null;
 
   // Actions cơ bản
+  setCurrentView: (view: 'shop' | 'street') => void;
+  setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
+  serveDishOrder: (orderId: string) => boolean;
   setShopOpen: (open: boolean) => void;
   setTimeSpeed: (speed: number) => void;
   openModal: (modal: ModalType) => void;
@@ -164,6 +171,58 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   lotteryDrawResult: null,
   toastMessage: null,
 
+  currentView: 'shop',
+  activeOrders: [],
+
+  setCurrentView: (view) => {
+    set({ currentView: view });
+    if (view === 'street') {
+      get().showToast('🚶 Đang ra đường quan sát phố xá vỉa hè!');
+    } else {
+      get().showToast('🍳 Đã trở về quầy bán hàng!');
+    }
+  },
+
+  setActiveOrders: (orders) => {
+    if (typeof orders === 'function') {
+      set((state) => ({ activeOrders: orders(state.activeOrders) }));
+    } else {
+      set({ activeOrders: orders });
+    }
+  },
+
+  serveDishOrder: (orderId) => {
+    const { activeOrders } = get();
+    const order = activeOrders.find((o) => o.id === orderId);
+    if (!order) return false;
+
+    const recipe = RECIPES[order.recipeId];
+    if (!recipe) return false;
+
+    const cType = CUSTOMER_TYPES[order.typeId];
+    const patiencePercent = Math.max(0, order.patienceRemaining / order.maxPatience);
+    let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
+
+    if (order.neighborId) {
+      tip += Math.round(recipe.basePrice * 0.2);
+      get().serveNeighborGuest(order.neighborId);
+    }
+
+    set((state) => ({
+      activeOrders: state.activeOrders.map((o) =>
+        o.id === orderId ? { ...o, state: 'eating' } : o
+      ),
+    }));
+
+    setTimeout(() => {
+      get().finishServing(order.tableIndex, recipe.basePrice, tip);
+      set((state) => ({
+        activeOrders: state.activeOrders.filter((o) => o.id !== orderId),
+      }));
+    }, 1800);
+
+    return true;
+  },
 
   setShopOpen: (open) => {
     set({ isShopOpen: open });

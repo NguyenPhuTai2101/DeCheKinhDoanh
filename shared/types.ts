@@ -261,6 +261,18 @@ export interface DeliveryOrder {
   status: 'pending' | 'ready' | 'delivering';
 }
 
+export interface ActiveOrder {
+  id: string;
+  tableIndex: number;
+  typeId: CustomerTypeId;
+  neighborId?: NeighborId;
+  dialogue?: string;
+  recipeId: RecipeId;
+  patienceRemaining: number;
+  maxPatience: number;
+  state: 'waiting' | 'ready' | 'eating' | 'leaving';
+}
+
 export interface GameSaveState {
   version: string;
   playerId: string;

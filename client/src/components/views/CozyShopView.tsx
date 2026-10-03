@@ -35,10 +35,14 @@ export const CozyShopView: React.FC = () => {
     deliveryOrders,
     serveNeighborGuest,
     buyLotteryTicket,
+    activeOrders,
+    setActiveOrders,
+    setCurrentView,
   } = useGameStore();
 
-  // Danh sách các bàn đang đón khách
-  const [orders, setOrders] = useState<ActiveOrder[]>([]);
+  // Đồng bộ danh sách bàn đón khách với store toàn cục
+  const orders = activeOrders;
+  const setOrders = setActiveOrders;
   const [selectedOrderIndex, setSelectedOrderIndex] = useState<number | null>(null);
   
   // Khay nguyên liệu người chơi đang chọn cho đơn hiện tại
@@ -395,15 +399,30 @@ export const CozyShopView: React.FC = () => {
             </div>
           </div>
 
-          {/* Lò nướng đang bốc khói ấm áp */}
-          <div className="flex items-center gap-2 bg-[#FFF7ED] px-3 py-1.5 rounded-2xl border border-[#F7D7BA] shadow-sm">
-            <div className="text-xl animate-bounce-short">♨️</div>
-            <div className="text-right">
-              <div className="text-[10px] font-bold text-[#9C7C75]">Bếp Đang Nóng</div>
-              <div className="text-[11px] font-black text-amber-700">
-                {orders.filter((o) => o.state === 'ready').length > 0
-                  ? '✨ Có Món Xong!'
-                  : 'Sẵn Sàng Nấu'}
+          <div className="flex items-center gap-1.5">
+            {/* Nút ra đường quan sát vỉa hè */}
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setCurrentView('street');
+              }}
+              className="flex items-center gap-1 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black px-2.5 py-1.5 rounded-2xl shadow-sm border border-amber-500 text-[11px] active:scale-95 transition-all animate-pulse"
+              title="Ra ngoài vỉa hè ngắm phố xá và các bàn ăn ngoài trời"
+            >
+              <span>👀</span>
+              <span>Ra Đường</span>
+            </button>
+
+            {/* Lò nướng đang bốc khói ấm áp */}
+            <div className="flex items-center gap-2 bg-[#FFF7ED] px-3 py-1.5 rounded-2xl border border-[#F7D7BA] shadow-sm">
+              <div className="text-xl animate-bounce-short">♨️</div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-[#9C7C75]">Bếp Đang Nóng</div>
+                <div className="text-[11px] font-black text-amber-700">
+                  {orders.filter((o) => o.state === 'ready').length > 0
+                    ? '✨ Có Món Xong!'
+                    : 'Sẵn Sàng Nấu'}
+                </div>
               </div>
             </div>
           </div>
@@ -444,6 +463,18 @@ export const CozyShopView: React.FC = () => {
         {/* Thanh phím tắt xóm giềng vỉa hè nhanh */}
         <div className="flex items-center justify-between gap-1.5 text-[10px]">
           <HorizontalScrollBox className="flex items-center gap-1 scrollbar-none py-0.5">
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setCurrentView('street');
+              }}
+              className="px-2.5 py-0.5 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 border border-amber-500 font-black flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0 animate-pulse"
+              title="Ra ngoài vỉa hè quan sát phố xá và các bàn ghế ăn uống"
+            >
+              <span>👀</span>
+              <span>Ra Đường Quan Sát</span>
+            </button>
+
             <button
               onClick={() => {
                 soundManager.playClick();

@@ -5,7 +5,16 @@ import { Play, Pause, FastForward, Clock, Zap, Award, Store, Volume2, VolumeX } 
 import { soundManager } from '../utils/soundManager';
 
 export const TopBar: React.FC = () => {
-  const { gameState, isShopOpen, setShopOpen, timeSpeed, setTimeSpeed, openModal } = useGameStore();
+  const {
+    gameState,
+    isShopOpen,
+    setShopOpen,
+    timeSpeed,
+    setTimeSpeed,
+    openModal,
+    currentView,
+    setCurrentView,
+  } = useGameStore();
   const [isMuted, setIsMuted] = useState(false);
 
   const toggleSound = () => {
@@ -144,6 +153,22 @@ export const TopBar: React.FC = () => {
               <FastForward className="w-2.5 h-2.5" />
             </button>
           </div>
+
+          {/* Phím chuyển nhanh Quán ⇄ Ra Đường */}
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              setCurrentView(currentView === 'street' ? 'shop' : 'street');
+            }}
+            className={`px-2 py-0.5 rounded-full font-black text-[9px] flex items-center gap-1 border transition-all active:scale-95 ${
+              currentView === 'street'
+                ? 'bg-amber-400 text-amber-950 border-amber-500 shadow-xs'
+                : 'bg-rose-100 text-rose-800 border-rose-300'
+            }`}
+            title="Chuyển chế độ: Quán Bếp ⇄ Ra đường quan sát"
+          >
+            <span>{currentView === 'street' ? '🍳 Quầy Bếp' : '👀 Ra Phố'}</span>
+          </button>
 
           <button
             onClick={toggleSound}

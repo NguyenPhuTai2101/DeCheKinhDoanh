@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { TopBar } from './components/TopBar';
 import { BottomBar } from './components/BottomBar';
 import { CozyShopView } from './components/views/CozyShopView';
+import { StreetMapView } from './components/views/StreetMapView';
 import { CookingModal } from './components/modals/CookingModal';
 import { MarketModal } from './components/modals/MarketModal';
 import { UpgradesModal } from './components/modals/UpgradesModal';
@@ -18,7 +19,7 @@ import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
 
 export const App: React.FC = () => {
-  const { activeModal, loadGame, saveLocal } = useGameStore();
+  const { activeModal, currentView, loadGame, saveLocal } = useGameStore();
 
   useEffect(() => {
     loadGame();
@@ -37,9 +38,9 @@ export const App: React.FC = () => {
         {/* 1. Thanh Header HUD Vỉa Hè */}
         <TopBar />
 
-        {/* 2. Khu vực hiển thị trò chơi chính: Quầy Hàng & Vỉa Hè Sắc Nét 100% Vector */}
+        {/* 2. Khu vực hiển thị trò chơi chính: Quầy Hàng (Bếp) ⇄ Ra Đường Quan Sát (Phố Vỉa Hè) */}
         <main className="flex-1 w-full relative overflow-hidden flex flex-col min-h-0 bg-[#FAF5EE]">
-          <CozyShopView />
+          {currentView === 'street' ? <StreetMapView /> : <CozyShopView />}
         </main>
 
         {/* 3. Thanh điều hướng dưới cùng */}

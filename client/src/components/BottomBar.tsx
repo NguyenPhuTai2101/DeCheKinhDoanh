@@ -14,29 +14,42 @@ import {
   LayoutGrid,
   SlidersHorizontal,
   Bike,
+  Eye,
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { HorizontalScrollBox } from './common/HorizontalScrollBox';
 
 export const BottomBar: React.FC = () => {
-  const { openModal, gameState, deliveryOrders } = useGameStore();
+  const { openModal, gameState, deliveryOrders, currentView, setCurrentView } = useGameStore();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleOpen = (modal: ModalType) => {
+  const handleOpen = (modal: ModalType | 'street_view_toggle') => {
     soundManager.playClick();
-    openModal(modal);
+    if (modal === 'street_view_toggle') {
+      setCurrentView(currentView === 'street' ? 'shop' : 'street');
+      return;
+    }
+    openModal(modal as ModalType);
   };
 
   const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
 
   const menuItems: Array<{
-    id: ModalType;
+    id: ModalType | 'street_view_toggle';
     label: string;
     icon: React.ReactNode;
     colorClasses: string;
     badge?: string | number | null;
     hasAlert?: boolean;
   }> = [
+    {
+      id: 'street_view_toggle',
+      label: currentView === 'street' ? 'Quầy Bếp' : 'Ra Phố',
+      icon: currentView === 'street' ? <Utensils className="w-4 h-4" /> : <Eye className="w-4 h-4" />,
+      colorClasses: currentView === 'street'
+        ? 'bg-rose-50 border-rose-300 text-rose-600 group-hover:bg-rose-400 group-hover:text-white'
+        : 'bg-amber-100 border-amber-400 text-amber-900 group-hover:bg-amber-400 group-hover:text-white',
+    },
     {
       id: 'cooking',
       label: 'Nấu Ăn',
