@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production builds
+dist/
+client/dist/
+server/dist/
+
+# Local data & environment
+*.local
+.env
+.DS_Store
+Thumbs.db
+server/data/*.json
+!server/data/.gitkeep
