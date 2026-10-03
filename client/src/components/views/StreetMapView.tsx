@@ -14,30 +14,25 @@ import confetti from 'canvas-confetti';
 import {
   Utensils,
   Sparkles,
+  Plus,
   ShoppingBag,
   Ticket,
   Bike,
-  HeartHandshake,
-  Store,
-  ChevronLeft,
-  ChevronRight,
-  MapPin,
-  Clock,
-  Heart,
   Coffee,
-  Plus,
+  MapPin,
+  Volume2,
+  AlertTriangle,
+  ArrowRight,
+  Store,
 } from 'lucide-react';
 
 export const StreetMapView: React.FC = () => {
   const {
     gameState,
-    isShopOpen,
-    setShopOpen,
     activeOrders,
     setCurrentView,
     serveDishOrder,
     openModal,
-    buyLotteryTicket,
     purchaseUpgrade,
     upgradeBusinessStage,
   } = useGameStore();
@@ -120,14 +115,10 @@ export const StreetMapView: React.FC = () => {
     }
   };
 
-  // Lăn chuột hoặc bấm nút để cuộn ngang phố xá
-  const handleScroll = (direction: 'left' | 'right') => {
+  const scrollToLandmark = (x: number) => {
     if (!scrollRef.current) return;
-    const distance = 280;
-    scrollRef.current.scrollBy({
-      left: direction === 'left' ? -distance : distance,
-      behavior: 'smooth',
-    });
+    soundManager.playClick();
+    scrollRef.current.scrollTo({ left: x, behavior: 'smooth' });
   };
 
   const handleServeOnStreet = (orderId: string) => {
@@ -146,330 +137,370 @@ export const StreetMapView: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden select-none bg-[#EBF4FA] relative">
-      {/* 1. MÁI HIÊN & HEADER "ĐẾ CHẾ VỈA HÈ" (THEO ẢNH MẪU CỦA BẠN) */}
-      <div className="relative z-20 shrink-0 bg-white border-b-2 border-amber-200 shadow-sm">
-        {/* Mái hiên sọc đỏ - trắng uốn lượn đặc trưng quán phố */}
-        <div className="h-4 w-full bg-repeat-x flex overflow-hidden">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex-1 h-full"
-              style={{
-                backgroundColor: i % 2 === 0 ? '#E53935' : '#FFFFFF',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Bảng hiệu chính & Thanh công cụ quan sát */}
-        <div className="px-3 py-1.5 flex items-center justify-between gap-2 bg-[#FFFDF8]">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-lg shrink-0">
-              🛵
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-black text-amber-950 truncate flex items-center gap-1.5">
-                <span>ĐẾ CHẾ VỈA HÈ</span>
-                <span className="text-[9px] bg-rose-100 text-rose-700 font-extrabold px-1.5 py-0.2 rounded-full border border-rose-200 shrink-0">
-                  Phố Hoa Đào
-                </span>
-              </h2>
-              <p className="text-[10px] text-amber-800/80 truncate">
-                Từ gánh vé số góc ngã tư đến chuỗi ẩm thực
-              </p>
-            </div>
-          </div>
-
-          {/* Phím điều hướng nhanh về quầy bán */}
-          <div className="flex items-center gap-1.5 shrink-0">
+      {/* 1. THANH ĐIỀU HƯỚNG TINH GỌN (COMPACT STREET TOP BAR) */}
+      <div className="relative z-30 shrink-0 bg-white/95 backdrop-blur-xs border-b border-amber-200 shadow-xs">
+        {/* Hàng 1: Nút Vào Bếp + Tên Phố + Thống Kê Bàn Ngoài Trời */}
+        <div className="px-3 py-1.5 flex items-center justify-between gap-2">
+          {/* Nút Vào Bếp Bự Rõ Nhất Cho Mobile */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 soundManager.playClick();
                 setCurrentView('shop');
               }}
-              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 active:scale-95 transition-all animate-bounce-short"
+              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:brightness-105 active:scale-95 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all"
             >
               <Utensils className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Vào Quầy Bán</span>
+              <span>Vào Bếp Nấu</span>
             </button>
+
+            {/* Tên Phố & Cấp Quán */}
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-950 font-black">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Phố Hoa Đào</span>
+              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                {currentStage.name}
+              </span>
+            </div>
+          </div>
+
+          {/* Góc phải: Thống kê bàn ngoài trời & Báo động biến phố xá */}
+          <div className="flex items-center gap-2">
+            {gameState.currentEvent && (
+              <button
+                onClick={() => {
+                  soundManager.playClick();
+                  openModal('streetEvents');
+                }}
+                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-xs font-black flex items-center gap-1 animate-bounce shadow-xs"
+              >
+                <span>🚨</span>
+                <span>CÓ BIẾN!</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl text-xs font-black text-amber-900 shadow-2xs">
+              <span>🪑 Bàn:</span>
+              <span className="text-rose-600 font-extrabold">
+                {activeOrders.length}/{maxTables}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Thanh trạng thái nhanh ngoài đường */}
-        <div className="px-3 py-1 bg-amber-50/80 border-t border-amber-100 flex items-center justify-between text-[10px] text-amber-900 font-bold">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1">
-              <span>🪑</span> Bàn ngoài trời: <b className="text-rose-600">{activeOrders.length}/{maxTables}</b>
-            </span>
-            <span className="text-amber-400">|</span>
-            <span className="flex items-center gap-1">
-              <span>{currentStage.icon}</span> {currentStage.name}
-            </span>
-          </div>
-          <div className="text-[10px] text-slate-500 italic">
-            👉 Vuốt hoặc bấm mũi tên để dạo phố
-          </div>
+        {/* Hàng 2: THANH CUỘN NHANH ĐỊA DANH PHỐ (QUICK JUMP CHIPS) */}
+        <div className="px-2 py-1 bg-amber-50/70 border-t border-amber-100/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold text-slate-700">
+          <span className="text-[10px] text-amber-800 font-black shrink-0 px-1">
+            📍 Địa Điểm:
+          </span>
+          <button
+            onClick={() => scrollToLandmark(0)}
+            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
+          >
+            <span>🔧</span> Sửa Xe Chú Năm
+          </button>
+          <button
+            onClick={() => scrollToLandmark(300)}
+            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
+          >
+            <span>🍬</span> Tạp Hóa Cô Ba
+          </button>
+          <button
+            onClick={() => scrollToLandmark(600)}
+            className="shrink-0 px-2.5 py-0.5 bg-gradient-to-r from-amber-200 to-rose-200 text-rose-950 font-black rounded-full border border-rose-300 shadow-2xs active:scale-95 transition-all flex items-center gap-1"
+          >
+            <span>🥖</span> Quán Mình & Bàn Ăn
+          </button>
+          <button
+            onClick={() => scrollToLandmark(1100)}
+            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
+          >
+            <span>🌳</span> Cây Me & Vé Số
+          </button>
+          <button
+            onClick={() => scrollToLandmark(1350)}
+            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
+          >
+            <span>☕</span> Cóc Bác Ba
+          </button>
         </div>
       </div>
 
-      {/* 2. KHÔNG GIAN TOÀN CẢNH PHỐ PHƯỜNG & VỈA HÈ (PANORAMA CUỘN NGANG) */}
+      {/* 2. KHÔNG GIAN TOÀN CẢNH PHỐ XÁ CHÂN THỰC (PANORAMA CUỘN NGANG DUY NHẤT) */}
       <div
         ref={scrollRef}
-        className="flex-1 w-full overflow-x-auto overflow-y-hidden relative no-scrollbar flex items-stretch touch-pan-x"
+        className="flex-1 w-full overflow-x-auto overflow-y-hidden relative no-scrollbar touch-pan-x flex flex-col justify-between bg-gradient-to-b from-[#CDE4F7] via-[#EBF4FA] to-[#F5ECE0]"
         style={{ scrollBehavior: 'smooth' }}
       >
-        {/* Container chiều rộng panorama cố định để cuộn mượt */}
-        <div className="min-w-[1250px] h-full flex flex-col justify-between relative bg-gradient-to-b from-[#D4E8F8] via-[#EBF4FA] to-[#F7EDE2] overflow-hidden">
-          {/* LỚP 1: BẦU TRỜI & CAO ỐC PHỐ XÁ XA XĂM (Skyline) */}
-          <div className="absolute top-0 left-0 right-0 h-28 pointer-events-none opacity-40 overflow-hidden flex items-end justify-between px-4">
-            {/* Tòa nhà chung cư xa xa phong cách pastel */}
-            <div className="w-20 h-24 bg-[#90CAF9] rounded-t-md opacity-50 flex flex-col justify-around p-1">
+        {/* CONTAINER PANORAMA TOÀN PHỐ (Rộng 1550px - Không lồng scroll con) */}
+        <div className="w-[1550px] shrink-0 h-full flex flex-col justify-between relative overflow-hidden">
+          {/* LỚP 1: BẦU TRỜI & DÃY NHÀ CAO ỐC XA XĂM (Skyline) */}
+          <div className="absolute top-0 left-0 right-0 h-28 pointer-events-none opacity-45 overflow-hidden flex items-end justify-between px-6">
+            <div className="w-24 h-24 bg-[#90CAF9] rounded-t-md opacity-60 flex flex-col justify-around p-1">
               <div className="grid grid-cols-3 gap-0.5 opacity-60">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="h-2 bg-white rounded-xs" />
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className="h-2 bg-white rounded-2xs" />
                 ))}
               </div>
             </div>
-            <div className="w-28 h-20 bg-[#CE93D8] rounded-t-md opacity-40" />
-            <div className="w-24 h-26 bg-[#80DEEA] rounded-t-md opacity-50" />
-            <div className="w-32 h-18 bg-[#FFE082] rounded-t-md opacity-40" />
-            <div className="w-24 h-24 bg-[#B0BEC5] rounded-t-md opacity-40" />
-            <div className="w-28 h-22 bg-[#A5D6A7] rounded-t-md opacity-40" />
-            <div className="w-24 h-26 bg-[#90CAF9] rounded-t-md opacity-50" />
+            <div className="w-32 h-18 bg-[#CE93D8] rounded-t-md opacity-40" />
+            <div className="w-28 h-26 bg-[#80DEEA] rounded-t-md opacity-50" />
+            <div className="w-36 h-20 bg-[#FFE082] rounded-t-md opacity-40" />
+            <div className="w-28 h-24 bg-[#B0BEC5] rounded-t-md opacity-40" />
+            <div className="w-32 h-22 bg-[#A5D6A7] rounded-t-md opacity-40" />
+            <div className="w-28 h-26 bg-[#90CAF9] rounded-t-md opacity-50" />
           </div>
 
-          {/* DÂY ĐIỆN VÀ CỘT ĐIỆN ĐẶC TRƯNG VIỆT NAM */}
-          <div className="absolute top-12 left-0 right-0 h-4 pointer-events-none z-10">
-            <svg viewBox="0 0 1250 30" className="w-full h-full opacity-60">
-              <path d="M 0 10 Q 300 25 600 12 Q 900 26 1250 10" stroke="#37474F" strokeWidth="1.2" fill="none" />
-              <path d="M 0 16 Q 320 28 650 15 Q 950 29 1250 16" stroke="#455A64" strokeWidth="0.8" fill="none" />
-              {/* Chim sẻ đậu trên dây điện */}
-              <circle cx="340" cy="18" r="2.5" fill="#3E2723" />
-              <circle cx="346" cy="19" r="2" fill="#3E2723" />
-              <circle cx="820" cy="21" r="2.5" fill="#3E2723" />
+          {/* DÂY ĐIỆN VÀ CỘT ĐIỆN CHẰNG CHỊT ĐẶC TRƯNG ĐƯỜNG PHỐ VIỆT NAM */}
+          <div className="absolute top-9 left-0 right-0 h-8 pointer-events-none z-10">
+            <svg viewBox="0 0 1550 40" className="w-full h-full opacity-65">
+              {/* Dây điện uốn lượn chằng chịt */}
+              <path d="M 0 10 Q 300 28 600 14 Q 1050 32 1550 12" stroke="#263238" strokeWidth="1.4" fill="none" />
+              <path d="M 0 16 Q 400 32 750 18 Q 1200 35 1550 18" stroke="#37474F" strokeWidth="1.0" fill="none" />
+              <path d="M 0 22 Q 350 36 900 20 Q 1350 30 1550 24" stroke="#455A64" strokeWidth="0.8" fill="none" />
+              {/* Cụm chim sẻ đậu trên dây */}
+              <circle cx="280" cy="21" r="2.5" fill="#3E2723" />
+              <circle cx="286" cy="22" r="2" fill="#3E2723" />
+              <circle cx="860" cy="23" r="2.5" fill="#3E2723" />
+              <circle cx="866" cy="24" r="2" fill="#3E2723" />
             </svg>
           </div>
 
-          {/* LỚP 2: DÃY NHÀ PHỐ 2 TẦNG ĐA MÀU SẮC (SHOPHOUSES) */}
-          <div className="flex-1 flex items-end pt-8 pb-0 px-2 relative z-10 gap-2">
-            {/* NHÀ 1: NGÃ BA & TIỆM SỬA XE (Bên trái) */}
-            <div className="w-56 h-60 bg-[#D7CCC8] border-2 border-[#8D6E63] rounded-t-xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
-              {/* Tầng 2 */}
-              <div className="h-20 bg-white/70 rounded-lg border border-[#A1887F] p-1.5 flex flex-col justify-between">
-                <div className="flex justify-between items-center text-[9px] font-bold text-[#5D4037]">
-                  <span>2F · Hộ Dân Cư</span>
-                  <span>🏠</span>
-                </div>
-                <div className="h-10 bg-[#BCAAA4]/40 rounded border border-[#8D6E63] flex items-center justify-around px-2">
-                  <div className="w-6 h-8 bg-sky-200/60 rounded border border-white" />
-                  <div className="w-6 h-8 bg-sky-200/60 rounded border border-white" />
+          {/* LỚP 2: DÃY NHÀ PHỐ & MẶT TIỀN THỰC TẾ (PHỐ XÁ ĐỜI THƯỜNG) */}
+          <div className="flex-1 flex items-end pt-10 pb-1 px-4 relative z-10 gap-3">
+            {/* ZONE 1: TIỆM SỬA XE MÁY & BƠM VÁ CHÚ NĂM (~270px) */}
+            <div className="w-68 h-56 bg-[#D7CCC8]/90 border-2 border-[#8D6E63] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
+              {/* Mái che & Biển hiệu tiệm */}
+              <div className="bg-[#FFA000] border border-[#FF8F00] text-amber-950 font-black text-center text-xs py-1 rounded-lg shadow-2xs">
+                🔧 SỬA XE MÁY CHÚ NĂM
+                <div className="text-[9px] font-bold text-amber-900 tracking-tight">
+                  Bơm Vá Săm Lốp · Thay Nhớt · Rửa Xe
                 </div>
               </div>
 
-              {/* Tầng 1: Tiệm Sửa Xe Máy Chú Bảy & Chú Năm */}
-              <div className="flex-1 mt-2 bg-[#EFEBE9] rounded-lg border-2 border-[#8D6E63] p-1.5 flex flex-col justify-between relative overflow-hidden">
-                <div className="bg-[#FFA000] text-white text-center font-black text-[11px] py-0.5 rounded shadow-sm">
-                  🔧 SỬA XE MÁY & VÁ LỐP
-                </div>
-
-                {/* Phụ kiện tiệm sửa xe */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm" title="Lốp xe dự phòng">⚫</span>
-                    <span className="text-sm" title="Lốp xe">⚫</span>
-                  </div>
-
-                  {/* Chú Năm đứng cạnh xe ôm */}
-                  <div
-                    onClick={() => {
-                      soundManager.playClick();
-                      openModal('delivery');
-                    }}
-                    className="flex flex-col items-center cursor-pointer group"
-                    title="Bấm để mở Đội Xe Giao Hàng Chú Năm"
-                  >
-                    <div className="bg-sky-500 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full mb-0.5 animate-bounce-short">
-                      Nổ Cuốc! 🛵
-                    </div>
-                    <ChibiAvatar type="chu_nam" emotion="happy" size={44} />
-                    <span className="text-[9px] font-black text-sky-900 bg-sky-100 px-1 rounded">
-                      Chú Năm
-                    </span>
+              {/* Vách tường: Lốp xe cũ treo lủng lẳng + Chai xăng lẻ */}
+              <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex flex-col gap-1 items-center">
+                  <span className="text-xl leading-none" title="Vỏ lốp xe dự phòng">
+                    🛞
+                  </span>
+                  <div className="bg-[#FFF8E1] border border-amber-300 rounded px-1 text-[8px] font-black text-amber-900 text-center">
+                    Xăng Lẻ<br />25k/chai
                   </div>
                 </div>
 
-                <div className="text-[9px] text-center font-bold text-slate-500 bg-white/80 rounded py-0.5">
-                  Bơm xe · Thay nhớt · Ship đồ ăn
+                {/* Chú Năm Biker ngồi trên chiếc Wave đỏ */}
+                <div
+                  onClick={() => {
+                    soundManager.playClick();
+                    openModal('delivery');
+                  }}
+                  className="flex flex-col items-center cursor-pointer group active:scale-95 transition-all"
+                  title="Chạm để mở Đội Xe Giao Hàng & Nhận Cuốc"
+                >
+                  <div className="bg-sky-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full mb-0.5 animate-bounce shadow-2xs">
+                    Nổ Cuốc 🛵
+                  </div>
+                  <ChibiAvatar type="chu_nam" emotion="happy" size={50} />
+                  <span className="text-[9px] font-black text-sky-950 bg-sky-100 px-2 py-0.5 rounded-md border border-sky-200 mt-0.5">
+                    Chú Năm (Biker)
+                  </span>
                 </div>
+              </div>
+
+              {/* Thanh footer tiệm */}
+              <div className="bg-white/80 rounded-lg py-0.5 text-center text-[9px] font-bold text-stone-600 border border-stone-300">
+                👉 Chạm Chú Năm để ship đơn mang về
               </div>
             </div>
 
-            {/* NHÀ 2: TIỆM TẠP HÓA CÔ BA */}
-            <div className="w-56 h-60 bg-[#FFF59D] border-2 border-[#FBC02D] rounded-t-xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
-              {/* Tầng 2 */}
-              <div className="h-20 bg-white/80 rounded-lg border border-[#FBC02D] p-1.5 flex flex-col justify-between">
-                <div className="flex justify-between text-[9px] font-bold text-[#F57F17]">
-                  <span>2F · Ban Công Hoa</span>
-                  <span>💐</span>
-                </div>
-                <div className="h-10 bg-amber-50 rounded border border-[#FBC02D] flex items-center justify-center">
-                  <span className="text-xs">🌱 🌺 🌿</span>
+            {/* Cột điện bê tông phân cách hẻm */}
+            <div className="w-5 h-64 bg-[#B0BEC5] rounded-t-sm flex flex-col justify-between items-center py-2 shrink-0 border border-[#90A4AE] relative">
+              <span className="text-[8px] font-black text-slate-700 writing-vertical-lr rotate-180 opacity-70">
+                KHOAN CẮT BÊ TÔNG
+              </span>
+              <div className="w-7 h-2 bg-[#78909C] rounded-xs" />
+            </div>
+
+            {/* ZONE 2: TẠP HÓA CÔ BA - ĐẠI LÝ BÁNH KẸO NƯỚC NGỌT (~270px) */}
+            <div className="w-68 h-56 bg-[#FFF9C4] border-2 border-[#FBC02D] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
+              {/* Biển hiệu bạt Hiflex đỏ tươi */}
+              <div className="bg-[#E53935] text-white font-black text-center text-xs py-1 rounded-lg shadow-2xs">
+                🍬 TẠP HÓA CÔ BA
+                <div className="text-[9px] font-medium text-amber-100">
+                  Đại lý bánh kẹo · Nước giải khát sỉ & lẻ
                 </div>
               </div>
 
-              {/* Tầng 1: Quầy Tạp Hóa Rực Rỡ */}
+              {/* Tủ kính bày bim bim Oishi & Nước lon */}
               <div
                 onClick={() => {
                   soundManager.playClick();
                   openModal('market');
                 }}
-                className="flex-1 mt-2 bg-white rounded-lg border-2 border-[#FBC02D] p-1.5 flex flex-col justify-between cursor-pointer hover:border-amber-500 transition-all shadow-xs"
-                title="Bấm để vào Chợ Đầu Mối mua nguyên liệu"
+                className="flex items-center justify-between px-2 py-1 bg-white/80 rounded-xl border border-amber-300 cursor-pointer hover:border-amber-500 transition-all group"
+                title="Chạm để vào Chợ Đầu Mối mua nguyên liệu"
               >
-                <div className="bg-[#E53935] text-white text-center font-black text-[11px] py-0.5 rounded shadow-sm">
-                  🍬 TẠP HÓA CÔ BA
-                </div>
-
-                {/* Kệ hàng bánh kẹo lon nước */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="text-[10px] space-y-0.5 leading-none">
-                    <div>🥫 🧃 🍼</div>
-                    <div>🍪 🍭 🍫</div>
-                    <div>🥚 🥒 🧈</div>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs animate-pulse">🙋‍♀️</span>
-                    <span className="text-[9px] font-black text-amber-900 bg-amber-100 px-1 rounded">
-                      Cô Ba
-                    </span>
+                <div className="space-y-0.5 text-xs">
+                  <div>🥫 🧃 🍼 (Nước ngọt)</div>
+                  <div>🍪 🍭 🍫 (Bánh kẹo)</div>
+                  <div className="text-[8px] font-extrabold text-rose-600 bg-rose-50 px-1 rounded inline-block">
+                    🧊 THÙNG ĐÁ LẠNH
                   </div>
                 </div>
 
-                <div className="text-[9px] text-center font-extrabold text-amber-800 bg-amber-50 rounded py-0.5">
-                  Chạm để mua nguyên liệu sỉ 🛒
+                <div className="flex flex-col items-center">
+                  <span className="text-xl group-hover:scale-110 transition-transform">
+                    🪭
+                  </span>
+                  <ChibiAvatar type="chi_lan" emotion="happy" size={44} />
+                  <span className="text-[9px] font-black text-amber-950 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 mt-0.5">
+                    Cô Ba Tạp Hóa
+                  </span>
                 </div>
+              </div>
+
+              <div className="bg-amber-100/90 rounded-lg py-0.5 text-center text-[9px] font-black text-amber-900 border border-amber-200">
+                🛒 Chạm mua sỉ rau thịt, pate, trứng
               </div>
             </div>
 
-            {/* NHÀ 3: TIỆM BÁNH MÌ CỦA BẠN (TRỌNG TÂM CON PHỐ) */}
+            {/* ZONE 3: TIỆM BÁNH MÌ CỦA BẠN (TRỌNG TÂM CON PHỐ ~480px) */}
             <div
-              className="w-72 h-68 border-4 rounded-t-2xl relative flex flex-col justify-between p-2.5 shadow-md shrink-0 transition-all"
+              className="w-120 h-64 border-4 rounded-t-3xl relative flex flex-col justify-between p-2.5 shadow-md shrink-0 transition-all"
               style={{
                 backgroundColor: activeTheme.bgColor,
                 borderColor: activeTheme.primaryColor,
               }}
             >
-              {/* Tầng 2: Biển hiệu to & Phòng sinh hoạt */}
+              {/* Biển hiệu tiệm bánh mì neon rực rỡ */}
               <div
-                className="h-22 rounded-xl p-2 flex flex-col justify-between border-2 shadow-inner"
+                className="rounded-2xl p-2 flex items-center justify-between border-2 shadow-xs"
                 style={{
                   backgroundColor: activeTheme.accentColor,
                   borderColor: activeTheme.primaryColor,
                 }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-[#7C5C55]">
-                    ⭐ {currentStage.name}
-                  </span>
-                  <span className="text-xs">✨ 🥖 ☕</span>
-                </div>
-                <div className="text-center">
-                  <h3 className="font-black text-xs sm:text-sm text-[#7C5C55] truncate drop-shadow-xs">
-                    {gameState.shopName}
-                  </h3>
-                  <div className="text-[9px] font-bold text-[#F7A8C4]">
-                    Ngon Giòn Nóng Hổi · Bánh Mì Ba Miền
+                <div className="flex items-center gap-1.5">
+                  <span className="text-2xl animate-bounce-short">🥖</span>
+                  <div>
+                    <h3 className="font-black text-sm sm:text-base text-[#7C5C55] leading-tight drop-shadow-2xs">
+                      {gameState.shopName}
+                    </h3>
+                    <div className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                      <span>{currentStage.icon}</span>
+                      <span>{currentStage.name}</span>
+                      <span>·</span>
+                      <span>⭐ Uy tín: {gameState.reputation}</span>
+                    </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    setCurrentView('shop');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-300 rounded-xl text-xs font-black text-rose-700 shadow-2xs active:scale-95 transition-all flex items-center gap-1"
+                >
+                  <Utensils className="w-3 h-3" />
+                  <span>Vào Bếp 🍳</span>
+                </button>
               </div>
 
-              {/* Tầng 1: Quầy Xe Đẩy & Nhân Viên Đang Nấu */}
+              {/* Xe Inox Bánh Mì Đời Thực & Nhân Viên Nấu Nướng */}
               <div
                 onClick={() => {
                   soundManager.playClick();
                   setCurrentView('shop');
                 }}
-                className="flex-1 mt-2 bg-white/90 rounded-xl border-2 p-2 flex flex-col justify-between cursor-pointer hover:brightness-105 transition-all shadow-sm group"
+                className="bg-white/95 rounded-2xl border-2 p-2 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-sm group"
                 style={{ borderColor: activeTheme.primaryColor }}
-                title="Bấm để vào quầy chuẩn bị món ăn"
+                title="Chạm vào xe bánh mì để chuẩn bị món ăn"
               >
-                {/* Mái hiên tiệm theo theme */}
-                <div
-                  className="text-white text-center font-black text-[11px] py-0.5 rounded shadow-sm flex items-center justify-center gap-1"
-                  style={{ backgroundColor: activeTheme.primaryColor }}
-                >
-                  <Utensils className="w-3 h-3" />
-                  <span>QUẦY BẾP VỈA HÈ</span>
+                {/* Tủ kính bánh mì và khay pate bốc khói */}
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-18 bg-amber-50 rounded-xl border border-amber-300 flex flex-col justify-around items-center p-1 shadow-inner">
+                    <span className="text-base animate-bounce-short">♨️🥖</span>
+                    <span className="text-[8px] font-black text-amber-900 bg-amber-200 px-1 rounded">
+                      Pate Bơ Tỏi
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-black text-slate-800 flex items-center gap-1">
+                      <span>Xe Đẩy Bánh Mì Inox</span>
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded-full font-bold">
+                        Đang Nấu
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      Bánh mì giòn · Cà phê phin · Trà đào
+                    </div>
+                    <div className="text-[9px] font-extrabold text-rose-600 mt-1">
+                      👉 Chạm để vào quầy nướng bánh 🍳
+                    </div>
+                  </div>
                 </div>
 
-                {/* Các nhân vật làm bếp */}
-                <div className="flex items-center justify-around py-1">
+                {/* Đội ngũ đầu bếp Player & Nhân viên */}
+                <div className="flex items-center gap-1.5 shrink-0">
                   <div className="relative">
-                    <ChibiAvatar type="player" emotion="happy" size={46} />
-                    <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[8px] font-black px-1 rounded-full">
+                    <ChibiAvatar type="player" emotion="happy" size={48} />
+                    <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[7px] font-black px-1 rounded-full">
                       Bếp
                     </span>
                   </div>
 
                   {gameState.hiredEmployees.includes('emp_mai') && (
                     <div className="relative">
-                      <ChibiAvatar type="emp_mai" emotion="love" size={40} />
+                      <ChibiAvatar type="emp_mai" emotion="love" size={42} />
                       <span className="absolute -bottom-1 -right-1 bg-pink-500 text-white text-[7px] font-black px-1 rounded-full">
                         Mai
                       </span>
                     </div>
                   )}
-
-                  <div className="text-right">
-                    <div className="text-xl animate-bounce-short">♨️🥖</div>
-                    <div className="text-[9px] font-black text-emerald-600">
-                      Đang phục vụ
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#FFF1F6] text-[#7C5C55] text-center text-[9px] font-black py-0.5 rounded group-hover:bg-[#F7A8C4] group-hover:text-white transition-all">
-                  👉 Chạm để vào quầy nấu món 🍳
                 </div>
               </div>
             </div>
 
-            {/* CÂY ME VỈA HÈ & QUẦY VÉ SỐ CÔ BẢY */}
-            <div className="w-44 h-60 relative flex flex-col justify-end items-center shrink-0">
-              {/* Cây me râm mát xòe bóng */}
-              <div className="absolute top-2 left-4 w-32 h-32 rounded-full bg-emerald-500/90 border-2 border-emerald-600 shadow-md flex items-center justify-center text-3xl z-10 opacity-95">
+            {/* ZONE 4: GỐC CÂY ME & QUẦY VÉ SỐ CÔ BẢY (~250px) */}
+            <div className="w-64 h-60 relative flex flex-col justify-end items-center shrink-0">
+              {/* Tán cây me cổ thụ xòe bóng râm */}
+              <div className="absolute top-1 left-2 w-40 h-40 rounded-full bg-emerald-600/90 border-4 border-emerald-700 shadow-md flex items-center justify-center text-4xl z-10">
                 🌳
-                {/* Loa Phường / Chuyện Xóm */}
+                {/* Loa Phường cảnh báo biến phố xá */}
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
                     soundManager.playClick();
                     openModal('streetEvents');
                   }}
-                  className={`absolute -top-1 -right-2 px-2 py-0.5 rounded-full text-[8px] font-black shadow-md cursor-pointer flex items-center gap-0.5 z-30 transition-all active:scale-95 ${
+                  className={`absolute -top-1 -right-2 px-2.5 py-1 rounded-full text-[9px] font-black shadow-md cursor-pointer flex items-center gap-1 z-30 transition-all active:scale-95 ${
                     gameState.currentEvent
                       ? 'bg-rose-600 text-white animate-bounce ring-2 ring-yellow-300'
-                      : 'bg-white/95 text-[#7C5C55] border border-amber-300 hover:bg-amber-100'
+                      : 'bg-white text-slate-800 border border-amber-300 hover:bg-amber-100'
                   }`}
-                  title="Bấm để xem Chuyện Trong Xóm & Sự Kiện Vỉa Hè"
+                  title="Loa phường phố: Xem tin tức & biến cố phố xá"
                 >
                   <span>📢</span>
-                  <span>{gameState.currentEvent ? 'CÓ BIẾN! 🚨' : 'Hóng Chuyện 🎲'}</span>
+                  <span>{gameState.currentEvent ? 'CÓ BIẾN! 🚨' : 'Loa Phường'}</span>
                 </div>
               </div>
-              <div className="w-4 h-28 bg-[#795548] rounded-t-sm z-0 mb-8" />
 
-              {/* Bình Trà Đá Miễn Phí & Quầy Vé Số */}
+              {/* Thân cây me */}
+              <div className="w-6 h-28 bg-[#5D4037] rounded-t-sm z-0 mb-6" />
+
+              {/* Quầy Vé Số & Bình Trà Đá Miễn Phí Dưới Gốc Cây */}
               <div className="absolute bottom-1 flex items-end gap-2 z-20">
-                {/* Bình trà đá inox miễn phí */}
+                {/* Bình Trà Đá Miễn Phí */}
                 <div
-                  className="bg-white border-2 border-sky-400 rounded-lg p-1 text-center shadow-xs cursor-pointer"
-                  title="Trà đá miễn phí ấm lòng bà con"
+                  className="bg-white border-2 border-sky-400 rounded-xl p-1 text-center shadow-xs"
+                  title="Trà đá miễn phí ấm lòng bà con vỉa hè"
                 >
-                  <span className="text-xs">🧊</span>
-                  <div className="text-[7px] font-black text-sky-800 leading-tight">
-                    TRÀ ĐÁ<br />FREE
+                  <span className="text-base">🧊</span>
+                  <div className="text-[7.5px] font-black text-sky-800 leading-tight">
+                    TRÀ ĐÁ<br />MIỄN PHÍ
                   </div>
                 </div>
 
@@ -477,116 +508,91 @@ export const StreetMapView: React.FC = () => {
                 <div
                   onClick={() => {
                     soundManager.playClick();
-                    openModal('neighbors');
+                    openModal('lotteryDraw');
                   }}
-                  className="bg-amber-50 border-2 border-amber-300 rounded-xl p-1 flex flex-col items-center cursor-pointer shadow-sm hover:scale-105 active:scale-95 transition-all"
-                  title="Bấm để ghi số đề, tra sổ mơ may mắn"
+                  className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-1.5 flex flex-col items-center cursor-pointer shadow-sm hover:scale-105 active:scale-95 transition-all"
+                  title="Chạm để tra sổ mơ, mua vé số hoặc ghi đề x70"
                 >
-                  <span className="text-[7.5px] bg-red-600 text-white font-black px-1 rounded-full mb-0.5 animate-pulse">
+                  <span className="text-[8px] bg-red-600 text-white font-black px-1.5 py-0.2 rounded-full mb-0.5 animate-pulse">
                     Đề x70 🎟️
                   </span>
-                  <ChibiAvatar type="co_bay" emotion="happy" size={40} />
-                  <span className="text-[8px] font-extrabold text-amber-900 mt-0.5">
-                    Cô Bảy (Sổ Mơ)
+                  <ChibiAvatar type="co_bay" emotion="happy" size={44} />
+                  <span className="text-[8.5px] font-black text-amber-950 mt-0.5">
+                    Cô Bảy Vé Số
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* NHÀ 4: TIỆM VĂN PHÒNG PHẨM & ĐIỆN THOẠI */}
-            <div className="w-56 h-60 bg-[#C8E6C9] border-2 border-[#81C784] rounded-t-xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
-              {/* Tầng 2 */}
-              <div className="h-20 bg-white/70 rounded-lg border border-[#81C784] p-1.5 flex flex-col justify-between">
-                <div className="flex justify-between text-[9px] font-bold text-[#2E7D32]">
-                  <span>2F · Cư Xá Phố</span>
-                  <span>📻</span>
-                </div>
-                <div className="h-10 bg-emerald-50 rounded border border-[#81C784] flex items-center justify-around px-2">
-                  <div className="w-6 h-8 bg-sky-200/50 rounded border border-white" />
-                  <div className="w-6 h-8 bg-sky-200/50 rounded border border-white" />
+            {/* ZONE 5: CÀ PHÊ CÓC & BÀN CỜ TƯỚNG BÁC BA (~240px) */}
+            <div className="w-62 h-56 bg-[#FFE0B2] border-2 border-[#FFA726] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
+              <div className="bg-[#E65100] text-white font-black text-center text-xs py-1 rounded-lg shadow-2xs">
+                ☕ CÀ PHÊ CÓC VỈA HÈ
+                <div className="text-[9px] font-medium text-amber-100">
+                  Cà phê phin · Bàn cờ tướng Bác Ba
                 </div>
               </div>
 
-              {/* Tầng 1: Văn Phòng Phẩm */}
-              <div className="flex-1 mt-2 bg-white rounded-lg border-2 border-[#81C784] p-1.5 flex flex-col justify-between">
-                <div className="bg-[#2E7D32] text-white text-center font-black text-[11px] py-0.5 rounded shadow-sm">
-                  📚 VĂN PHÒNG PHẨM
+              {/* Bác Ba & Bé Bông */}
+              <div
+                onClick={() => {
+                  soundManager.playClick();
+                  openModal('neighbors');
+                }}
+                className="flex items-center justify-around px-1 py-1 bg-white/80 rounded-xl border border-amber-300 cursor-pointer hover:border-amber-500 transition-all"
+                title="Bác Ba Tổ Trưởng & Bé Bông: Chạm để trò chuyện"
+              >
+                <div className="flex flex-col items-center">
+                  <ChibiAvatar type="bac_ba" emotion="happy" size={42} />
+                  <span className="text-[8px] font-black text-amber-950 bg-amber-100 px-1 rounded mt-0.5">
+                    Bác Ba
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between px-1">
-                  <div className="text-xs">📖 ✏️ 🎒 📐</div>
-                  {/* Bé Bông đứng xem truyện tranh */}
-                  <div
-                    onClick={() => {
-                      soundManager.playClick();
-                      openModal('neighbors');
-                    }}
-                    className="flex flex-col items-center cursor-pointer"
-                    title="Bé Bông học sinh trong xóm"
-                  >
-                    <ChibiAvatar type="be_bong" emotion="love" size={38} />
-                    <span className="text-[8px] font-black text-rose-700 bg-rose-50 px-1 rounded">
-                      Bé Bông
-                    </span>
+                <div className="text-center">
+                  <span className="text-lg">♟️☕</span>
+                  <div className="text-[7.5px] font-bold text-slate-600">
+                    Chiếu Tướng!
                   </div>
                 </div>
 
-                <div className="text-[9px] text-center font-bold text-emerald-800 bg-emerald-50 rounded py-0.5">
-                  Sách vở · Bút mực · Truyện tranh
-                </div>
-              </div>
-            </div>
-
-            {/* NHÀ 5: CỬA HÀNG GẠO & NÔNG SẢN (Bên phải cùng) */}
-            <div className="w-52 h-60 bg-[#FFE0B2] border-2 border-[#FFB74D] rounded-t-xl relative flex flex-col justify-between p-2 shadow-sm shrink-0">
-              <div className="h-20 bg-white/70 rounded-lg border border-[#FFB74D] p-1.5 flex flex-col justify-between">
-                <div className="text-[9px] font-bold text-[#E65100]">2F · Kho Gạo Sạch</div>
-                <div className="h-10 bg-amber-50 rounded border border-[#FFB74D] flex items-center justify-center">
-                  <span>🍚 🌾 🌾</span>
+                <div className="flex flex-col items-center">
+                  <ChibiAvatar type="be_bong" emotion="love" size={38} />
+                  <span className="text-[8px] font-black text-rose-800 bg-rose-100 px-1 rounded mt-0.5">
+                    Bé Bông
+                  </span>
                 </div>
               </div>
 
-              <div className="flex-1 mt-2 bg-white rounded-lg border-2 border-[#FFB74D] p-1.5 flex flex-col justify-between">
-                <div className="bg-[#EF6C00] text-white text-center font-black text-[11px] py-0.5 rounded shadow-sm">
-                  🌾 ĐẠI LÝ GẠO SẠCH
-                </div>
-                <div className="flex items-center justify-around py-1">
-                  <span className="text-sm">🌾</span>
-                  <div className="text-[9px] font-extrabold text-amber-900">
-                    Bao Gạo ST25<br />Nếp Cái Hoa Vàng
-                  </div>
-                </div>
-                <div className="text-[9px] text-center font-bold text-amber-800 bg-amber-50 rounded py-0.5">
-                  Gạo ngon mỗi ngày
-                </div>
+              <div className="bg-amber-100 rounded-lg py-0.5 text-center text-[9px] font-bold text-amber-900 border border-amber-200">
+                💬 Giao lưu tình làng nghĩa xóm
               </div>
             </div>
           </div>
 
-          {/* LỚP 3: VỈA HÈ LÁT GẠCH & DÃY BÀN GHẾ NHỰA ĐÓN KHÁCH (TRỌNG TÂM USER YÊU CẦU) */}
-          <div className="relative z-20 bg-[#F5E6D3] border-t-4 border-[#D7CCC8] shadow-inner pt-2 pb-3 px-4">
-            {/* Hàng gạch lát vỉa hè hoa văn caro nhẹ */}
+          {/* LỚP 3: VỈA HÈ LÁT GẠCH CHỮ NHẬT & DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG (LIỀN MẠCH, KHÔNG CUỘN LỒNG) */}
+          <div className="relative z-20 bg-[#F4E4D0] border-t-4 border-[#D7CCC8] shadow-inner pt-2 pb-2 px-4">
+            {/* Header vỉa hè: Biển hiệu vỉa hè & Hướng dẫn phục vụ */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm animate-pulse">
-                  <span>🪑</span> BÀN GHẾ NHỰA VỈA HÈ ĐÓN KHÁCH
+                <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                  <span>🪑</span> BÀN GHẾ NHỰA VỈA HÈ ĐÓN KHÁCH ({activeOrders.length}/{maxTables})
                 </span>
-                <span className="text-[10px] text-[#7C5C55] font-bold">
-                  (Chạm vào bàn để bưng món hoặc vào bếp)
+                <span className="text-[10px] text-[#7C5C55] font-extrabold hidden sm:inline">
+                  👉 Chạm vào bàn để bưng món hoặc xem khách đợi
                 </span>
               </div>
 
-              {/* Vật phẩm trang trí vỉa hè: Trụ cứu hỏa & Biển tên đường */}
-              <div className="flex items-center gap-3 text-xs opacity-80">
-                <span title="Cột đèn giao thông">🚦</span>
-                <span title="Biển tên đường phố">🚏 Đường Hoa Đào</span>
+              {/* Phụ kiện vỉa hè: Nắp cống & Cột đèn */}
+              <div className="flex items-center gap-3 text-xs opacity-75">
+                <span title="Cột đèn">🚦</span>
+                <span title="Đường Hoa Đào">🚏 Phố Hoa Đào</span>
                 <span title="Trụ nước cứu hỏa">🚒</span>
-                <span title="Thùng rác công cộng">🗑️</span>
               </div>
             </div>
 
-            {/* DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG & Ô THÊM BÀN */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {/* DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG & Ô THÊM BÀN (DÀN TRẢI TRỰC TIẾP TRÊN TOÀN VỈA HÈ) */}
+            <div className="flex items-stretch gap-2.5">
               {Array.from({ length: maxTables }).map((_, idx) => {
                 const tableNum = idx + 1;
                 const order = activeOrders.find((o) => o.tableIndex === tableNum);
@@ -604,7 +610,7 @@ export const StreetMapView: React.FC = () => {
                       soundManager.playClick();
                       setSelectedTable(tableNum);
                     }}
-                    className={`relative shrink-0 w-32 sm:w-34 rounded-2xl p-1.5 transition-all cursor-pointer border-2 shadow-xs ${
+                    className={`relative shrink-0 w-32 sm:w-36 rounded-2xl p-1.5 transition-all cursor-pointer border-2 shadow-2xs flex flex-col justify-between ${
                       isSelected
                         ? 'bg-amber-100/90 border-amber-500 ring-2 ring-amber-300'
                         : order
@@ -619,7 +625,7 @@ export const StreetMapView: React.FC = () => {
                       </span>
                       {order && (
                         <span
-                          className={`text-[8px] font-bold px-1 py-0.2 rounded-full ${
+                          className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full ${
                             order.state === 'ready'
                               ? 'bg-emerald-100 text-emerald-700 animate-pulse font-extrabold'
                               : order.state === 'eating'
@@ -636,11 +642,11 @@ export const StreetMapView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Khung cảnh bàn ăn nhỏ gọn: Ghế nhựa + Khách + Món ăn */}
+                    {/* Khung cảnh bàn ăn: Ghế nhựa Song Long + Khách chibi + Món ăn */}
                     <div className="h-16 bg-[#FFF9F2] rounded-xl border border-[#F7D7BA] flex items-center justify-around px-1 relative overflow-hidden">
                       {order ? (
                         <>
-                          {/* Khách Chibi ngồi trên ghế đẩu */}
+                          {/* Khách Chibi ngồi trên ghế đẩu nhựa */}
                           <div className="flex flex-col items-center">
                             <ChibiAvatar
                               type={order.neighborId || order.typeId}
@@ -655,22 +661,24 @@ export const StreetMapView: React.FC = () => {
                               }
                               size={34}
                             />
-                            <span className="text-[7px] font-black text-[#7C5C55] truncate max-w-[48px] leading-tight">
+                            <span className="text-[7.5px] font-black text-[#7C5C55] truncate max-w-[48px] leading-tight mt-0.5">
                               {order.neighborId
                                 ? NEIGHBORS_DATA[order.neighborId].name
                                 : cType?.name.split(' ')[0]}
                             </span>
                           </div>
 
-                          {/* Chiếc Bàn Nhựa Đỏ ở giữa */}
+                          {/* Chiếc Bàn Nhựa Đỏ Song Long ở giữa */}
                           <div className="flex flex-col items-center">
                             <div className="text-base animate-bounce-short leading-none" title={recipe?.name}>
                               {recipe?.icon || '🥖'}
                             </div>
-                            <div className="w-7 h-2 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs flex items-center justify-center my-0.5">
-                              <span className="text-[4.5px] text-white font-black leading-none">SLONG</span>
+                            <div className="w-8 h-2 bg-[#E53935] rounded-2xs border border-[#B71C1C] shadow-2xs flex items-center justify-center my-0.5">
+                              <span className="text-[5px] text-white font-black leading-none tracking-tighter">
+                                SLONG
+                              </span>
                             </div>
-                            <div className="w-6 flex justify-between">
+                            <div className="w-7 flex justify-between">
                               <div className="w-0.5 h-2 bg-[#C62828]" />
                               <div className="w-0.5 h-2 bg-[#C62828]" />
                             </div>
@@ -679,13 +687,15 @@ export const StreetMapView: React.FC = () => {
                       ) : (
                         /* Bàn trống */
                         <div className="flex flex-col items-center justify-center text-center py-1 opacity-75">
-                          <div className="w-7 h-2 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs mb-0.5" />
-                          <span className="text-[8px] font-bold text-slate-500">Bàn Trống ☕</span>
+                          <div className="w-8 h-2 bg-[#E53935] rounded-2xs border border-[#B71C1C] shadow-2xs mb-1" />
+                          <span className="text-[8.5px] font-bold text-slate-500">
+                            Bàn Trống 🪑
+                          </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Nút hành động trực tiếp nhỏ gọn */}
+                    {/* Nút hành động trực tiếp */}
                     <div className="mt-1">
                       {order ? (
                         order.state === 'ready' ? (
@@ -694,14 +704,14 @@ export const StreetMapView: React.FC = () => {
                               e.stopPropagation();
                               handleServeOnStreet(order.id);
                             }}
-                            className="w-full py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 animate-bounce-short active:scale-95"
+                            className="w-full py-1 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white rounded-lg text-[9px] font-black shadow-xs flex items-center justify-center gap-1 animate-bounce"
                           >
-                            <Sparkles className="w-2.5 h-2.5" />
-                            <span>Bưng Món 💰</span>
+                            <Sparkles className="w-3 h-3" />
+                            <span>BƯNG MÓN 💰</span>
                           </button>
                         ) : order.state === 'eating' ? (
-                          <div className="w-full py-0.5 text-center text-[8px] font-bold text-amber-700 bg-amber-50 rounded-lg">
-                            Đang ăn...
+                          <div className="w-full py-0.5 text-center text-[8.5px] font-bold text-amber-700 bg-amber-50 rounded-lg">
+                            Đang thưởng thức
                           </div>
                         ) : (
                           <button
@@ -709,7 +719,7 @@ export const StreetMapView: React.FC = () => {
                               e.stopPropagation();
                               setCurrentView('shop');
                             }}
-                            className="w-full py-0.5 bg-amber-400 hover:bg-amber-500 text-amber-950 rounded-lg text-[8.5px] font-black flex items-center justify-center gap-0.5 active:scale-95"
+                            className="w-full py-0.5 bg-amber-400 hover:bg-amber-500 active:scale-95 text-amber-950 rounded-lg text-[8.5px] font-black flex items-center justify-center gap-0.5"
                           >
                             <Utensils className="w-2.5 h-2.5" />
                             <span>Vào Nấu 🍳</span>
@@ -725,10 +735,10 @@ export const StreetMapView: React.FC = () => {
                 );
               })}
 
-              {/* Ô 'THÊM BÀN' ĐỂ USER CÓ THỂ THÊM BÀN TRỰC TIẾP TẠI ĐÂY */}
+              {/* Ô 'THÊM BÀN' TRỰC TIẾP TRÊN VỈA HÈ */}
               <div
                 onClick={handleBuyNextTable}
-                className={`relative shrink-0 w-32 sm:w-34 rounded-2xl p-1.5 transition-all cursor-pointer border-2 border-dashed flex flex-col justify-between shadow-xs active:scale-95 ${
+                className={`relative shrink-0 w-32 sm:w-36 rounded-2xl p-1.5 transition-all cursor-pointer border-2 border-dashed flex flex-col justify-between shadow-2xs active:scale-95 ${
                   canAffordNextTable
                     ? 'bg-amber-50/90 border-amber-400 hover:bg-amber-100 ring-2 ring-amber-300 animate-pulse'
                     : 'bg-slate-50 border-slate-300 hover:border-slate-400'
@@ -739,18 +749,18 @@ export const StreetMapView: React.FC = () => {
                   <span className="flex items-center gap-0.5 text-amber-700">
                     <Plus className="w-2.5 h-2.5 stroke-[3]" /> Thêm Bàn
                   </span>
-                  <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded text-[7.5px] font-black">
+                  <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded text-[8px] font-black">
                     {nextTableCost > 0 ? `${(nextTableCost / 1000).toFixed(0)}k` : 'MAX'}
                   </span>
                 </div>
 
                 {/* Khung cảnh thêm bàn */}
                 <div className="h-16 rounded-xl border border-dashed border-amber-300 bg-white/70 flex flex-col items-center justify-center p-1 text-center">
-                  <span className="text-lg">🪑➕</span>
-                  <div className="text-[8px] font-black text-amber-900 truncate max-w-full">
+                  <span className="text-xl">🪑➕</span>
+                  <div className="text-[8.5px] font-black text-amber-900 truncate max-w-full">
                     {nextTableTitle}
                   </div>
-                  <div className="text-[7px] text-slate-500 font-medium">
+                  <div className="text-[7.5px] text-slate-500 font-medium">
                     {nextTableType === 'max'
                       ? 'Đạt số bàn tối đa'
                       : '+1 Bàn Nhựa Đón Khách'}
@@ -766,9 +776,9 @@ export const StreetMapView: React.FC = () => {
                   ) : canAffordNextTable ? (
                     <button
                       onClick={handleBuyNextTable}
-                      className="w-full py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 active:scale-95"
+                      className="w-full py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 active:scale-95"
                     >
-                      <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                      <Plus className="w-3 h-3 stroke-[3]" />
                       <span>Kê Thêm Bàn</span>
                     </button>
                   ) : (
@@ -787,35 +797,24 @@ export const StreetMapView: React.FC = () => {
             </div>
           </div>
 
-          {/* LỚP 4: LÒNG ĐƯỜNG XE CHẠY (ASPHALT ROADWAY) */}
-          <div className="h-6 bg-[#37474F] border-t-2 border-[#263238] flex items-center justify-around px-8 relative overflow-hidden">
-            {/* Vạch sơn vàng tim đường nét đứt */}
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
-            <div className="w-16 h-1 bg-[#FFD54F] rounded-full" />
+          {/* LỚP 4: LÒNG ĐƯỜNG XE CHẠY (ASPHALT ROADWAY CHÂN THỰC) */}
+          <div className="h-7 bg-[#2E373B] border-t-2 border-[#1E2528] flex items-center justify-around px-8 relative overflow-hidden">
+            {/* Vạch sơn vàng nét đứt tim đường */}
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+            <div className="w-16 h-1 bg-[#FFD54F] rounded-full opacity-80" />
+
+            {/* Nắp cống tròn trên đường */}
+            <div className="absolute right-40 top-1.5 w-4 h-4 rounded-full border border-stone-500 bg-[#37474F] opacity-70" />
+            <div className="absolute left-60 top-1.5 w-4 h-4 rounded-full border border-stone-500 bg-[#37474F] opacity-70" />
           </div>
         </div>
       </div>
-
-      {/* 3. MŨI TÊN ĐIỀU HƯỚNG CUỘN NGANG TRÊN MÀN HÌNH */}
-      <button
-        onClick={() => handleScroll('left')}
-        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center z-30 active:scale-90 transition-all opacity-80 hover:opacity-100"
-        title="Cuộn sang trái"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-
-      <button
-        onClick={() => handleScroll('right')}
-        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center z-30 active:scale-90 transition-all opacity-80 hover:opacity-100"
-        title="Cuộn sang phải"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
     </div>
   );
 };
