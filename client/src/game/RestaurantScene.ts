@@ -3,7 +3,7 @@ import { generateProceduralAssets } from './assetGenerator';
 import { useGameStore } from '../store/gameStore';
 import { CUSTOMER_TYPES, RECIPES, INGREDIENTS } from '../../../shared/gameData';
 import { CustomerTypeId, RecipeId } from '../../../shared/types';
-import { gameBridge } from './gameBridge';
+import { gameBridge, TableStatusInfo } from './gameBridge';
 import { soundManager } from '../utils/soundManager';
 
 interface SceneTable {
@@ -46,33 +46,32 @@ export class RestaurantScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
   private targetPosition: { x: number; y: number } | null = null;
+  private virtualMoveInput: { vx: number; vy: number } = { vx: 0, vy: 0 };
   
   private tables: SceneTable[] = [];
   private customers: SceneCustomer[] = [];
   private spawnTimer = 0;
+  private statusEmitTimer = 0;
   private kitchenCounter!: Phaser.GameObjects.Sprite;
   private cashierCounter!: Phaser.GameObjects.Sprite;
   
   // Trợ lý tự động
   private staffMaiSprite?: Phaser.GameObjects.Sprite;
   private staffLinhSprite?: Phaser.GameObjects.Sprite;
-  private staffMaiTarget: { x: number; y: number } | null = null;
 
   constructor() {
     super('RestaurantScene');
   }
 
   preload() {
-    // Tạo texture bằng procedural canvas
     generateProceduralAssets(this);
   }
 
   create() {
-    // 1. Tạo bản đồ nền (Floor & Walls)
     const mapWidth = 800;
     const mapHeight = 600;
 
-    // Sàn gỗ trải đều
+    // Sàn gỗ
     for (let x = 0; x < mapWidth; x += 64) {
       for (let y = 64; y < mapHeight; y += 64) {
         this.add.image(x + 32, y + 32, 'tile_floor');
@@ -84,36 +83,49 @@ export class RestaurantScene extends Phaser.Scene {
       this.add.image(x + 32, 32, 'tile_wall');
     }
 
-    // Thảm cửa đón khách ở cửa chính dưới cùng (x: 400, y: 570)
+    // Thảm cửa đón khách
     this.add.image(400, 570, 'prop_door_mat');
 
-    // 2. Nội thất cố định: Quầy bếp và Quầy thu ngân
-    // Quầy bếp góc trên bên trái
-    this.kitchenCounter = this.add.sprite(150, 95, 'prop_kitchen').setInteractive({ useHandCursor: true });
-    this.add.text(150, 130, '🍳 Bếp Nấu Ăn', {
-      fontSize: '13px',
+    // Quầy bếp - Vùng chạm lớn cho mobile (120x90)
+    this.kitchenCounter = this.add.sprite(150, 95, 'prop_kitchen')
+      .setInteractive(new Phaser.Geom.Rectangle(-10, -10, 100, 70), Phaser.Geom.Rectangle.Contains);
+    
+    this.add.text(150, 132, '🍳 Bếp Nấu Ăn (Chạm để mở)', {
+      fontSize: '12px',
       color: '#7C5C55',
       fontStyle: 'bold',
+      backgroundColor: '#FFF7ED',
+      padding: { x: 5, y: 2 },
     }).setOrigin(0.5);
 
     this.kitchenCounter.on('pointerdown', () => {
+      soundManager.playClick();
       useGameStore.getState().openModal('cooking');
     });
 
-    // Quầy thu ngân góc trên bên phải
-    this.cashierCounter = this.add.sprite(650, 95, 'prop_cashier').setInteractive({ useHandCursor: true });
-    this.add.text(650, 130, '🌸 Thu Ngân', {
-      fontSize: '13px',
+    // Quầy thu ngân
+    this.cashierCounter = this.add.sprite(650, 95, 'prop_cashier')
+      .setInteractive(new Phaser.Geom.Rectangle(-10, -10, 90, 64), Phaser.Geom.Rectangle.Contains);
+    
+    this.add.text(650, 132, '🌸 Quầy Thu Ngân', {
+      fontSize: '12px',
       color: '#7C5C55',
       fontStyle: 'bold',
+      backgroundColor: '#FFF7ED',
+      padding: { x: 5, y: 2 },
     }).setOrigin(0.5);
 
-    // 3. Khởi tạo Bàn ăn (Tối đa 4 bàn, mở rộng qua Shop Upgrade)
+    this.cashierCounter.on('pointerdown', () => {
+      soundManager.playClick();
+      useGameStore.getState().openModal('dailySummary');
+    });
+
+    // Khởi tạo Bàn ăn
     const tableConfigs = [
-      { index: 1, x: 230, y: 280, chairX: 185, chairY: 280, defaultUnlocked: true },
-      { index: 2, x: 570, y: 280, chairX: 615, chairY: 280, defaultUnlocked: true },
-      { index: 3, x: 230, y: 440, chairX: 185, chairY: 440, defaultUnlocked: false, upgradeKey: 'extra_table_1' },
-      { index: 4, x: 570, y: 440, chairX: 615, chairY: 440, defaultUnlocked: false, upgradeKey: 'extra_table_2' },
+      { index: 1, x: 230, y: 280, chairX: 180, chairY: 280, defaultUnlocked: true },
+      { index: 2, x: 570, y: 280, chairX: 620, chairY: 280, defaultUnlocked: true },
+      { index: 3, x: 230, y: 440, chairX: 180, chairY: 440, defaultUnlocked: false, upgradeKey: 'extra_table_1' },
+      { index: 4, x: 570, y: 440, chairX: 620, chairY: 440, defaultUnlocked: false, upgradeKey: 'extra_table_2' },
     ];
 
     const storeState = useGameStore.getState();
@@ -123,14 +135,18 @@ export class RestaurantScene extends Phaser.Scene {
         cfg.defaultUnlocked || (storeState.gameState.purchasedUpgrades[cfg.upgradeKey || ''] || 0) > 0;
 
       const chair = this.add.sprite(cfg.chairX, cfg.chairY, 'prop_chair').setVisible(isUnlocked);
-      const table = this.add.sprite(cfg.x, cfg.y, 'prop_table').setInteractive({ useHandCursor: true }).setVisible(isUnlocked);
+      
+      // Vùng chạm to rộng (bán kính 45px) để ngón tay chạm trúng dễ dàng trên mobile
+      const table = this.add.sprite(cfg.x, cfg.y, 'prop_table')
+        .setInteractive(new Phaser.Geom.Circle(30, 30, 48), Phaser.Geom.Circle.Contains)
+        .setVisible(isUnlocked);
 
-      // Nhãn số bàn
-      this.add.text(cfg.x, cfg.y + 35, `Bàn ${cfg.index}`, {
-        fontSize: '12px',
+      this.add.text(cfg.x, cfg.y + 36, `Bàn ${cfg.index}`, {
+        fontSize: '13px',
         color: '#7C5C55',
+        fontStyle: 'bold',
         backgroundColor: '#FFF7ED',
-        padding: { x: 4, y: 2 },
+        padding: { x: 6, y: 2 },
       }).setOrigin(0.5).setVisible(isUnlocked);
 
       const sceneTable: SceneTable = {
@@ -147,7 +163,6 @@ export class RestaurantScene extends Phaser.Scene {
         foodReady: false,
       };
 
-      // Tương tác bấm vào bàn ăn
       table.on('pointerdown', () => {
         this.handleTableClick(sceneTable);
       });
@@ -155,16 +170,17 @@ export class RestaurantScene extends Phaser.Scene {
       this.tables.push(sceneTable);
     });
 
-    // 4. Nhân vật chính (Chủ tiệm)
+    // Nhân vật chính
     this.player = this.add.sprite(400, 320, 'char_player').setDepth(10);
-    this.add.text(400, 350, 'Bạn (Chủ Quán)', {
+    this.add.text(400, 355, 'Bạn (Chủ Quán)', {
       fontSize: '11px',
       color: '#FFF',
+      fontStyle: 'bold',
       backgroundColor: '#F7A8C4',
-      padding: { x: 4, y: 2 },
+      padding: { x: 5, y: 2 },
     }).setOrigin(0.5).setDepth(11);
 
-    // 5. Cài đặt phím bấm
+    // Cài đặt phím bấm
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.wasdKeys = {
@@ -175,47 +191,81 @@ export class RestaurantScene extends Phaser.Scene {
       };
     }
 
-    // 6. Chạm/Click chuột để di chuyển nhân vật
+    // Chạm/Click chuột di chuyển
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Chỉ nhận di chuyển nếu không bấm trúng vật thể tương tác
+      // Chỉ nhận click di chuyển nếu bấm trên nền sàn trống
       if (pointer.y > 64 && pointer.y < 580) {
-        this.targetPosition = { x: pointer.x, y: pointer.y };
+        // Kiểm tra xem có bấm trúng bàn hoặc quầy bếp không
+        const clickedTable = this.tables.find(
+          (t) => t.isUnlocked && Phaser.Math.Distance.Between(pointer.x, pointer.y, t.x, t.y) < 55
+        );
+        const clickedKitchen = Phaser.Math.Distance.Between(pointer.x, pointer.y, 150, 95) < 65;
+        
+        if (!clickedTable && !clickedKitchen) {
+          this.targetPosition = { x: pointer.x, y: pointer.y };
+        }
       }
     });
 
-    // 7. Đồng bộ nhân viên nếu đã thuê
     this.syncStaffSprites();
-
-    // Đăng ký với Game Bridge
     gameBridge.setScene(this);
+    this.broadcastTableStatuses();
+  }
+
+  public setVirtualMoveInput(vx: number, vy: number) {
+    this.virtualMoveInput = { vx, vy };
+    if (vx !== 0 || vy !== 0) {
+      this.targetPosition = null;
+    }
+  }
+
+  public triggerTableActionFromUI(tableIndex: number) {
+    const table = this.tables.find((t) => t.index === tableIndex);
+    if (!table) return;
+    this.handleTableClick(table);
+  }
+
+  private broadcastTableStatuses() {
+    const statuses: TableStatusInfo[] = this.tables.map((t) => {
+      const cust = this.customers.find((c) => c.tableIndex === t.index);
+      const patiencePercent = cust ? cust.patienceRemaining / cust.maxPatience : 1;
+      return {
+        index: t.index,
+        isUnlocked: t.isUnlocked,
+        isOccupied: t.isOccupied,
+        currentRecipeId: t.currentRecipeId,
+        foodReady: t.foodReady,
+        patiencePercent: Math.max(0, patiencePercent),
+      };
+    });
+    gameBridge.emitTableStatuses(statuses);
   }
 
   public syncStaffSprites() {
     const hired = useGameStore.getState().gameState.hiredEmployees;
 
-    // Nhân viên Mai (Phục vụ)
     if (hired.includes('emp_mai') && !this.staffMaiSprite) {
       this.staffMaiSprite = this.add.sprite(400, 150, 'char_emp_mai').setDepth(9);
-      this.add.text(400, 180, 'Bé Mai (Phục Vụ)', {
-        fontSize: '10px',
+      this.add.text(400, 182, 'Bé Mai (Phục Vụ)', {
+        fontSize: '11px',
         color: '#FFF',
+        fontStyle: 'bold',
         backgroundColor: '#FF80AB',
-        padding: { x: 3, y: 1 },
+        padding: { x: 4, y: 2 },
       }).setOrigin(0.5).setDepth(9);
     }
 
-    // Bác Linh (Đầu bếp)
     if (hired.includes('emp_linh') && !this.staffLinhSprite) {
       this.staffLinhSprite = this.add.sprite(150, 60, 'char_emp_linh').setDepth(9);
       this.add.text(150, 30, 'Bác Linh (Bếp Trưởng)', {
-        fontSize: '10px',
+        fontSize: '11px',
         color: '#FFF',
+        fontStyle: 'bold',
         backgroundColor: '#455A64',
-        padding: { x: 3, y: 1 },
+        padding: { x: 4, y: 2 },
       }).setOrigin(0.5).setDepth(9);
     }
 
-    // Cập nhật trạng thái mở bàn từ upgrades
     const upgrades = useGameStore.getState().gameState.purchasedUpgrades;
     this.tables.forEach((t) => {
       if (t.index === 3 && (upgrades['extra_table_1'] || 0) > 0) {
@@ -229,16 +279,16 @@ export class RestaurantScene extends Phaser.Scene {
         t.chairSprite.setVisible(true);
       }
     });
+
+    this.broadcastTableStatuses();
   }
 
   private handleTableClick(table: SceneTable) {
     if (!table.isOccupied || !table.currentRecipeId) return;
 
     if (table.foodReady) {
-      // Món ăn đã sẵn sàng trên bàn -> Khách ăn xong và thanh toán
       this.serveCustomer(table);
     } else {
-      // Mở modal nấu ăn cho món của bàn này
       useGameStore.setState({
         selectedTableForCooking: table.index,
         activeModal: 'cooking',
@@ -252,16 +302,14 @@ export class RestaurantScene extends Phaser.Scene {
 
     table.foodReady = true;
 
-    // Cập nhật icon trên đầu bàn: hiện món lấp lánh
     if (table.dishText) {
       const recipe = RECIPES[table.currentRecipeId!];
       table.dishText.setText(`✨ ${recipe?.icon || '🍲'} (Bấm để bưng)`);
     }
 
     soundManager.playDishComplete();
-
-    // Tạo hiệu ứng sao lấp lánh
-    this.createFloatingFeedback('✨ Món đã xong!', '#FFE6A7', table.x, table.y - 40);
+    this.createFloatingFeedback('✨ Món đã nấu xong!', '#FFE6A7', table.x, table.y - 45);
+    this.broadcastTableStatuses();
   }
 
   private serveCustomer(table: SceneTable) {
@@ -273,23 +321,20 @@ export class RestaurantScene extends Phaser.Scene {
     const patiencePercent = customer.patienceRemaining / customer.maxPatience;
     const tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
 
-    // Chuyển sang trạng thái ăn ngon miệng
     customer.state = 'eating';
     if (table.dishText) {
       table.dishText.setText('😋 Măm măm...');
     }
+    this.broadcastTableStatuses();
 
     this.time.delayedCall(2200, () => {
-      // Khách ăn xong -> trả tiền
       soundManager.playCoin();
       useGameStore.getState().finishServing(table.index, recipe.basePrice, tip);
       this.createFloatingFeedback(`+${(recipe.basePrice + tip).toLocaleString('vi-VN')} đ 💰`, '#4CAF50', table.x, table.y - 50);
 
-      // Xóa bubble order
       this.clearTableBubble(table);
-
-      // Khách đứng dậy ra về
       customer.state = 'walking_out';
+
       this.tweens.add({
         targets: customer.sprite,
         x: 400,
@@ -302,6 +347,7 @@ export class RestaurantScene extends Phaser.Scene {
           table.customerId = null;
           table.currentRecipeId = undefined;
           table.foodReady = false;
+          this.broadcastTableStatuses();
         },
       });
     });
@@ -309,16 +355,16 @@ export class RestaurantScene extends Phaser.Scene {
 
   private createFloatingFeedback(text: string, color: string, x: number, y: number) {
     const floating = this.add.text(x, y, text, {
-      fontSize: '14px',
+      fontSize: '15px',
       color: color,
       fontStyle: 'bold',
       stroke: '#FFFFFF',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(20);
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(25);
 
     this.tweens.add({
       targets: floating,
-      y: y - 45,
+      y: y - 50,
       alpha: 0,
       duration: 1200,
       ease: 'Power1',
@@ -330,7 +376,6 @@ export class RestaurantScene extends Phaser.Scene {
     const availableTable = this.tables.find((t) => t.isUnlocked && !t.isOccupied);
     if (!availableTable) return;
 
-    // Chọn ngẫu nhiên loại khách
     const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
     const selectedType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
     const cType = CUSTOMER_TYPES[selectedType];
@@ -361,8 +406,8 @@ export class RestaurantScene extends Phaser.Scene {
     this.customers.push(newCustomer);
 
     soundManager.playDoorBell();
+    this.broadcastTableStatuses();
 
-    // Di chuyển khách vào bàn
     this.tweens.add({
       targets: customerSprite,
       x: availableTable.chairX,
@@ -377,7 +422,6 @@ export class RestaurantScene extends Phaser.Scene {
 
   private setupOrderForTable(table: SceneTable, customer: SceneCustomer) {
     const cType = CUSTOMER_TYPES[customer.typeId];
-    // Chọn món ưa thích
     const favorites = cType.favoriteRecipeIds;
     const chosenRecipeId = favorites[Math.floor(Math.random() * favorites.length)];
     const recipe = RECIPES[chosenRecipeId];
@@ -386,16 +430,16 @@ export class RestaurantScene extends Phaser.Scene {
     table.foodReady = false;
     customer.recipeId = chosenRecipeId;
 
-    // Tạo khung bong bóng order trên bàn
-    const container = this.add.container(table.x, table.y - 48).setDepth(15);
+    // Kích thước bong bóng to rõ cho màn hình điện thoại (130x42)
+    const container = this.add.container(table.x, table.y - 54).setDepth(15);
     const bubbleBg = this.add.graphics();
-    bubbleBg.fillStyle(0xffffff, 0.95);
-    bubbleBg.lineStyle(2, 0xf7a8c4);
-    bubbleBg.fillRoundedRect(-55, -20, 110, 36, 12);
-    bubbleBg.strokeRoundedRect(-55, -20, 110, 36, 12);
+    bubbleBg.fillStyle(0xffffff, 0.96);
+    bubbleBg.lineStyle(2.5, 0xf7a8c4);
+    bubbleBg.fillRoundedRect(-65, -22, 130, 44, 14);
+    bubbleBg.strokeRoundedRect(-65, -22, 130, 44, 14);
 
     const dishText = this.add.text(0, -6, `${recipe.icon} ${recipe.name}`, {
-      fontSize: '11px',
+      fontSize: '12px',
       color: '#7C5C55',
       fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -408,15 +452,16 @@ export class RestaurantScene extends Phaser.Scene {
     table.dishText = dishText;
     table.patienceBar = patienceBar;
 
-    // Bong bóng nhấp nháy nhẹ
     this.tweens.add({
       targets: container,
-      y: table.y - 52,
+      y: table.y - 58,
       duration: 1000,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    this.broadcastTableStatuses();
   }
 
   private clearTableBubble(table: SceneTable) {
@@ -447,6 +492,7 @@ export class RestaurantScene extends Phaser.Scene {
         table.customerId = null;
         table.currentRecipeId = undefined;
         table.foodReady = false;
+        this.broadcastTableStatuses();
       },
     });
   }
@@ -454,17 +500,22 @@ export class RestaurantScene extends Phaser.Scene {
   update(time: number, delta: number) {
     const store = useGameStore.getState();
     const speed = store.timeSpeed;
-    if (speed === 0) return; // Đang Pause
+    if (speed === 0) return;
 
-    // 1. Tiến trình thời gian trong game
-    // 1 ngày = ~6 phút thực tế -> 1 giây thực tế = 2.5 phút game
+    // 1. Tiến trình thời gian
     const minutesPassed = (delta / 1000) * 2.5 * speed;
     store.tickTime(minutesPassed);
 
-    // 2. Sinh khách định kỳ khi mở cửa
+    // 2. Định kỳ phát sóng table status lên React mỗi 400ms
+    this.statusEmitTimer += delta;
+    if (this.statusEmitTimer >= 400) {
+      this.statusEmitTimer = 0;
+      this.broadcastTableStatuses();
+    }
+
+    // 3. Sinh khách
     if (store.isShopOpen) {
       this.spawnTimer += delta * speed;
-      // Bonus tốc độ gọi khách từ nâng cấp Biển hiệu hoa hồng
       const hasSignboard = (store.gameState.purchasedUpgrades['flower_signboard'] || 0) > 0;
       const spawnInterval = hasSignboard ? 4500 : 6500;
 
@@ -474,7 +525,7 @@ export class RestaurantScene extends Phaser.Scene {
       }
     }
 
-    // 3. Cập nhật thanh kiên nhẫn của khách
+    // 4. Thanh kiên nhẫn
     this.customers.forEach((c) => {
       if (c.state === 'sitting' && !this.tables.find((t) => t.index === c.tableIndex)?.foodReady) {
         c.patienceRemaining -= (delta / 1000) * speed;
@@ -484,10 +535,9 @@ export class RestaurantScene extends Phaser.Scene {
           const percent = Math.max(0, c.patienceRemaining / c.maxPatience);
           const barColor = percent > 0.5 ? 0x81c784 : percent > 0.25 ? 0xffb74d : 0xe57373;
           table.patienceBar.fillStyle(barColor, 1);
-          table.patienceBar.fillRoundedRect(-45, 8, 90 * percent, 4, 2);
+          table.patienceBar.fillRoundedRect(-55, 9, 110 * percent, 5, 2.5);
         }
 
-        // Hết kiên nhẫn
         if (c.patienceRemaining <= 0) {
           const t = this.tables.find((tb) => tb.index === c.tableIndex);
           if (t) this.handleCustomerLeaveAngry(t, c);
@@ -495,10 +545,10 @@ export class RestaurantScene extends Phaser.Scene {
       }
     });
 
-    // 4. Hỗ trợ tự động của nhân viên
+    // 5. Nhân viên tự động
     this.updateAutomatedStaff(delta * speed);
 
-    // 5. Di chuyển nhân vật người chơi
+    // 6. Di chuyển nhân vật người chơi
     this.updatePlayerMovement(delta);
   }
 
@@ -506,11 +556,9 @@ export class RestaurantScene extends Phaser.Scene {
     const store = useGameStore.getState();
     const hired = store.gameState.hiredEmployees;
 
-    // Nhân viên Mai (Phục vụ): Tự động bưng món khi món đã xong
     if (hired.includes('emp_mai') && this.staffMaiSprite) {
       const readyTable = this.tables.find((t) => t.isOccupied && t.foodReady);
       if (readyTable) {
-        // Mai bước tới bàn phục vụ
         const dist = Phaser.Math.Distance.Between(
           this.staffMaiSprite.x,
           this.staffMaiSprite.y,
@@ -518,20 +566,15 @@ export class RestaurantScene extends Phaser.Scene {
           readyTable.y
         );
         if (dist > 30) {
-          this.physics?.moveToObject
-            ? this.physics.moveToObject(this.staffMaiSprite, readyTable.tableSprite, 120)
-            : this.moveTowards(this.staffMaiSprite, readyTable.x, readyTable.y, 1.8);
+          this.moveTowards(this.staffMaiSprite, readyTable.x, readyTable.y, 1.8);
         } else {
-          // Phục vụ món
           this.serveCustomer(readyTable);
         }
       } else {
-        // Quay về vị trí nghỉ
         this.moveTowards(this.staffMaiSprite, 400, 160, 1.2);
       }
     }
 
-    // Bác Linh (Đầu bếp): Tự nấu khi có order và kho còn nguyên liệu
     if (hired.includes('emp_linh')) {
       const pendingTable = this.tables.find(
         (t) => t.isOccupied && !t.foodReady && t.currentRecipeId
@@ -545,12 +588,9 @@ export class RestaurantScene extends Phaser.Scene {
             break;
           }
         }
-        if (hasEnough) {
-          // Bác Linh tự động nấu sau 3.5 giây
-          if (!pendingTable.foodReady) {
-            store.completeCooking(pendingTable.currentRecipeId, pendingTable.index);
-            this.markFoodReadyForTable(pendingTable.index);
-          }
+        if (hasEnough && !pendingTable.foodReady) {
+          store.completeCooking(pendingTable.currentRecipeId, pendingTable.index);
+          this.markFoodReadyForTable(pendingTable.index);
         }
       }
     }
@@ -566,7 +606,7 @@ export class RestaurantScene extends Phaser.Scene {
   }
 
   private updatePlayerMovement(delta: number) {
-    const moveSpeed = 3.2;
+    const moveSpeed = 3.4;
     let vx = 0;
     let vy = 0;
 
@@ -576,14 +616,18 @@ export class RestaurantScene extends Phaser.Scene {
     if (this.cursors.up.isDown || this.wasdKeys.W.isDown) vy -= 1;
     if (this.cursors.down.isDown || this.wasdKeys.S.isDown) vy += 1;
 
+    // Nhận thêm từ Virtual D-Pad trên mobile
+    if (this.virtualMoveInput.vx !== 0 || this.virtualMoveInput.vy !== 0) {
+      vx = this.virtualMoveInput.vx;
+      vy = this.virtualMoveInput.vy;
+    }
+
     if (vx !== 0 || vy !== 0) {
-      // Hủy vị trí click chuột nếu người chơi ấn phím
       this.targetPosition = null;
       const len = Math.sqrt(vx * vx + vy * vy);
       this.player.x += (vx / len) * moveSpeed;
       this.player.y += (vy / len) * moveSpeed;
     } else if (this.targetPosition) {
-      // Di chuyển theo vị trí chạm/click
       const dx = this.targetPosition.x - this.player.x;
       const dy = this.targetPosition.y - this.player.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -596,7 +640,6 @@ export class RestaurantScene extends Phaser.Scene {
       }
     }
 
-    // Giới hạn trong khuôn viên quán
     this.player.x = Phaser.Math.Clamp(this.player.x, 60, 740);
     this.player.y = Phaser.Math.Clamp(this.player.y, 110, 560);
   }

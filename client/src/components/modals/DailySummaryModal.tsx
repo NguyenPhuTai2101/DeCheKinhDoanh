@@ -35,8 +35,8 @@ export const DailySummaryModal: React.FC = () => {
   }, [netProfit]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-fade-in">
-      <div className="bg-white rounded-3xl border-4 border-[#FFD6E5] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFD6E5] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh] animate-slide-up">
         {/* Header Modal */}
         <div className="bg-[#FFF1F6] px-6 py-5 border-b-2 border-[#FFD6E5] flex items-center justify-between">
           <div className="flex items-center gap-3">

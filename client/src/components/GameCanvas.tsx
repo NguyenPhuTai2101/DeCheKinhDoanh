@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { RestaurantScene } from '../game/RestaurantScene';
 import { gameBridge } from '../game/gameBridge';
+import { MobileDPad } from './MobileDPad';
 
 export const GameCanvas: React.FC = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
@@ -10,7 +11,6 @@ export const GameCanvas: React.FC = () => {
   useEffect(() => {
     if (!gameContainerRef.current) return;
 
-    // Tránh khởi tạo 2 lần trong React StrictMode
     if (gameInstanceRef.current) {
       return;
     }
@@ -46,12 +46,15 @@ export const GameCanvas: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-[#FFF1F6] p-2 select-none relative">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FFF1F6] p-1 sm:p-2 select-none relative overflow-hidden">
       <div
         ref={gameContainerRef}
         id="phaser-game-container"
-        className="w-full max-w-[900px] aspect-[4/3] rounded-2xl overflow-hidden shadow-xl border-4 border-[#FFD6E5]"
+        className="w-full h-full max-w-[900px] max-h-[675px] rounded-2xl overflow-hidden shadow-lg border-2 sm:border-4 border-[#FFD6E5] flex items-center justify-center"
       />
+      
+      {/* Phím điều hướng ảo cho Mobile */}
+      <MobileDPad />
     </div>
   );
 };
