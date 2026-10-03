@@ -75,7 +75,10 @@ export interface CustomerInstance {
   state: CustomerState;
   patienceRemaining: number;
   maxPatience: number;
+  neighborId?: NeighborId;
+  neighborGreeting?: string;
 }
+
 
 export interface TableSpot {
   index: number;
@@ -246,6 +249,18 @@ export interface LotteryTicket {
   prizeAmount?: number;
 }
 
+export interface DeliveryOrder {
+  id: string;
+  customerName: string;
+  recipeId: RecipeId;
+  quantity: number;
+  rewardMoney: number;
+  rewardTip: number;
+  timeRemainingSeconds: number;
+  maxTimeSeconds: number;
+  status: 'pending' | 'ready' | 'delivering';
+}
+
 export interface GameSaveState {
   version: string;
   playerId: string;
@@ -268,11 +283,14 @@ export interface GameSaveState {
   historySummaries: DailySummary[];
   lastSavedAt: string;
 
-  // Thuộc tính mới V0.4 - V0.5: Đế Chế Vỉa Hè
+  // Thuộc tính mới V0.4: Đế Chế Vỉa Hè (decheviahe.com)
   businessStage: BusinessStageId;
   neighbors: Record<NeighborId, NeighborRelationship>;
   activeLotteryTicket?: LotteryTicket | null;
   lotteryHistory: LotteryTicket[];
   currentEvent?: StreetEvent | null;
+  deliveryOrders?: DeliveryOrder[];
+  totalDeliveriesCompleted?: number;
 }
+
 

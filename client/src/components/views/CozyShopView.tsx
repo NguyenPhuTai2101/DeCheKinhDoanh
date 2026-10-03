@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { CUSTOMER_TYPES, RECIPES, INGREDIENTS, SHOP_THEMES, DECORATION_ITEMS, BUSINESS_STAGES, NEIGHBORS_DATA } from '../../../../shared/gameData';
-import { CustomerTypeId, RecipeId, IngredientId } from '../../../../shared/types';
+import { CustomerTypeId, RecipeId, IngredientId, NeighborId } from '../../../../shared/types';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
-import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag, HeartHandshake, Megaphone, Ticket } from 'lucide-react';
+import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag, HeartHandshake, Megaphone, Ticket, Bike } from 'lucide-react';
 import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
-
 
 interface ActiveOrder {
   id: string;
   tableIndex: number;
   typeId: CustomerTypeId;
+  neighborId?: NeighborId;
+  dialogue?: string;
   recipeId: RecipeId;
   patienceRemaining: number;
   maxPatience: number;
@@ -31,6 +32,9 @@ export const CozyShopView: React.FC = () => {
     finishServing,
     handleCustomerLeaveAngry,
     openModal,
+    deliveryOrders,
+    serveNeighborGuest,
+    buyLotteryTicket,
   } = useGameStore();
 
   // Danh sách các bàn đang đón khách
@@ -98,11 +102,35 @@ export const CozyShopView: React.FC = () => {
           }
         }
 
-        const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
-        const chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-        const cType = CUSTOMER_TYPES[chosenType];
-        const favoriteList = cType.favoriteRecipeIds;
-        const chosenRecipe = favoriteList[Math.floor(Math.random() * favoriteList.length)];
+        // Tỷ lệ xuất hiện khách VIP Xóm Giềng (28%)
+        const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
+        const seatedNeighbors = prev.map((o) => o.neighborId).filter(Boolean);
+        const availableNeighbors = neighborKeys.filter((k) => !seatedNeighbors.includes(k));
+        const isNeighborRoll = Math.random() < 0.28 && availableNeighbors.length > 0;
+        const chosenNeighborId = isNeighborRoll
+          ? availableNeighbors[Math.floor(Math.random() * availableNeighbors.length)]
+          : undefined;
+
+        let chosenType: CustomerTypeId = 'student';
+        let chosenRecipe: RecipeId = 'banh_mi_trung';
+        let dialogue: string | undefined = undefined;
+        let patienceSeconds = 30;
+
+        if (chosenNeighborId) {
+          const nData = NEIGHBORS_DATA[chosenNeighborId];
+          const nRel = gameState.neighbors[chosenNeighborId] || { level: 1 };
+          chosenType = 'neighborhood';
+          chosenRecipe = nData.favoriteDishId;
+          dialogue = nData.dialogues[nRel.level] || nData.dialogues[1];
+          patienceSeconds = 48; // Hàng xóm kiên nhẫn và thích ngồi tán gẫu
+        } else {
+          const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
+          chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
+          const cType = CUSTOMER_TYPES[chosenType];
+          const favoriteList = cType.favoriteRecipeIds;
+          chosenRecipe = favoriteList[Math.floor(Math.random() * favoriteList.length)];
+          patienceSeconds = cType.patienceSeconds;
+        }
 
         soundManager.playDoorBell();
 
@@ -110,9 +138,11 @@ export const CozyShopView: React.FC = () => {
           id: Math.random().toString(36).substring(2, 9),
           tableIndex: freeTable,
           typeId: chosenType,
+          neighborId: chosenNeighborId,
+          dialogue,
           recipeId: chosenRecipe,
-          patienceRemaining: cType.patienceSeconds,
-          maxPatience: cType.patienceSeconds,
+          patienceRemaining: patienceSeconds,
+          maxPatience: patienceSeconds,
           state: 'waiting',
         };
 
@@ -121,7 +151,7 @@ export const CozyShopView: React.FC = () => {
     }, spawnRate / timeSpeed);
 
     return () => clearInterval(spawnInterval);
-  }, [isShopOpen, timeSpeed, maxTables, currentStage.customerRateMs, gameState.purchasedUpgrades]);
+  }, [isShopOpen, timeSpeed, maxTables, currentStage.customerRateMs, gameState.purchasedUpgrades, gameState.neighbors]);
 
 
   // 4. Tự động phục vụ nếu có nhân viên
@@ -215,7 +245,13 @@ export const CozyShopView: React.FC = () => {
     const recipe = RECIPES[order.recipeId];
     const cType = CUSTOMER_TYPES[order.typeId];
     const patiencePercent = order.patienceRemaining / order.maxPatience;
-    const tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
+    let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
+
+    // Nếu là hàng xóm thân thiết, cộng thêm tip và tăng hảo cảm
+    if (order.neighborId) {
+      tip += Math.round(recipe.basePrice * 0.2);
+      serveNeighborGuest(order.neighborId);
+    }
 
     // Chuyển sang trạng thái ăn
     setOrders((prev) =>
@@ -226,12 +262,14 @@ export const CozyShopView: React.FC = () => {
       soundManager.playCoin();
       finishServing(order.tableIndex, recipe.basePrice, tip);
 
-      // Bắn confetti nhẹ
+      // Bắn confetti chúc mừng
       confetti({
-        particleCount: 25,
-        spread: 45,
+        particleCount: order.neighborId ? 45 : 25,
+        spread: 50,
         origin: { y: 0.7 },
-        colors: ['#F7A8C4', '#FFD6E5', '#FFE6A7'],
+        colors: order.neighborId
+          ? ['#F43F5E', '#FB7185', '#FBBF24', '#38BDF8']
+          : ['#F7A8C4', '#FFD6E5', '#FFE6A7'],
       });
 
       // Khách rời đi
@@ -337,7 +375,17 @@ export const CozyShopView: React.FC = () => {
                 </button>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-[#9C7C75]">
-                <span>{activeTheme.name.split(' ')[0]}</span>
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    openModal('upgrades');
+                  }}
+                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 active:scale-95 transition-all"
+                  title="Cấp bậc vỉa hè - Bấm để nâng cấp cơ nghiệp"
+                >
+                  <span>{currentStage.icon}</span>
+                  <span>{currentStage.name}</span>
+                </button>
                 {cozyScore > 0 && (
                   <span className="bg-[#FFE6A7] text-amber-800 font-bold px-1.5 py-0.2 rounded-full">
                     +{cozyScore} Cozy ✨
@@ -360,6 +408,35 @@ export const CozyShopView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Banner đơn giao hàng mang đi Chú Năm nếu có */}
+        {deliveryOrders.length > 0 && (
+          <div
+            onClick={() => {
+              soundManager.playClick();
+              openModal('delivery');
+            }}
+            className="mt-2.5 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 text-white rounded-2xl p-2 px-3 flex items-center justify-between cursor-pointer shadow-md hover:brightness-105 active:scale-98 transition-all animate-pulse"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🛵</span>
+              <div>
+                <div className="text-[11px] font-black leading-tight flex items-center gap-1.5">
+                  <span>Có {deliveryOrders.length} Đơn Giao Hàng Chú Năm!</span>
+                  <span className="bg-amber-400 text-amber-950 text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                    Nóng hổi
+                  </span>
+                </div>
+                <div className="text-[9px] text-sky-100 font-medium">
+                  Chạm để đóng gói & ship tận nơi cho bà con trong xóm
+                </div>
+              </div>
+            </div>
+            <span className="bg-white text-sky-700 text-[10px] font-black px-2.5 py-1 rounded-xl shrink-0 shadow-sm">
+              Giao Đơn 🚀
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 2. HÀNG THẺ KHÁCH HÀNG & BÀ CON XÓM GIỀNG */}
@@ -467,7 +544,7 @@ export const CozyShopView: React.FC = () => {
                   {/* Avatar và thông tin khách */}
                   <div className="flex items-center gap-2">
                     <ChibiAvatar
-                      type={order.typeId}
+                      type={order.neighborId || order.typeId}
                       emotion={
                         order.state === 'eating'
                           ? 'eating'
@@ -480,8 +557,18 @@ export const CozyShopView: React.FC = () => {
                       size={44}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-black text-[#7C5C55] truncate">
-                        Bàn {order.tableIndex} · {cType.name.split(' ')[0]}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] font-black text-[#7C5C55] truncate">
+                          Bàn {order.tableIndex} ·{' '}
+                          {order.neighborId
+                            ? NEIGHBORS_DATA[order.neighborId].name
+                            : cType.name.split(' ')[0]}
+                        </span>
+                        {order.neighborId && (
+                          <span className="text-[8px] bg-rose-100 text-rose-700 font-extrabold px-1 py-0.2 rounded-full shrink-0">
+                            VIP
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] font-bold text-[#F7A8C4] truncate flex items-center gap-1">
                         <span>{recipe.icon}</span>
@@ -489,6 +576,42 @@ export const CozyShopView: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Lời chào / Câu thoại tâm tình xóm giềng */}
+                  {order.dialogue && (
+                    <div className="mt-1.5 p-1.5 bg-[#FFF9F2] rounded-xl border border-amber-200 text-[10px] text-amber-900 leading-tight italic flex items-start gap-1">
+                      <span className="shrink-0 not-italic">💬</span>
+                      <span className="line-clamp-2">"{order.dialogue}"</span>
+                    </div>
+                  )}
+
+                  {/* Phím tắt tương tác nhanh nếu Cô Bảy ghé bàn */}
+                  {order.neighborId === 'co_bay' && !gameState.activeLotteryTicket && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundManager.playClick();
+                        buyLotteryTicket();
+                      }}
+                      className="w-full mt-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl text-[9px] font-black border border-amber-300 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                    >
+                      <span>🎟️ Mua Vé Số Cô Bảy (10k)</span>
+                    </button>
+                  )}
+
+                  {/* Phím tắt nhanh nếu Chú Năm ghé bàn */}
+                  {order.neighborId === 'chu_nam' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundManager.playClick();
+                        openModal('delivery');
+                      }}
+                      className="w-full mt-1.5 py-0.5 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-xl text-[9px] font-black border border-sky-300 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                    >
+                      <span>🛵 Đội Xe Ship Chú Năm</span>
+                    </button>
+                  )}
 
 
                   {/* Thanh kiên nhẫn */}

@@ -1,7 +1,19 @@
 import React from 'react';
 
 interface ChibiAvatarProps {
-  type: 'player' | 'student' | 'office_worker' | 'food_lover' | 'neighborhood' | 'emp_mai' | 'emp_linh';
+  type:
+    | 'player'
+    | 'student'
+    | 'office_worker'
+    | 'food_lover'
+    | 'neighborhood'
+    | 'emp_mai'
+    | 'emp_linh'
+    | 'bac_ba'
+    | 'co_bay'
+    | 'chu_nam'
+    | 'be_bong'
+    | 'chi_lan';
   emotion?: 'happy' | 'waiting' | 'eating' | 'love' | 'angry';
   size?: number;
   className?: string;
@@ -14,7 +26,7 @@ export const ChibiAvatar: React.FC<ChibiAvatarProps> = ({
   className = '',
 }) => {
   // Cấu hình bảng màu sắc nét cho từng nhân vật
-  const configs = {
+  const configs: Record<string, any> = {
     player: {
       skin: '#FFE0BD',
       hair: '#5D4037',
@@ -70,6 +82,46 @@ export const ChibiAvatar: React.FC<ChibiAvatarProps> = ({
       outfit: '#CFD8DC',
       hat: 'chef_tall',
       accessory: 'mustache',
+    },
+    bac_ba: {
+      skin: '#FFE0BD',
+      hair: '#9E9E9E',
+      hairStyle: 'short',
+      outfit: '#33691E',
+      hat: 'none',
+      accessory: 'glasses',
+    },
+    co_bay: {
+      skin: '#FFE0BD',
+      hair: '#616161',
+      hairStyle: 'bun',
+      outfit: '#F59E0B',
+      hat: 'none',
+      accessory: 'scarf',
+    },
+    chu_nam: {
+      skin: '#FFE0BD',
+      hair: '#3E2723',
+      hairStyle: 'short',
+      outfit: '#0284C7',
+      hat: 'helmet',
+      accessory: 'tie',
+    },
+    be_bong: {
+      skin: '#FFE0BD',
+      hair: '#212121',
+      hairStyle: 'twin_bows',
+      outfit: '#F472B6',
+      hat: 'none',
+      accessory: 'scarf',
+    },
+    chi_lan: {
+      skin: '#FFE0BD',
+      hair: '#4E342E',
+      hairStyle: 'pigtails',
+      outfit: '#E11D48',
+      hat: 'none',
+      accessory: 'badge',
     },
   };
 
@@ -196,6 +248,14 @@ export const ChibiAvatar: React.FC<ChibiAvatarProps> = ({
             fill="#D84315"
             stroke="#7C5C55"
             strokeWidth="2"
+          />
+        )}
+        {cfg.hat === 'helmet' && (
+          <path
+            d="M 26 36 C 26 14 74 14 74 36 C 65 30 35 30 26 36 Z"
+            fill="#0284C7"
+            stroke="#7C5C55"
+            strokeWidth="2.5"
           />
         )}
 

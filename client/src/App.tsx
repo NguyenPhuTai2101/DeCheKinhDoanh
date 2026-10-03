@@ -12,6 +12,8 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { NeighborsModal } from './components/modals/NeighborsModal';
 import { StreetEventsModal } from './components/modals/StreetEventsModal';
 import { LedgerModal } from './components/modals/LedgerModal';
+import { DeliveryModal } from './components/modals/DeliveryModal';
+import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
 
@@ -54,6 +56,8 @@ export const App: React.FC = () => {
         {activeModal === 'neighbors' && <NeighborsModal />}
         {activeModal === 'streetEvents' && <StreetEventsModal />}
         {activeModal === 'ledger' && <LedgerModal />}
+        {activeModal === 'delivery' && <DeliveryModal />}
+        {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
 
         {/* 5. Thông báo nổi (Toast & Floating feedback) */}
         <ToastNotification />

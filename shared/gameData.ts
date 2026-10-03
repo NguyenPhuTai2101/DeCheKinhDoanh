@@ -813,6 +813,9 @@ export const INITIAL_GAME_STATE: GameSaveState = {
   activeLotteryTicket: null,
   lotteryHistory: [],
   currentEvent: null,
+  deliveryOrders: [],
+  totalDeliveriesCompleted: 0,
 };
+
 
 

@@ -12,6 +12,7 @@ import {
   NeighborId,
   StreetEvent,
   LotteryTicket,
+  DeliveryOrder,
 } from '../../../shared/types';
 import {
   INITIAL_GAME_STATE,
@@ -39,6 +40,8 @@ export type ModalType =
   | 'neighbors'
   | 'streetEvents'
   | 'ledger'
+  | 'delivery'
+  | 'lotteryDraw'
   | null;
 
 export interface FloatingFeedback {
@@ -68,9 +71,16 @@ export interface GameStoreState {
   dailyCustomersLost: number;
   isDailySummaryShown: boolean;
   
-  // V0.4: Sự kiện & Xổ số runtime flags
+  // V0.4: Sự kiện & Xổ số & Giao hàng runtime
   hasEventTriggeredToday: boolean;
   isLotteryDrawnToday: boolean;
+  deliveryOrders: DeliveryOrder[];
+  lotteryDrawResult: {
+    drawnNumber: string;
+    prizeType: 'jackpot' | 'prize2' | 'prize3' | 'none';
+    prizeAmount: number;
+    userTicket: string;
+  } | null;
 
   // UI Toast message
   toastMessage: string | null;
@@ -112,9 +122,16 @@ export interface GameStoreState {
   giveGiftToNeighbor: (neighborId: NeighborId, recipeId: RecipeId) => boolean;
   buyLotteryTicket: (chosenNum?: string) => boolean;
   checkLotteryDraw: () => void;
+  closeLotteryDrawModal: () => void;
   triggerStreetEvent: (event?: StreetEvent) => void;
   resolveStreetEventChoice: (choiceIndex: number) => void;
   upgradeBusinessStage: () => boolean;
+
+  // V0.4: Giao hàng mang đi & Hàng xóm ghé bàn
+  spawnDeliveryOrder: () => void;
+  fulfillDeliveryOrder: (orderId: string) => boolean;
+  cancelDeliveryOrder: (orderId: string) => void;
+  serveNeighborGuest: (neighborId: NeighborId) => void;
 
   // Day Cycle
   endDayAndSleep: () => void;
@@ -125,6 +142,7 @@ export interface GameStoreState {
   syncCloud: () => Promise<void>;
   resetGame: () => void;
 }
+
 
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
@@ -142,7 +160,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   isDailySummaryShown: false,
   hasEventTriggeredToday: false,
   isLotteryDrawnToday: false,
+  deliveryOrders: [],
+  lotteryDrawResult: null,
   toastMessage: null,
+
 
   setShopOpen: (open) => {
     set({ isShopOpen: open });
@@ -811,17 +832,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (drawnNumber === ticket.ticketNumber) {
       prizeType = 'jackpot';
       prizeAmount = 300000;
-      get().showToast(`🎉 ĐỘC ĐẮC VỈA HÈ! Số trúng: [${drawnNumber}]. Bạn nhận được 300,000 đ!`);
     } else if (drawnNumber[1] === ticket.ticketNumber[1]) {
       prizeType = 'prize2';
       prizeAmount = 40000;
-      get().showToast(`✨ TRÚNG GIẢI NHÌ! Đuôi số [${drawnNumber[1]}] trùng khớp! Nhận 40,000 đ!`);
     } else if (Math.abs(parseInt(drawnNumber, 10) - parseInt(ticket.ticketNumber, 10)) === 1) {
       prizeType = 'prize3';
       prizeAmount = 20000;
-      get().showToast(`⭐ TRÚNG GIẢI AN ỦI! Số trúng: [${drawnNumber}]. Nhận 20,000 đ!`);
-    } else {
-      get().showToast(`🎟️ Kết quả chiều nay: [${drawnNumber}]. Vé của bạn là [${ticket.ticketNumber}]. Chúc bạn may mắn lần sau!`);
     }
 
     const completedTicket: LotteryTicket = {
@@ -833,6 +849,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set((state) => ({
       isLotteryDrawnToday: true,
+      activeModal: 'lotteryDraw',
+      lotteryDrawResult: {
+        drawnNumber,
+        prizeType,
+        prizeAmount,
+        userTicket: ticket.ticketNumber,
+      },
       dailyRevenue: state.dailyRevenue + prizeAmount,
       gameState: {
         ...state.gameState,
@@ -844,6 +867,158 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     get().saveLocal();
   },
+
+  closeLotteryDrawModal: () => {
+    set({ activeModal: null, lotteryDrawResult: null });
+  },
+
+  serveNeighborGuest: (neighborId) => {
+    const { gameState } = get();
+    const neighbor = gameState.neighbors[neighborId] || {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    };
+    const data = NEIGHBORS_DATA[neighborId];
+    if (!data) return;
+
+    const addedExp = 25;
+    const newExp = neighbor.intimacyExp + addedExp;
+    let newLevel = neighbor.level;
+    const newSecrets = [...neighbor.unlockedSecretIds];
+
+    if (newExp >= 100 && newLevel < 5) {
+      newLevel += 1;
+      const secretToUnlock = data.secrets.find((s) => s.level === newLevel);
+      if (secretToUnlock && !newSecrets.includes(newLevel)) {
+        newSecrets.push(newLevel);
+      }
+      get().showToast(`💖 Tình làng nghĩa xóm: Thân thiết với ${data.name} đạt cấp ${newLevel}!`);
+    } else {
+      get().showToast(`✨ ${data.name} thưởng thức món ăn rất vui vẻ! (+${addedExp} Thân thiết)`);
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        neighbors: {
+          ...gameState.neighbors,
+          [neighborId]: {
+            ...neighbor,
+            level: newLevel,
+            intimacyExp: newExp >= 100 && newLevel < 5 ? newExp - 100 : newExp,
+            unlockedSecretIds: newSecrets,
+            lastInteractedDay: gameState.day,
+          },
+        },
+      },
+    });
+    get().saveLocal();
+  },
+
+  spawnDeliveryOrder: () => {
+    const { deliveryOrders } = get();
+    if (deliveryOrders.length >= 3) return;
+
+    const customers = [
+      'Phòng Marketing Tầng 3',
+      'Anh Tuấn Shipper Chạy Đêm',
+      'Nhóm Học Sinh Trường Làng',
+      'Chị Ngọc Kế Toán',
+      'Đội Bảo Vệ Khu Phố',
+    ];
+
+    const recipesKeys: RecipeId[] = ['banh_mi_thit', 'banh_mi_trung', 'banh_mi_dac_biet', 'tra_sua', 'cafe_sua'];
+    const chosenRecipeId = recipesKeys[Math.floor(Math.random() * recipesKeys.length)];
+    const recipe = RECIPES[chosenRecipeId];
+    const qty = Math.floor(Math.random() * 2) + 2; // 2 - 3 suất
+
+    const baseRev = recipe.basePrice * qty;
+    const tip = Math.round(baseRev * 0.25);
+
+    const newOrder: DeliveryOrder = {
+      id: Math.random().toString(36).substring(2, 9),
+      customerName: customers[Math.floor(Math.random() * customers.length)],
+      recipeId: chosenRecipeId,
+      quantity: qty,
+      rewardMoney: baseRev,
+      rewardTip: tip,
+      timeRemainingSeconds: 90,
+      maxTimeSeconds: 90,
+      status: 'pending',
+    };
+
+    set((state) => ({
+      deliveryOrders: [...state.deliveryOrders, newOrder],
+    }));
+    get().showToast(`🛵 Có đơn giao hàng mang đi mới từ ${newOrder.customerName}!`);
+  },
+
+  fulfillDeliveryOrder: (orderId) => {
+    const { deliveryOrders, gameState } = get();
+    const order = deliveryOrders.find((o) => o.id === orderId);
+    if (!order) return false;
+
+    const recipe = RECIPES[order.recipeId];
+    if (!recipe) return false;
+
+    // Kiểm tra nguyên liệu
+    for (const ingId of recipe.requiredIngredients) {
+      if ((gameState.inventory[ingId] || 0) < order.quantity) {
+        get().showToast(`❌ Không đủ nguyên liệu để giao ${order.quantity} suất ${recipe.name}!`);
+        return false;
+      }
+    }
+
+    // Trừ nguyên liệu
+    const newInventory = { ...gameState.inventory };
+    for (const ingId of recipe.requiredIngredients) {
+      newInventory[ingId] -= order.quantity;
+    }
+
+    const totalEarned = order.rewardMoney + order.rewardTip;
+
+    // Tăng thiện cảm Chú Năm
+    const chuNam = gameState.neighbors.chu_nam || {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    };
+
+    set((state) => ({
+      dailyRevenue: state.dailyRevenue + totalEarned,
+      deliveryOrders: state.deliveryOrders.filter((o) => o.id !== orderId),
+      gameState: {
+        ...state.gameState,
+        inventory: newInventory,
+        money: state.gameState.money + totalEarned,
+        totalDeliveriesCompleted: (state.gameState.totalDeliveriesCompleted || 0) + 1,
+        reputation: state.gameState.reputation + 2,
+        neighbors: {
+          ...state.gameState.neighbors,
+          chu_nam: {
+            ...chuNam,
+            intimacyExp: chuNam.intimacyExp + 15,
+            lastInteractedDay: state.gameState.day,
+          },
+        },
+      },
+    }));
+
+    get().showToast(`🛵 Chú Năm đã giao thành công đơn hàng! (+${totalEarned.toLocaleString('vi-VN')} đ, +2 Uy tín)`);
+    get().saveLocal();
+    return true;
+  },
+
+  cancelDeliveryOrder: (orderId) => {
+    set((state) => ({
+      deliveryOrders: state.deliveryOrders.filter((o) => o.id !== orderId),
+    }));
+    get().showToast('Đã hủy đơn giao hàng.');
+  },
+
 
   triggerStreetEvent: (event) => {
     const { gameState, hasEventTriggeredToday } = get();

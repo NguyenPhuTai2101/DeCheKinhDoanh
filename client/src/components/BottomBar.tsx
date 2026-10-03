@@ -13,12 +13,13 @@ import {
   Settings,
   LayoutGrid,
   SlidersHorizontal,
+  Bike,
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { HorizontalScrollBox } from './common/HorizontalScrollBox';
 
 export const BottomBar: React.FC = () => {
-  const { openModal, gameState } = useGameStore();
+  const { openModal, gameState, deliveryOrders } = useGameStore();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleOpen = (modal: ModalType) => {
@@ -67,6 +68,14 @@ export const BottomBar: React.FC = () => {
       icon: <Megaphone className="w-4 h-4" />,
       colorClasses: 'bg-sky-50 border-sky-300 text-sky-600 group-hover:bg-sky-400 group-hover:text-white',
       hasAlert: !!gameState.currentEvent,
+    },
+    {
+      id: 'delivery',
+      label: deliveryOrders.length > 0 ? `Ship (${deliveryOrders.length})` : 'Giao Hàng',
+      icon: <Bike className="w-4 h-4" />,
+      colorClasses: 'bg-sky-50 border-sky-400 text-sky-600 group-hover:bg-sky-500 group-hover:text-white',
+      badge: deliveryOrders.length > 0 ? deliveryOrders.length : null,
+      hasAlert: deliveryOrders.length > 0,
     },
     {
       id: 'upgrades',
@@ -129,9 +138,9 @@ export const BottomBar: React.FC = () => {
         </button>
       </div>
 
-      {/* CHẾ ĐỘ 1: LƯỚI 2 HÀNG GỌN GÀNG (Hiển thị 100% không cần cuộn) */}
+      {/* CHẾ ĐỘ 1: LƯỚI GỌN GÀNG (Hiển thị 100% không cần cuộn) */}
       {isExpanded ? (
-        <div className="p-1.5 grid grid-cols-5 gap-1 animate-slide-up">
+        <div className="p-1.5 grid grid-cols-4 sm:grid-cols-6 gap-1 animate-slide-up">
           {menuItems.map((item) => (
             <button
               key={item.id}
