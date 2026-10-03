@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-pink-primary: #F7A8C4;
+    --color-pink-light: #FFD6E5;
+    --color-pink-bg: #FFF1F6;
+    --color-cream: #FFF7ED;
+    --color-brown: #7C5C55;
+    --color-lavender: #D8C4F1;
+    --color-mint: #BFE3D0;
+    --color-yellow: #FFE6A7;
+  }
+
+  body {
+    background-color: #FFF1F6;
+    color: #7C5C55;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+}
+
+/* Custom animations for cozy feeling */
+@keyframes coinPop {
+  0% { transform: translateY(0px) scale(0.8); opacity: 0; }
+  30% { transform: translateY(-15px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-40px) scale(1); opacity: 0; }
+}
+
+@keyframes heartFloat {
+  0% { transform: translateY(0px) scale(0.7); opacity: 0; }
+  40% { transform: translateY(-10px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(-30px) scale(0.9); opacity: 0; }
+}
+
+@keyframes bubbleWiggle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-coin-pop {
+  animation: coinPop 0.8s ease-out forwards;
+}
+
+.animate-heart-float {
+  animation: heartFloat 1s ease-out forwards;
+}
+
+.animate-bubble-wiggle {
+  animation: bubbleWiggle 2s infinite ease-in-out;
+}
+
+/* Custom rounded button style */
+.btn-cozy-primary {
+  background-color: #F7A8C4;
+  color: white;
+  border-radius: 9999px;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(247, 168, 196, 0.4);
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-cozy-primary:hover {
+  background-color: #f28bb1;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(247, 168, 196, 0.5);
+}
+
+.btn-cozy-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-cozy-secondary {
+  background-color: #FFF7ED;
+  color: #7C5C55;
+  border: 2px solid #F7A8C4;
+  border-radius: 9999px;
+  font-weight: 700;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-cozy-secondary:hover {
+  background-color: #FFD6E5;
+}
+
+.card-cozy {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 2px solid #FFD6E5;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(247, 168, 196, 0.2);
+  backdrop-filter: blur(8px);
+}

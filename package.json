@@ -1,0 +1,25 @@
+{
+  "name": "de-che-kinh-doanh",
+  "version": "0.1.0",
+  "description": "Game nhập vai kinh doanh Cozy - Từ quán nhỏ đến tập đoàn đa ngành",
+  "scripts": {
+    "dev": "npm run dev --prefix client",
+    "dev:all": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client && npm run build --prefix server",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client"
+  },
+  "keywords": [
+    "game",
+    "rpg",
+    "business-sim",
+    "cozy",
+    "phaser",
+    "react"
+  ],
+  "author": "Katalin Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
