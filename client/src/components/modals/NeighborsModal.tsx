@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { NEIGHBORS_DATA, RECIPES } from '../../../../shared/gameData';
+import { NEIGHBORS_DATA, RECIPES, DREAM_BOOK_NUMBERS } from '../../../../shared/gameData';
 import { NeighborId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
-import { X, Heart, MessageCircle, Gift, Sparkles, Ticket, BookOpen, Check } from 'lucide-react';
+import { X, Heart, MessageCircle, Gift, Sparkles, Ticket, BookOpen, Check, Dices, Flame } from 'lucide-react';
 import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
 
 
@@ -14,11 +14,15 @@ export const NeighborsModal: React.FC = () => {
     interactNeighbor,
     giveGiftToNeighbor,
     buyLotteryTicket,
+    playInstantLotteryDraw,
     checkLotteryDraw,
   } = useGameStore();
 
   const [selectedNeighborId, setSelectedNeighborId] = useState<NeighborId>('bac_ba');
   const [activeTab, setActiveTab] = useState<'chat' | 'secrets' | 'lottery'>('chat');
+  const [lotteryNumber, setLotteryNumber] = useState('68');
+  const [lotteryBet, setLotteryBet] = useState(10000);
+  const [lotteryType, setLotteryType] = useState<'de' | 'lo'>('de');
 
   const selectedData = NEIGHBORS_DATA[selectedNeighborId];
   const relation = gameState.neighbors[selectedNeighborId] || {
@@ -271,63 +275,218 @@ export const NeighborsModal: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 3: VÉ SỐ CỦA CÔ BẢY */}
+          {/* TAB 3: VÉ SỐ & SỔ MƠ DÂN GIAN CÔ BẢY */}
           {activeTab === 'lottery' && selectedNeighborId === 'co_bay' && (
-            <div className="bg-white rounded-2xl p-4 border-2 border-amber-300 shadow-sm space-y-3">
+            <div className="bg-white rounded-2xl p-4 border-2 border-amber-300 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-black text-amber-900 flex items-center gap-1.5">
-                    <span>🎟️</span> Xổ Số Kiến Thiết Vỉa Hè
+                    <span>🎟️</span> Xổ Số, Đánh Đề & Sổ Mơ Dân Gian
                   </h4>
                   <p className="text-xs text-amber-700">
-                    Ủng hộ Cô Bảy 1 tờ vé số (10,000 đ) - Quay số lúc 16:30 mỗi ngày
+                    Ghi số may mắn với Cô Bảy · Đề đuôi ăn gấp 70 lần vốn!
                   </p>
                 </div>
+                <span className="text-[10px] bg-rose-500 text-white font-black px-2 py-0.5 rounded-full animate-pulse">
+                  Ăn x70 🔥
+                </span>
               </div>
 
-              {/* Vé số hiện tại */}
+              {/* Vé số hiện tại chờ xổ */}
               {gameState.activeLotteryTicket ? (
-                <div className="p-3 bg-gradient-to-r from-amber-100 to-yellow-100 rounded-2xl border-2 border-dashed border-amber-400 flex items-center justify-between">
+                <div className="p-3 bg-gradient-to-r from-amber-100 to-yellow-100 rounded-2xl border-2 border-dashed border-amber-400 flex items-center justify-between shadow-xs">
                   <div>
-                    <div className="text-[10px] font-bold text-amber-800">TẤM VÉ MAY MẮN HÔM NAY</div>
+                    <div className="text-[10px] font-bold text-amber-800">TẤM VÉ CHỜ MỞ THƯỞNG 16:30</div>
                     <div className="text-2xl font-black text-amber-900 tracking-wider">
-                      Số: {gameState.activeLotteryTicket.ticketNumber}
+                      Số: [{gameState.activeLotteryTicket.ticketNumber}]
+                    </div>
+                    <div className="text-[10px] text-amber-700 font-bold">
+                      Cược: {gameState.activeLotteryTicket.cost.toLocaleString('vi-VN')} đ (
+                      {gameState.activeLotteryTicket.betType === 'lo' ? 'Bao Lô' : 'Đề Đuôi x70'})
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="px-2.5 py-1 bg-amber-500 text-white rounded-full text-[10px] font-bold shadow-sm">
-                      Chờ 16h30 Xổ
+                      Chờ 16h30 Xổ ⏰
                     </span>
                   </div>
                 </div>
-              ) : (
-                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between">
-                  <div className="text-xs text-amber-800 font-medium">
-                    Hôm nay bạn chưa mua vé số. Mua ủng hộ Cô Bảy nhé!
-                  </div>
+              ) : null}
+
+              {/* KHU VỰC CHỌN SỐ VÀ MỨC CƯỢC */}
+              <div className="bg-[#FFFDF7] p-3.5 rounded-2xl border-2 border-amber-200 space-y-3">
+                {/* 1. Chọn kiểu đánh */}
+                <div className="flex gap-2">
                   <button
-                    onClick={handleBuyLottery}
-                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-all"
+                    onClick={() => {
+                      soundManager.playClick();
+                      setLotteryType('de');
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1 ${
+                      lotteryType === 'de'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                        : 'bg-white border border-amber-200 text-amber-800 hover:bg-amber-50'
+                    }`}
                   >
-                    Mua Vé (10k)
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Đề Đuôi (Ăn x70)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      soundManager.playClick();
+                      setLotteryType('lo');
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1 ${
+                      lotteryType === 'lo'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                        : 'bg-white border border-amber-200 text-amber-800 hover:bg-amber-50'
+                    }`}
+                  >
+                    <Dices className="w-3.5 h-3.5" />
+                    <span>Bao Lô (Ăn x35)</span>
                   </button>
                 </div>
-              )}
+
+                {/* 2. Nhập số & Random */}
+                <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-amber-200">
+                  <div className="text-xs font-bold text-amber-950">
+                    Số Bạn Chọn (00 - 99):
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      maxLength={2}
+                      value={lotteryNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 2) setLotteryNumber(val);
+                      }}
+                      className="w-14 h-10 text-center font-black text-xl bg-amber-50 border-2 border-amber-400 rounded-xl text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <button
+                      onClick={() => {
+                        soundManager.playClick();
+                        const rand = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                        setLotteryNumber(rand);
+                      }}
+                      className="px-2.5 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-bold border border-amber-300 flex items-center gap-1 active:scale-95 transition-all"
+                      title="Quay số ngẫu nhiên"
+                    >
+                      <Dices className="w-3.5 h-3.5" />
+                      <span>Hên Xui</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Mức cược */}
+                <div className="space-y-1">
+                  <div className="text-[11px] font-bold text-amber-900">Mức Tiền Cược:</div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[5000, 10000, 20000, 50000].map((amt) => (
+                      <button
+                        key={amt}
+                        onClick={() => {
+                          soundManager.playClick();
+                          setLotteryBet(amt);
+                        }}
+                        className={`py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                          lotteryBet === amt
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-white border border-amber-200 text-amber-900 hover:bg-amber-50'
+                        }`}
+                      >
+                        {(amt / 1000).toFixed(0)}k đ
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Hai nút bấm hành động */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      soundManager.playCoin();
+                      const num = lotteryNumber.padStart(2, '0');
+                      buyLotteryTicket(num, lotteryBet, lotteryType);
+                    }}
+                    disabled={gameState.money < lotteryBet}
+                    className={`py-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1 active:scale-95 transition-all ${
+                      gameState.money >= lotteryBet
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Ticket className="w-3.5 h-3.5" />
+                    <span>Ghi Vé Chiều (16h30)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      soundManager.playCoin();
+                      const num = lotteryNumber.padStart(2, '0');
+                      playInstantLotteryDraw(num, lotteryBet, lotteryType);
+                    }}
+                    disabled={gameState.money < lotteryBet}
+                    className={`py-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1 active:scale-95 transition-all ${
+                      gameState.money >= lotteryBet
+                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white'
+                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Quay Thử Ngay 🎲</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SỔ MƠ DÂN GIAN GEN Z */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-950 flex items-center gap-1">
+                    <span>📖</span> Sổ Mơ Dân Gian Gen Z (Chạm để chọn số)
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-semibold">Tâm linh chuẩn bài</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {DREAM_BOOK_NUMBERS.map((d, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        soundManager.playClick();
+                        setLotteryNumber(d.number);
+                      }}
+                      className={`p-1.5 rounded-xl text-left border text-[11px] font-bold flex items-center justify-between transition-all ${
+                        lotteryNumber === d.number
+                          ? 'bg-amber-100 border-amber-400 text-amber-950 ring-1 ring-amber-400'
+                          : 'bg-[#FAF5EE] border-amber-200 text-[#7C5C55] hover:bg-amber-50'
+                      }`}
+                    >
+                      <span className="truncate pr-1">
+                        {d.icon} {d.dream}
+                      </span>
+                      <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded font-black text-[10px] shrink-0">
+                        {d.number}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Bảng cơ cấu giải thưởng */}
               <div className="bg-[#FAF5EE] p-3 rounded-xl border border-amber-200 text-xs space-y-1 text-[#7C5C55]">
                 <div className="font-bold text-[#7C5C55] mb-1">Cơ Cấu Giải Thưởng Vỉa Hè:</div>
                 <div className="flex justify-between">
-                  <span>👑 Trùng khớp 2 số (Độc Đắc):</span>
-                  <span className="font-bold text-amber-700">300,000 đ</span>
+                  <span>👑 Trùng khớp 2 số (Độc Đắc Đề Đuôi):</span>
+                  <span className="font-bold text-amber-700">Ăn x70 lần (Ví dụ 10k ăn 700k)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>✨ Trùng đuôi số (Giải Nhì):</span>
-                  <span className="font-bold text-amber-700">40,000 đ</span>
+                  <span>✨ Trùng đuôi hàng đơn vị (Giải Nhì):</span>
+                  <span className="font-bold text-amber-700">Ăn x4 lần tiền cược</span>
                 </div>
                 <div className="flex justify-between">
                   <span>⭐ Liền kề ±1 số (Giải An Ủi):</span>
-                  <span className="font-bold text-amber-700">20,000 đ</span>
+                  <span className="font-bold text-amber-700">Ăn x2 lần tiền cược</span>
                 </div>
               </div>
             </div>

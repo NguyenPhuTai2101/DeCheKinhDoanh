@@ -440,6 +440,23 @@ export const StreetMapView: React.FC = () => {
               {/* Cây me râm mát xòe bóng */}
               <div className="absolute top-2 left-4 w-32 h-32 rounded-full bg-emerald-500/90 border-2 border-emerald-600 shadow-md flex items-center justify-center text-3xl z-10 opacity-95">
                 🌳
+                {/* Loa Phường / Chuyện Xóm */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    soundManager.playClick();
+                    openModal('streetEvents');
+                  }}
+                  className={`absolute -top-1 -right-2 px-2 py-0.5 rounded-full text-[8px] font-black shadow-md cursor-pointer flex items-center gap-0.5 z-30 transition-all active:scale-95 ${
+                    gameState.currentEvent
+                      ? 'bg-rose-600 text-white animate-bounce ring-2 ring-yellow-300'
+                      : 'bg-white/95 text-[#7C5C55] border border-amber-300 hover:bg-amber-100'
+                  }`}
+                  title="Bấm để xem Chuyện Trong Xóm & Sự Kiện Vỉa Hè"
+                >
+                  <span>📢</span>
+                  <span>{gameState.currentEvent ? 'CÓ BIẾN! 🚨' : 'Hóng Chuyện 🎲'}</span>
+                </div>
               </div>
               <div className="w-4 h-28 bg-[#795548] rounded-t-sm z-0 mb-8" />
 
@@ -456,25 +473,21 @@ export const StreetMapView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Quầy Vé Số Cô Bảy */}
+                {/* Quầy Vé Số & Số Đề Cô Bảy */}
                 <div
                   onClick={() => {
                     soundManager.playClick();
-                    if (!gameState.activeLotteryTicket) {
-                      buyLotteryTicket();
-                    } else {
-                      openModal('neighbors');
-                    }
+                    openModal('neighbors');
                   }}
                   className="bg-amber-50 border-2 border-amber-300 rounded-xl p-1 flex flex-col items-center cursor-pointer shadow-sm hover:scale-105 active:scale-95 transition-all"
-                  title="Bấm để mua vé số may mắn 16h30"
+                  title="Bấm để ghi số đề, tra sổ mơ may mắn"
                 >
-                  <span className="text-[8px] bg-red-600 text-white font-black px-1 rounded-full mb-0.5">
-                    Vé Số 🎟️
+                  <span className="text-[7.5px] bg-red-600 text-white font-black px-1 rounded-full mb-0.5 animate-pulse">
+                    Đề x70 🎟️
                   </span>
                   <ChibiAvatar type="co_bay" emotion="happy" size={40} />
                   <span className="text-[8px] font-extrabold text-amber-900 mt-0.5">
-                    Cô Bảy (10k)
+                    Cô Bảy (Sổ Mơ)
                   </span>
                 </div>
               </div>

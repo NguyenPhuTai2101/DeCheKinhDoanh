@@ -25,13 +25,15 @@ export const LotteryDrawModal: React.FC = () => {
         setIsSpinning(false);
 
         if (lotteryDrawResult.prizeAmount > 0) {
-          soundManager.playCoin();
+          soundManager.playFanfare();
           confetti({
-            particleCount: 80,
-            spread: 70,
+            particleCount: 100,
+            spread: 80,
             origin: { y: 0.6 },
-            colors: ['#F59E0B', '#EF4444', '#10B981', '#EC4899'],
+            colors: ['#F59E0B', '#EF4444', '#10B981', '#EC4899', '#8B5CF6'],
           });
+        } else {
+          soundManager.playBuzzer();
         }
       }
     }, 90);
@@ -54,8 +56,8 @@ export const LotteryDrawModal: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 to-yellow-500 px-5 py-4 text-white relative">
           <div className="text-3xl animate-bounce-short">🎟️</div>
-          <h3 className="text-lg font-black tracking-wide mt-1">XỔ SỐ KIẾN THIẾT VỈA HÈ</h3>
-          <p className="text-xs text-amber-100 font-medium">Giờ Vàng Quay Thưởng 16:30 Chiều</p>
+          <h3 className="text-lg font-black tracking-wide mt-1">XỔ SỐ & ĐÁNH ĐỀ VỈA HÈ</h3>
+          <p className="text-xs text-amber-100 font-medium">Lồng Cầu Quay Thưởng Cô Bảy 16:30 Chiều</p>
 
           <button
             onClick={closeLotteryDrawModal}

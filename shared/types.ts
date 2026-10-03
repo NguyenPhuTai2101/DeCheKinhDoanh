@@ -229,6 +229,7 @@ export interface StreetEventChoice {
   cost?: number;
   gainMoney?: number;
   gainReputation?: number;
+  gainEnergy?: number;
   outcomeText: string;
 }
 
@@ -236,12 +237,14 @@ export interface StreetEvent {
   id: string;
   title: string;
   icon: string;
+  tag?: string;
   description: string;
   choices: StreetEventChoice[];
 }
 
 export interface LotteryTicket {
   ticketNumber: string; // 2 chữ số (ví dụ: '68')
+  betType?: 'de' | 'lo'; // 'de': trúng x70, 'lo': bao lô x3.5
   boughtDay: number;
   cost: number;
   drawnNumber?: string;

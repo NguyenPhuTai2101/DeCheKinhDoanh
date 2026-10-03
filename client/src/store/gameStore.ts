@@ -75,6 +75,19 @@ export interface GameStoreState {
   
   // V0.4: Sự kiện & Xổ số & Giao hàng runtime
   hasEventTriggeredToday: boolean;
+  dailyEventsCount: number;
+  lastEventTimeMinutes: number;
+  lastEventOutcome: {
+    eventTitle: string;
+    icon: string;
+    tag?: string;
+    choiceText: string;
+    outcomeText: string;
+    cost: number;
+    gainMoney: number;
+    gainReputation: number;
+    gainEnergy?: number;
+  } | null;
   isLotteryDrawnToday: boolean;
   deliveryOrders: DeliveryOrder[];
   lotteryDrawResult: {
@@ -127,11 +140,13 @@ export interface GameStoreState {
   // V0.4 - V0.5: Đế Chế Vỉa Hè (decheviahe.com)
   interactNeighbor: (neighborId: NeighborId) => void;
   giveGiftToNeighbor: (neighborId: NeighborId, recipeId: RecipeId) => boolean;
-  buyLotteryTicket: (chosenNum?: string) => boolean;
+  buyLotteryTicket: (chosenNum?: string, betAmount?: number, betType?: 'de' | 'lo') => boolean;
+  playInstantLotteryDraw: (chosenNum?: string, betAmount?: number, betType?: 'de' | 'lo') => void;
   checkLotteryDraw: () => void;
   closeLotteryDrawModal: () => void;
   triggerStreetEvent: (event?: StreetEvent) => void;
   resolveStreetEventChoice: (choiceIndex: number) => void;
+  closeStreetEventOutcome: () => void;
   upgradeBusinessStage: () => boolean;
 
   // V0.4: Giao hàng mang đi & Hàng xóm ghé bàn
@@ -166,6 +181,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   dailyCustomersLost: 0,
   isDailySummaryShown: false,
   hasEventTriggeredToday: false,
+  dailyEventsCount: 0,
+  lastEventTimeMinutes: 0,
+  lastEventOutcome: null,
   isLotteryDrawnToday: false,
   deliveryOrders: [],
   lotteryDrawResult: null,
@@ -265,8 +283,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     const newTime = gameState.gameTimeMinutes + deltaMinutes;
 
-    // Kích hoạt sự kiện đường phố ngẫu nhiên vào khoảng 08:30 - 15:00
-    if (!hasEventTriggeredToday && newTime >= 520 && newTime <= 900 && Math.random() < 0.25) {
+    // Kích hoạt sự kiện đường phố ngẫu nhiên theo nhịp điệu (cách nhau ít nhất 150 phút game)
+    const timeSinceLastEvent = newTime - get().lastEventTimeMinutes;
+    if (get().dailyEventsCount < 3 && timeSinceLastEvent >= 150 && Math.random() < 0.2) {
       get().triggerStreetEvent();
     }
 
@@ -826,12 +845,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return true;
   },
 
-  buyLotteryTicket: (chosenNum) => {
+  buyLotteryTicket: (chosenNum, betAmount = 10000, betType = 'de') => {
     const { gameState } = get();
-    const TICKET_COST = 10000;
 
-    if (gameState.money < TICKET_COST) {
-      get().showToast('❌ Cần 10,000 đ để mua 1 tờ vé số may mắn!');
+    if (gameState.money < betAmount) {
+      get().showToast(`❌ Cần ${betAmount.toLocaleString('vi-VN')} đ để mua vé!`);
       return false;
     }
 
@@ -853,14 +871,15 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     const newTicket: LotteryTicket = {
       ticketNumber,
+      betType,
       boughtDay: gameState.day,
-      cost: TICKET_COST,
+      cost: betAmount,
     };
 
     set({
       gameState: {
         ...gameState,
-        money: gameState.money - TICKET_COST,
+        money: gameState.money - betAmount,
         activeLotteryTicket: newTicket,
         neighbors: {
           ...gameState.neighbors,
@@ -873,9 +892,62 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       },
     });
 
-    get().showToast(`🎟️ Đã mua vé số may mắn số [${ticketNumber}] của Cô Bảy! Chiều 16h30 sẽ quay số.`);
+    get().showToast(`🎟️ Đã ghi [${ticketNumber}] (${betType === 'de' ? 'Đề Đuôi x70' : 'Bao Lô'}) với Cô Bảy! Chiều 16h30 sẽ quay số.`);
     get().saveLocal();
     return true;
+  },
+
+  playInstantLotteryDraw: (chosenNum, betAmount = 10000, betType = 'de') => {
+    const { gameState } = get();
+    if (gameState.money < betAmount) {
+      get().showToast(`❌ Cần ${betAmount.toLocaleString('vi-VN')} đ để thử vận may!`);
+      return;
+    }
+
+    const ticketNumber = chosenNum || Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    const drawnNumber = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    let prizeType: 'jackpot' | 'prize2' | 'prize3' | 'none' = 'none';
+    let prizeAmount = 0;
+
+    if (drawnNumber === ticketNumber) {
+      prizeType = 'jackpot';
+      prizeAmount = betType === 'de' ? betAmount * 70 : betAmount * 35;
+    } else if (drawnNumber[1] === ticketNumber[1]) {
+      prizeType = 'prize2';
+      prizeAmount = betAmount * 4;
+    } else if (Math.abs(parseInt(drawnNumber, 10) - parseInt(ticketNumber, 10)) === 1) {
+      prizeType = 'prize3';
+      prizeAmount = betAmount * 2;
+    }
+
+    const completedTicket: LotteryTicket = {
+      ticketNumber,
+      betType,
+      boughtDay: gameState.day,
+      cost: betAmount,
+      drawnNumber,
+      prizeType,
+      prizeAmount,
+    };
+
+    set((state) => ({
+      activeModal: 'lotteryDraw',
+      lotteryDrawResult: {
+        drawnNumber,
+        prizeType,
+        prizeAmount,
+        userTicket: ticketNumber,
+      },
+      dailyRevenue: state.dailyRevenue + prizeAmount,
+      dailyCost: state.dailyCost + betAmount,
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money - betAmount + prizeAmount,
+        lotteryHistory: [completedTicket, ...state.gameState.lotteryHistory].slice(0, 15),
+      },
+    }));
+
+    get().saveLocal();
   },
 
   checkLotteryDraw: () => {
@@ -888,15 +960,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     let prizeType: 'jackpot' | 'prize2' | 'prize3' | 'none' = 'none';
     let prizeAmount = 0;
 
+    const cost = ticket.cost || 10000;
+    const isDe = ticket.betType !== 'lo';
+
     if (drawnNumber === ticket.ticketNumber) {
       prizeType = 'jackpot';
-      prizeAmount = 300000;
+      prizeAmount = isDe ? cost * 70 : cost * 35;
     } else if (drawnNumber[1] === ticket.ticketNumber[1]) {
       prizeType = 'prize2';
-      prizeAmount = 40000;
+      prizeAmount = cost * 4;
     } else if (Math.abs(parseInt(drawnNumber, 10) - parseInt(ticket.ticketNumber, 10)) === 1) {
       prizeType = 'prize3';
-      prizeAmount = 20000;
+      prizeAmount = cost * 2;
     }
 
     const completedTicket: LotteryTicket = {
@@ -1080,18 +1155,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
 
   triggerStreetEvent: (event) => {
-    const { gameState, hasEventTriggeredToday } = get();
+    const { gameState } = get();
     if (gameState.currentEvent) return;
 
     const chosen = event || STREET_EVENTS[Math.floor(Math.random() * STREET_EVENTS.length)];
-    set({
+    set((state) => ({
       hasEventTriggeredToday: true,
+      dailyEventsCount: state.dailyEventsCount + 1,
+      lastEventTimeMinutes: state.gameState.gameTimeMinutes,
       activeModal: 'streetEvents',
+      lastEventOutcome: null,
       gameState: {
         ...gameState,
         currentEvent: chosen,
       },
-    });
+    }));
   },
 
   resolveStreetEventChoice: (choiceIndex) => {
@@ -1103,26 +1181,48 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const cost = choice.cost || 0;
     const gain = choice.gainMoney || 0;
     const rep = choice.gainReputation || 0;
+    const energy = choice.gainEnergy || 0;
 
     if (cost > 0 && gameState.money < cost) {
       get().showToast('❌ Không đủ tiền để thực hiện lựa chọn này!');
       return;
     }
 
+    const currentEnergy = gameState.player.energy;
+    const maxEnergy = gameState.player.maxEnergy;
+    const newEnergy = Math.max(0, Math.min(maxEnergy, currentEnergy + energy));
+
     set((state) => ({
       dailyRevenue: state.dailyRevenue + gain,
       dailyCost: state.dailyCost + cost,
-      activeModal: null,
+      lastEventOutcome: {
+        eventTitle: event.title,
+        icon: event.icon,
+        tag: event.tag,
+        choiceText: choice.text,
+        outcomeText: choice.outcomeText,
+        cost,
+        gainMoney: gain,
+        gainReputation: rep,
+        gainEnergy: energy,
+      },
       gameState: {
         ...state.gameState,
         money: state.gameState.money - cost + gain,
         reputation: Math.max(0, state.gameState.reputation + rep),
+        player: {
+          ...state.gameState.player,
+          energy: newEnergy,
+        },
         currentEvent: null,
       },
     }));
 
-    get().showToast(choice.outcomeText);
     get().saveLocal();
+  },
+
+  closeStreetEventOutcome: () => {
+    set({ lastEventOutcome: null, activeModal: null });
   },
 
   upgradeBusinessStage: () => {
@@ -1230,6 +1330,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       isShopOpen: false,
       isDailySummaryShown: false,
       hasEventTriggeredToday: false,
+      dailyEventsCount: 0,
+      lastEventTimeMinutes: 0,
+      lastEventOutcome: null,
       isLotteryDrawnToday: false,
       activeModal: null,
       dailyRevenue: 0,
@@ -1342,6 +1445,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCustomersLost: 0,
       activeModal: null,
       hasEventTriggeredToday: false,
+      dailyEventsCount: 0,
+      lastEventTimeMinutes: 0,
+      lastEventOutcome: null,
       isLotteryDrawnToday: false,
       isDailySummaryShown: false,
     });
