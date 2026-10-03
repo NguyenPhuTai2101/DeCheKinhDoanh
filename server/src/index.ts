@@ -8,6 +8,8 @@ import {
   CUSTOMER_TYPES,
   SHOP_UPGRADES,
   EMPLOYEES,
+  SHOP_THEMES,
+  DECORATION_ITEMS,
   INITIAL_GAME_STATE,
 } from '../../shared/gameData';
 import { GameSaveState } from '../../shared/types';
@@ -25,7 +27,7 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     game: 'Đế Chế Kinh Doanh (Cozy Business Story)',
-    version: '0.1.0',
+    version: '0.3.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -38,6 +40,8 @@ app.get('/api/game/catalog', (req: Request, res: Response) => {
     customerTypes: CUSTOMER_TYPES,
     upgrades: SHOP_UPGRADES,
     employees: EMPLOYEES,
+    themes: SHOP_THEMES,
+    decorations: DECORATION_ITEMS,
     initialState: INITIAL_GAME_STATE,
   });
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { CUSTOMER_TYPES, RECIPES, INGREDIENTS } from '../../../../shared/gameData';
+import { CUSTOMER_TYPES, RECIPES, INGREDIENTS, SHOP_THEMES, DECORATION_ITEMS } from '../../../../shared/gameData';
 import { CustomerTypeId, RecipeId, IngredientId } from '../../../../shared/types';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
@@ -234,18 +234,48 @@ export const CozyShopView: React.FC = () => {
     }, 1800);
   };
 
+  const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
+
+  // Tổng điểm Cozy từ đồ trang trí đã trưng bày
+  const cozyScore = gameState.equippedDecorations.reduce((sum, decorId) => {
+    const item = DECORATION_ITEMS.find((d) => d.id === decorId);
+    return sum + (item ? item.cozyPoints : 0);
+  }, 0);
+
   return (
-    <div className="w-full h-full flex flex-col bg-[#FAF5EE] overflow-hidden select-none">
+    <div
+      className="w-full h-full flex flex-col overflow-hidden select-none transition-colors duration-300"
+      style={{ backgroundColor: activeTheme.bgColor }}
+    >
       {/* 1. MÁI HIÊN & KHÔNG GIAN QUÁN CHIBI COZY */}
-      <div className="relative bg-[#FFF1F6] border-b-2 border-[#FFD6E5] pt-1 pb-3 px-3 shrink-0 shadow-sm overflow-hidden">
-        {/* Mái hiên sọc trắng hồng pastel phong cách Tiệm Trà Nhỏ */}
+      <div
+        className="relative border-b-2 pt-1 pb-3 px-3 shrink-0 shadow-sm overflow-hidden"
+        style={{
+          backgroundColor: activeTheme.accentColor,
+          borderColor: activeTheme.primaryColor,
+        }}
+      >
+        {/* Mái hiên sọc màu theo Theme phong cách Tiệm Trà Nhỏ */}
         <div className="absolute top-0 left-0 right-0 h-4 bg-repeat-x flex opacity-90">
           {Array.from({ length: 24 }).map((_, i) => (
             <div
               key={i}
-              className={`flex-1 h-full ${i % 2 === 0 ? 'bg-[#F7A8C4]' : 'bg-white'}`}
+              className="flex-1 h-full"
+              style={{
+                backgroundColor: i % 2 === 0 ? activeTheme.primaryColor : '#FFFFFF',
+              }}
             />
           ))}
+        </div>
+
+        {/* Đồ trang trí treo phía trên (Đèn chùm, Tranh mèo) */}
+        <div className="absolute top-4 right-14 flex items-center gap-2 pointer-events-none opacity-80">
+          {gameState.equippedDecorations.includes('deco_sun_lamp') && (
+            <span className="text-xl animate-bounce-short" title="Đèn Chùm Giọt Nắng">💡</span>
+          )}
+          {gameState.equippedDecorations.includes('deco_cat_painting') && (
+            <span className="text-lg" title="Tranh Mèo Thưởng Trà">🖼️</span>
+          )}
         </div>
 
         {/* Khung cảnh quầy bán hàng */}
@@ -254,7 +284,10 @@ export const CozyShopView: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="relative">
               <ChibiAvatar type="player" emotion="happy" size={54} />
-              <span className="absolute -bottom-1 -right-1 bg-[#F7A8C4] text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white">
+              <span
+                className="absolute -bottom-1 -right-1 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white"
+                style={{ backgroundColor: activeTheme.primaryColor }}
+              >
                 Bếp
               </span>
             </div>
@@ -277,9 +310,35 @@ export const CozyShopView: React.FC = () => {
               </div>
             )}
 
-            <div className="hidden sm:block leading-tight">
-              <h3 className="font-black text-xs text-[#7C5C55]">Tiệm Bánh Mì & Đồ Uống 🌸</h3>
-              <p className="text-[10px] text-[#9C7C75]">Hương vị truyền thống ngọt ngào</p>
+            {/* Đồ trang trí trên bàn quầy (Bình hoa, Menu phấn) */}
+            {gameState.equippedDecorations.includes('deco_flower_vase') && (
+              <span className="text-2xl animate-pulse" title="Bình Hoa Linh Lan">💐</span>
+            )}
+            {gameState.equippedDecorations.includes('deco_menu_chalk') && (
+              <span className="text-xl" title="Bảng Menu Vẽ Phấn">📋</span>
+            )}
+
+            <div className="leading-tight">
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-black text-xs sm:text-sm text-[#7C5C55]">
+                  {gameState.shopName || 'Tiệm Bánh Mì Của Tôi 🌸'}
+                </h3>
+                <button
+                  onClick={() => openModal('decor')}
+                  className="text-[#7C5C55]/60 hover:text-[#7C5C55] p-0.5"
+                  title="Đổi tên quán / Trang trí"
+                >
+                  <Sparkles className="w-3 h-3 text-[#F7A8C4]" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-[#9C7C75]">
+                <span>{activeTheme.name.split(' ')[0]}</span>
+                {cozyScore > 0 && (
+                  <span className="bg-[#FFE6A7] text-amber-800 font-bold px-1.5 py-0.2 rounded-full">
+                    +{cozyScore} Cozy ✨
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -290,7 +349,7 @@ export const CozyShopView: React.FC = () => {
               <div className="text-[10px] font-bold text-[#9C7C75]">Bếp Đang Nóng</div>
               <div className="text-[11px] font-black text-amber-700">
                 {orders.filter((o) => o.state === 'ready').length > 0
-                  ? '✨ Có Món Đã Xong!'
+                  ? '✨ Có Món Xong!'
                   : 'Sẵn Sàng Nấu'}
               </div>
             </div>

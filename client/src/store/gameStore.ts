@@ -5,6 +5,9 @@ import {
   RecipeId,
   DailySummary,
   CustomerInstance,
+  Employee,
+  ShopThemeId,
+  CareerTier,
 } from '../../../shared/types';
 import {
   INITIAL_GAME_STATE,
@@ -12,15 +15,18 @@ import {
   RECIPES,
   SHOP_UPGRADES,
   EMPLOYEES,
+  SHOP_THEMES,
+  DECORATION_ITEMS,
 } from '../../../shared/gameData';
 
-const LOCAL_STORAGE_KEY = 'cozy_empire_save_v1';
+const LOCAL_STORAGE_KEY = 'cozy_empire_save_v3';
 
 export type ModalType =
   | 'cooking'
   | 'market'
   | 'upgrades'
   | 'employees'
+  | 'decor'
   | 'dailySummary'
   | 'settings'
   | null;
@@ -55,7 +61,7 @@ export interface GameStoreState {
   // UI Toast message
   toastMessage: string | null;
 
-  // Actions
+  // Actions cơ bản
   setShopOpen: (open: boolean) => void;
   setTimeSpeed: (speed: number) => void;
   openModal: (modal: ModalType) => void;
@@ -72,7 +78,20 @@ export interface GameStoreState {
   finishServing: (tableIndex: number, revenue: number, tip: number) => void;
   handleCustomerLeaveAngry: (tableIndex: number) => void;
   purchaseUpgrade: (upgradeId: string) => boolean;
+  
+  // V0.2: Deep HR & Nhân sự
   hireEmployee: (employeeId: string) => boolean;
+  fireEmployee: (employeeId: string) => void;
+  trainEmployee: (employeeId: string) => boolean;
+  promoteEmployee: (employeeId: string) => boolean;
+  giveBonusEmployee: (employeeId: string, amount: number) => boolean;
+  
+  // V0.3: Trang trí & Themes
+  updateShopName: (name: string) => void;
+  buyTheme: (themeId: ShopThemeId) => boolean;
+  setTheme: (themeId: ShopThemeId) => void;
+  buyDecoration: (decorId: string) => boolean;
+  toggleEquipDecoration: (decorId: string) => void;
   
   // Day Cycle
   endDayAndSleep: () => void;
@@ -188,7 +207,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return false;
     }
 
-    // Kiểm tra sức chứa kho
     const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
     const addedStock = Object.values(items).reduce((a, b) => a + b, 0);
     if (currentStock + addedStock > gameState.storageCapacity) {
@@ -221,7 +239,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const recipe = RECIPES[recipeId];
     if (!recipe) return false;
 
-    // Kiểm tra đủ nguyên liệu
     for (const ingId of recipe.requiredIngredients) {
       if ((gameState.inventory[ingId] || 0) <= 0) {
         get().showToast(`❌ Hết ${INGREDIENTS[ingId]?.name}! Cần đi chợ mua thêm.`);
@@ -229,10 +246,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       }
     }
 
-    // Tiêu hao 3 năng lượng khi nấu
     if (!consumeEnergy(3)) return false;
 
-    // Trừ nguyên liệu
     const newInventory = { ...gameState.inventory };
     for (const ingId of recipe.requiredIngredients) {
       newInventory[ingId] -= 1;
@@ -261,7 +276,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   finishServing: (tableIndex, revenue, tip) => {
     const totalEarned = revenue + tip;
-    const { gameState } = get();
 
     set((state) => ({
       dailyRevenue: state.dailyRevenue + totalEarned,
@@ -321,31 +335,274 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       },
     });
 
-    get().showToast(`🎉 Đã mua thành công: ${upgrade.name}!`);
+    get().showToast(`🎉 Đã nâng cấp thành công: ${upgrade.name}!`);
     get().saveLocal();
     return true;
   },
 
+  // V0.2: Tuyển dụng & Quản lý nhân sự
   hireEmployee: (employeeId) => {
     const { gameState } = get();
-    const employee = EMPLOYEES.find((e) => e.id === employeeId);
-    if (!employee) return false;
+    const defaultEmp = EMPLOYEES.find((e) => e.id === employeeId);
+    if (!defaultEmp) return false;
 
     if (gameState.hiredEmployees.includes(employeeId)) {
       get().showToast('ℹ️ Nhân viên này đã được tuyển dụng!');
       return false;
     }
 
+    const empDetail: Employee = {
+      ...defaultEmp,
+      hired: true,
+      mood: 95,
+      stress: 10,
+      loyalty: 80,
+    };
+
     set({
       gameState: {
         ...gameState,
         hiredEmployees: [...gameState.hiredEmployees, employeeId],
+        employeeDetails: {
+          ...gameState.employeeDetails,
+          [employeeId]: empDetail,
+        },
       },
     });
 
-    get().showToast(`👩‍🍳 Đã chào đón ${employee.name} gia nhập tiệm!`);
+    get().showToast(`👩‍🍳 Đã chào đón ${defaultEmp.name} gia nhập tiệm!`);
     get().saveLocal();
     return true;
+  },
+
+  fireEmployee: (employeeId) => {
+    const { gameState } = get();
+    const emp = gameState.employeeDetails[employeeId] || EMPLOYEES.find((e) => e.id === employeeId);
+
+    const updatedHired = gameState.hiredEmployees.filter((id) => id !== employeeId);
+    const updatedDetails = { ...gameState.employeeDetails };
+    delete updatedDetails[employeeId];
+
+    set({
+      gameState: {
+        ...gameState,
+        hiredEmployees: updatedHired,
+        employeeDetails: updatedDetails,
+      },
+    });
+
+    get().showToast(`👋 Đã cho nghỉ việc nhân viên ${emp?.name || ''}.`);
+    get().saveLocal();
+  },
+
+  trainEmployee: (employeeId) => {
+    const { gameState } = get();
+    const trainCost = 25000;
+    if (gameState.money < trainCost) {
+      get().showToast('❌ Cần 25,000 đ chi phí đào tạo chuyên môn!');
+      return false;
+    }
+
+    const emp = gameState.employeeDetails[employeeId];
+    if (!emp) return false;
+
+    const newSpeed = +(emp.speed + 0.05).toFixed(2);
+    const newSkill = Math.min(100, emp.cookingSkill + 8);
+    const newExp = emp.experience + 50;
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - trainCost,
+        employeeDetails: {
+          ...gameState.employeeDetails,
+          [employeeId]: {
+            ...emp,
+            speed: newSpeed,
+            cookingSkill: newSkill,
+            experience: newExp,
+            mood: Math.min(100, emp.mood + 5),
+          },
+        },
+      },
+    });
+
+    get().showToast(`🎓 ${emp.name} đã hoàn thành khóa đào tạo! Tốc độ & Kỹ năng tăng vượt bậc.`);
+    get().saveLocal();
+    return true;
+  },
+
+  promoteEmployee: (employeeId) => {
+    const { gameState } = get();
+    const emp = gameState.employeeDetails[employeeId];
+    if (!emp) return false;
+
+    const careerLadder: CareerTier[] = ['intern', 'junior', 'senior', 'shift_leader', 'store_manager'];
+    const currentIdx = careerLadder.indexOf(emp.careerTier);
+    if (currentIdx >= careerLadder.length - 1) {
+      get().showToast('⭐ Nhân viên đã đạt cấp bậc cao nhất (Quản lý cửa hàng)!');
+      return false;
+    }
+
+    const nextTier = careerLadder[currentIdx + 1];
+    const newSalary = Math.round(emp.salaryPerDay * 1.35);
+
+    set({
+      gameState: {
+        ...gameState,
+        employeeDetails: {
+          ...gameState.employeeDetails,
+          [employeeId]: {
+            ...emp,
+            careerTier: nextTier,
+            salaryPerDay: newSalary,
+            loyalty: 100,
+            mood: 100,
+            stress: 0,
+            speed: +(emp.speed + 0.1).toFixed(2),
+          },
+        },
+      },
+    });
+
+    get().showToast(`🎉 Chúc mừng ${emp.name} đã được thăng chức lên ${nextTier.toUpperCase()}! Lòng trung thành đạt 100%.`);
+    get().saveLocal();
+    return true;
+  },
+
+  giveBonusEmployee: (employeeId, amount) => {
+    const { gameState } = get();
+    if (gameState.money < amount) {
+      get().showToast('❌ Không đủ tiền để thưởng nóng!');
+      return false;
+    }
+
+    const emp = gameState.employeeDetails[employeeId];
+    if (!emp) return false;
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - amount,
+        employeeDetails: {
+          ...gameState.employeeDetails,
+          [employeeId]: {
+            ...emp,
+            mood: 100,
+            stress: Math.max(0, emp.stress - 40),
+            loyalty: Math.min(100, emp.loyalty + 15),
+          },
+        },
+      },
+    });
+
+    get().showToast(`💖 Đã thưởng nóng ${amount.toLocaleString('vi-VN')} đ cho ${emp.name}! Nhân viên vô cùng hạnh phúc.`);
+    get().saveLocal();
+    return true;
+  },
+
+  // V0.3: Trang trí & Themes
+  updateShopName: (name) => {
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        shopName: name,
+      },
+    }));
+    get().showToast(`🌸 Đã đổi tên tiệm thành: "${name}"`);
+    get().saveLocal();
+  },
+
+  buyTheme: (themeId) => {
+    const { gameState } = get();
+    const theme = SHOP_THEMES[themeId];
+    if (!theme) return false;
+
+    if (gameState.ownedThemes.includes(themeId)) {
+      get().setTheme(themeId);
+      return true;
+    }
+
+    if (gameState.money < theme.cost) {
+      get().showToast(`❌ Cần ${theme.cost.toLocaleString('vi-VN')} đ để mở khóa chủ đề này!`);
+      return false;
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - theme.cost,
+        ownedThemes: [...gameState.ownedThemes, themeId],
+        activeTheme: themeId,
+      },
+    });
+
+    get().showToast(`✨ Đã mở khóa và kích hoạt chủ đề: ${theme.name}!`);
+    get().saveLocal();
+    return true;
+  },
+
+  setTheme: (themeId) => {
+    const { gameState } = get();
+    if (!gameState.ownedThemes.includes(themeId)) return;
+
+    set({
+      gameState: {
+        ...gameState,
+        activeTheme: themeId,
+      },
+    });
+
+    const theme = SHOP_THEMES[themeId];
+    get().showToast(`🎨 Đã đổi diện mạo quán sang: ${theme?.name || themeId}`);
+    get().saveLocal();
+  },
+
+  buyDecoration: (decorId) => {
+    const { gameState } = get();
+    const decor = DECORATION_ITEMS.find((d) => d.id === decorId);
+    if (!decor) return false;
+
+    if (gameState.ownedDecorations.includes(decorId)) {
+      get().toggleEquipDecoration(decorId);
+      return true;
+    }
+
+    if (gameState.money < decor.cost) {
+      get().showToast(`❌ Cần ${decor.cost.toLocaleString('vi-VN')} đ để mua đồ trang trí này!`);
+      return false;
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - decor.cost,
+        ownedDecorations: [...gameState.ownedDecorations, decorId],
+        equippedDecorations: [...gameState.equippedDecorations, decorId],
+      },
+    });
+
+    get().showToast(`💐 Đã mua và trang hoàng: ${decor.name}! (+${decor.cozyPoints} điểm Thẩm Mỹ Cozy)`);
+    get().saveLocal();
+    return true;
+  },
+
+  toggleEquipDecoration: (decorId) => {
+    const { gameState } = get();
+    const isEquipped = gameState.equippedDecorations.includes(decorId);
+    const updated = isEquipped
+      ? gameState.equippedDecorations.filter((id) => id !== decorId)
+      : [...gameState.equippedDecorations, decorId];
+
+    set({
+      gameState: {
+        ...gameState,
+        equippedDecorations: updated,
+      },
+    });
+
+    get().showToast(isEquipped ? '📦 Đã cất đồ trang trí vào kho.' : '✨ Đã trưng bày đồ trang trí lên quán!');
+    get().saveLocal();
   },
 
   endDayAndSleep: () => {
@@ -353,9 +610,28 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     // Tính lương nhân viên
     let totalSalaries = 0;
+    const updatedEmployees = { ...gameState.employeeDetails };
+
+    // Kiểm tra có tranh mèo giảm stress không
+    const hasCatPainting = gameState.equippedDecorations.includes('deco_cat_painting');
+
     for (const empId of gameState.hiredEmployees) {
-      const emp = EMPLOYEES.find((e) => e.id === empId);
-      if (emp) totalSalaries += emp.salaryPerDay;
+      const emp = updatedEmployees[empId] || EMPLOYEES.find((e) => e.id === empId);
+      if (emp) {
+        totalSalaries += emp.salaryPerDay;
+
+        // Cập nhật độ stress & mood sau ngày làm việc
+        const stressDelta = hasCatPainting ? 4 : 8;
+        const newStress = Math.min(100, (emp.stress || 15) + stressDelta);
+        const newMood = Math.max(10, (emp.mood || 85) - Math.floor(newStress / 10));
+
+        updatedEmployees[empId] = {
+          ...emp,
+          stress: newStress,
+          mood: newMood,
+          experience: (emp.experience || 0) + 20,
+        };
+      }
     }
 
     const netProfit = dailyRevenue - dailyCost - totalSalaries;
@@ -378,8 +654,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       money: Math.max(0, gameState.money - totalSalaries),
       player: {
         ...gameState.player,
-        energy: gameState.player.maxEnergy, // Hồi phục 100% năng lượng sau khi ngủ
+        energy: gameState.player.maxEnergy, // Hồi phục 100% năng lượng
       },
+      employeeDetails: updatedEmployees,
       historySummaries: [summary, ...gameState.historySummaries],
       lastSavedAt: new Date().toISOString(),
     };
@@ -395,7 +672,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCustomersLost: 0,
     });
 
-    get().showToast(`☀️ Chào buổi sáng Ngày ${nextDayState.day}! Năng lượng đã phục hồi 100%.`);
+    get().showToast(`☀️ Chào buổi sáng Ngày ${nextDayState.day}! Đã trả lương nhân viên (-${totalSalaries.toLocaleString('vi-VN')} đ).`);
     get().saveLocal();
     get().syncCloud();
   },
@@ -414,34 +691,50 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   loadGame: async () => {
     try {
-      // 1. Thử load từ LocalStorage
       const local = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local) as GameSaveState;
-        set({ gameState: parsed });
-        console.log('✅ Đã nạp dữ liệu từ LocalStorage');
+        // Merge with safe initial fallback values
+        set({
+          gameState: {
+            ...INITIAL_GAME_STATE,
+            ...parsed,
+            ownedThemes: parsed.ownedThemes || ['sakura_pink'],
+            ownedDecorations: parsed.ownedDecorations || [],
+            equippedDecorations: parsed.equippedDecorations || [],
+            employeeDetails: parsed.employeeDetails || {},
+            shopName: parsed.shopName || 'Tiệm Bánh Mì Của Tôi 🌸',
+          },
+        });
       }
 
-      // 2. Thử fetch từ Backend API
       const res = await fetch('/api/save/player_default');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
-          // So sánh phiên bản hoặc timestamp
           const cloudState = json.data as GameSaveState;
           const currentLocal = get().gameState;
           if (
             new Date(cloudState.lastSavedAt).getTime() >
             new Date(currentLocal.lastSavedAt || 0).getTime()
           ) {
-            set({ gameState: cloudState });
+            set({
+              gameState: {
+                ...INITIAL_GAME_STATE,
+                ...cloudState,
+                ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
+                ownedDecorations: cloudState.ownedDecorations || [],
+                equippedDecorations: cloudState.equippedDecorations || [],
+                employeeDetails: cloudState.employeeDetails || {},
+                shopName: cloudState.shopName || 'Tiệm Bánh Mì Của Tôi 🌸',
+              },
+            });
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
-            console.log('☁️ Đã đồng bộ save mới nhất từ Cloud Server');
           }
         }
       }
     } catch (e) {
-      console.warn('Backend chưa sẵn sàng hoặc ngoại tuyến, sử dụng Local save:', e);
+      console.warn('Sử dụng Local save do Cloud offline:', e);
     }
   },
 
@@ -453,9 +746,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state),
       });
-      console.log('☁️ Đã đồng bộ lên Cloud Server thành công');
     } catch (e) {
-      console.warn('Không thể kết nối đến server backend để đồng bộ:', e);
+      console.warn('Lỗi đồng bộ Cloud:', e);
     }
   },
 

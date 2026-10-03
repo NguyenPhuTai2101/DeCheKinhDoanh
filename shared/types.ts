@@ -101,14 +101,60 @@ export interface ShopUpgrade {
   };
 }
 
+export type EmployeePersonality =
+  | 'hardworking'
+  | 'friendly'
+  | 'ambitious'
+  | 'creative'
+  | 'extrovert';
+
+export type EmployeeRole = 'cook' | 'server' | 'manager';
+
+export type CareerTier = 'intern' | 'junior' | 'senior' | 'shift_leader' | 'store_manager';
+
 export interface Employee {
   id: string;
   name: string;
-  role: 'cook' | 'server';
+  role: EmployeeRole;
+  careerTier: CareerTier;
   avatar: string;
+  personality: EmployeePersonality;
+  personalityDesc: string;
   salaryPerDay: number;
-  speed: number; // Hệ số tốc độ
+  speed: number;
+  cookingSkill: number;
+  serviceSkill: number;
+  mood: number; // 0 - 100
+  stress: number; // 0 - 100
+  loyalty: number; // 0 - 100
+  experience: number;
   hired: boolean;
+  description: string;
+}
+
+export type ShopThemeId = 'sakura_pink' | 'mint_cafe' | 'lavender_dream' | 'cream_bakery';
+
+export interface ShopTheme {
+  id: ShopThemeId;
+  name: string;
+  description: string;
+  primaryColor: string;
+  accentColor: string;
+  bgColor: string;
+  unlocked: boolean;
+  cost: number;
+}
+
+export interface DecorationItem {
+  id: string;
+  name: string;
+  category: 'wall' | 'plant' | 'lighting' | 'furniture';
+  icon: string;
+  cost: number;
+  cozyPoints: number; // Điểm thẩm mỹ Cozy
+  bonusEffectDesc: string;
+  owned: boolean;
+  equipped: boolean;
   description: string;
 }
 
@@ -134,6 +180,7 @@ export interface PlayerStats {
 export interface GameSaveState {
   version: string;
   playerId: string;
+  shopName: string;
   day: number;
   gameTimeMinutes: number; // 360 (06:00) đến 1320 (22:00)
   money: number;
@@ -143,6 +190,11 @@ export interface GameSaveState {
   unlockedRecipes: RecipeId[];
   purchasedUpgrades: Record<string, number>;
   hiredEmployees: string[];
+  employeeDetails: Record<string, Employee>;
+  activeTheme: ShopThemeId;
+  ownedThemes: ShopThemeId[];
+  ownedDecorations: string[];
+  equippedDecorations: string[];
   storageCapacity: number;
   historySummaries: DailySummary[];
   lastSavedAt: string;

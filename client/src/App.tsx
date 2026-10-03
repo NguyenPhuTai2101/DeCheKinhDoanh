@@ -7,6 +7,7 @@ import { CookingModal } from './components/modals/CookingModal';
 import { MarketModal } from './components/modals/MarketModal';
 import { UpgradesModal } from './components/modals/UpgradesModal';
 import { EmployeesModal } from './components/modals/EmployeesModal';
+import { DecorModal } from './components/modals/DecorModal';
 import { DailySummaryModal } from './components/modals/DailySummaryModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { ToastNotification } from './components/ToastNotification';
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
         {activeModal === 'market' && <MarketModal />}
         {activeModal === 'upgrades' && <UpgradesModal />}
         {activeModal === 'employees' && <EmployeesModal />}
+        {activeModal === 'decor' && <DecorModal />}
         {activeModal === 'dailySummary' && <DailySummaryModal />}
         {activeModal === 'settings' && <SettingsModal />}
 
