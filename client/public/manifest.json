@@ -1,0 +1,17 @@
+{
+  "name": "Tiệm Nhỏ Của Tôi 🌸 Cozy Business Story",
+  "short_name": "Tiệm Nhỏ",
+  "description": "Game nhập vai kinh doanh cozy - từ quán nhỏ đến tập đoàn đa ngành",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF1F6",
+  "theme_color": "#F7A8C4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
