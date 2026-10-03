@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { CUSTOMER_TYPES, RECIPES, INGREDIENTS, SHOP_THEMES, DECORATION_ITEMS, BUSINESS_STAGES, NEIGHBORS_DATA } from '../../../../shared/gameData';
-import { CustomerTypeId, RecipeId, IngredientId, NeighborId } from '../../../../shared/types';
+import {
+  CUSTOMER_TYPES,
+  RECIPES,
+  INGREDIENTS,
+  SHOP_THEMES,
+  BUSINESS_STAGES,
+  NEIGHBORS_DATA,
+} from '../../../../shared/gameData';
+import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder } from '../../../../shared/types';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
-import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag, HeartHandshake, Megaphone, Ticket, Bike } from 'lucide-react';
+import {
+  Utensils,
+  Sparkles,
+  Check,
+  Store,
+  ShoppingBag,
+  Eye,
+  RotateCcw,
+  Flame,
+  Clock,
+  Bike,
+  Plus,
+  Heart,
+  Coffee,
+} from 'lucide-react';
 import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
-
-interface ActiveOrder {
-  id: string;
-  tableIndex: number;
-  typeId: CustomerTypeId;
-  neighborId?: NeighborId;
-  dialogue?: string;
-  recipeId: RecipeId;
-  patienceRemaining: number;
-  maxPatience: number;
-  state: 'waiting' | 'ready' | 'eating' | 'leaving';
-}
 
 export const CozyShopView: React.FC = () => {
   const {
@@ -27,7 +36,6 @@ export const CozyShopView: React.FC = () => {
     setShopOpen,
     timeSpeed,
     tickTime,
-    consumeEnergy,
     completeCooking,
     finishServing,
     handleCustomerLeaveAngry,
@@ -40,30 +48,29 @@ export const CozyShopView: React.FC = () => {
     setCurrentView,
   } = useGameStore();
 
-  // Đồng bộ danh sách bàn đón khách với store toàn cục
+  // Đồng bộ đơn hàng với store
   const orders = activeOrders;
   const setOrders = setActiveOrders;
   const [selectedOrderIndex, setSelectedOrderIndex] = useState<number | null>(null);
-  
-  // Khay nguyên liệu người chơi đang chọn cho đơn hiện tại
+
+  // Khay nguyên liệu đang chọn trên thớt
   const [selectedIngredients, setSelectedIngredients] = useState<Record<string, boolean>>({});
 
-  // 1. Quản lý số bàn tối đa từ Cơ Nghiệp Vỉa Hè (decheviahe.com)
+  // Cấu hình cấp bậc
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const upgrades = gameState.purchasedUpgrades;
-  const maxTables = currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+  const maxTables =
+    currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+  const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
 
-  // 2. Vòng lặp thời gian & sinh khách
+  // 1. Vòng lặp thời gian & tính kiên nhẫn của khách
   useEffect(() => {
     if (!isShopOpen || timeSpeed === 0) return;
 
     const interval = setInterval(() => {
-      // 1 giây = 2.5 phút game
       tickTime(2.5 * timeSpeed);
 
-      // Cập nhật thanh kiên nhẫn
       setOrders((prev) => {
-        let updated = false;
         const next = prev.map((order) => {
           if (order.state === 'waiting') {
             const newPatience = order.patienceRemaining - 1 * timeSpeed;
@@ -75,16 +82,14 @@ export const CozyShopView: React.FC = () => {
           }
           return order;
         });
-
-        // Lọc bỏ khách đã rời đi
         return next.filter((o) => o.state !== 'leaving');
       });
     }, 1000 / timeSpeed);
 
     return () => clearInterval(interval);
-  }, [isShopOpen, timeSpeed, tickTime, handleCustomerLeaveAngry]);
+  }, [isShopOpen, timeSpeed, tickTime, handleCustomerLeaveAngry, setOrders]);
 
-  // 3. Định kỳ sinh khách mới theo cấp độ vỉa hè
+  // 2. Vòng lặp đón khách mới
   useEffect(() => {
     if (!isShopOpen || timeSpeed === 0) return;
 
@@ -96,7 +101,6 @@ export const CozyShopView: React.FC = () => {
       setOrders((prev) => {
         if (prev.length >= maxTables) return prev;
 
-        // Tìm bàn trống đầu tiên
         const occupiedIndices = prev.map((o) => o.tableIndex);
         let freeTable = 1;
         for (let i = 1; i <= maxTables; i++) {
@@ -106,7 +110,6 @@ export const CozyShopView: React.FC = () => {
           }
         }
 
-        // Tỷ lệ xuất hiện khách VIP Xóm Giềng (28%)
         const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
         const seatedNeighbors = prev.map((o) => o.neighborId).filter(Boolean);
         const availableNeighbors = neighborKeys.filter((k) => !seatedNeighbors.includes(k));
@@ -118,7 +121,7 @@ export const CozyShopView: React.FC = () => {
         let chosenType: CustomerTypeId = 'student';
         let chosenRecipe: RecipeId = 'banh_mi_trung';
         let dialogue: string | undefined = undefined;
-        let patienceSeconds = 30;
+        let patienceSeconds = 35;
 
         if (chosenNeighborId) {
           const nData = NEIGHBORS_DATA[chosenNeighborId];
@@ -126,7 +129,7 @@ export const CozyShopView: React.FC = () => {
           chosenType = 'neighborhood';
           chosenRecipe = nData.favoriteDishId;
           dialogue = nData.dialogues[nRel.level] || nData.dialogues[1];
-          patienceSeconds = 48; // Hàng xóm kiên nhẫn và thích ngồi tán gẫu
+          patienceSeconds = 50;
         } else {
           const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
           chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
@@ -155,16 +158,22 @@ export const CozyShopView: React.FC = () => {
     }, spawnRate / timeSpeed);
 
     return () => clearInterval(spawnInterval);
-  }, [isShopOpen, timeSpeed, maxTables, currentStage.customerRateMs, gameState.purchasedUpgrades, gameState.neighbors]);
+  }, [
+    isShopOpen,
+    timeSpeed,
+    maxTables,
+    currentStage.customerRateMs,
+    gameState.purchasedUpgrades,
+    gameState.neighbors,
+    setOrders,
+  ]);
 
-
-  // 4. Tự động phục vụ nếu có nhân viên
+  // 3. Tự động phục vụ nếu có nhân viên
   useEffect(() => {
     if (!isShopOpen || timeSpeed === 0) return;
 
     const hired = gameState.hiredEmployees;
 
-    // Bé Mai tự bưng món
     if (hired.includes('emp_mai')) {
       const readyOrder = orders.find((o) => o.state === 'ready');
       if (readyOrder) {
@@ -172,7 +181,6 @@ export const CozyShopView: React.FC = () => {
       }
     }
 
-    // Bác Linh tự nấu nếu còn nguyên liệu
     if (hired.includes('emp_linh')) {
       const waitingOrder = orders.find((o) => o.state === 'waiting');
       if (waitingOrder) {
@@ -193,13 +201,13 @@ export const CozyShopView: React.FC = () => {
         }
       }
     }
-  }, [orders, isShopOpen, timeSpeed, gameState.hiredEmployees, gameState.inventory]);
+  }, [orders, isShopOpen, timeSpeed, gameState.hiredEmployees, gameState.inventory, setOrders]);
 
-  // Chọn một đơn để chuẩn bị
+  // Đơn hàng đang được chọn chế biến
   const activeOrder = orders.find((o) => o.tableIndex === selectedOrderIndex) || orders[0] || null;
   const currentRecipe = activeOrder ? RECIPES[activeOrder.recipeId] : null;
 
-  // Toggle chọn nguyên liệu cho đơn đang chọn
+  // Chạm khay nguyên liệu để thêm/bỏ trên thớt
   const toggleIngredient = (ingId: string) => {
     soundManager.playClick();
     setSelectedIngredients((prev) => ({
@@ -208,7 +216,11 @@ export const CozyShopView: React.FC = () => {
     }));
   };
 
-  // Kiểm tra người chơi đã chọn đúng nguyên liệu của công thức chưa
+  const clearCuttingBoard = () => {
+    soundManager.playClick();
+    setSelectedIngredients({});
+  };
+
   const hasMatchedRecipe = () => {
     if (!currentRecipe) return false;
     for (const req of currentRecipe.requiredIngredients) {
@@ -230,7 +242,7 @@ export const CozyShopView: React.FC = () => {
     return true;
   };
 
-  // Bấm Hoàn thành món
+  // Nấu xong món trên thớt
   const handleCookCurrent = () => {
     if (!activeOrder || !currentRecipe) return;
 
@@ -251,13 +263,11 @@ export const CozyShopView: React.FC = () => {
     const patiencePercent = order.patienceRemaining / order.maxPatience;
     let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
 
-    // Nếu là hàng xóm thân thiết, cộng thêm tip và tăng hảo cảm
     if (order.neighborId) {
       tip += Math.round(recipe.basePrice * 0.2);
       serveNeighborGuest(order.neighborId);
     }
 
-    // Chuyển sang trạng thái ăn
     setOrders((prev) =>
       prev.map((o) => (o.id === order.id ? { ...o, state: 'eating' } : o))
     );
@@ -266,569 +276,531 @@ export const CozyShopView: React.FC = () => {
       soundManager.playCoin();
       finishServing(order.tableIndex, recipe.basePrice, tip);
 
-      // Bắn confetti chúc mừng
       confetti({
-        particleCount: order.neighborId ? 45 : 25,
+        particleCount: order.neighborId ? 45 : 30,
         spread: 50,
-        origin: { y: 0.7 },
+        origin: { y: 0.65 },
         colors: order.neighborId
           ? ['#F43F5E', '#FB7185', '#FBBF24', '#38BDF8']
           : ['#F7A8C4', '#FFD6E5', '#FFE6A7'],
       });
 
-      // Khách rời đi
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
     }, 1800);
   };
 
-  const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
+  // Danh sách 12 khay nhân chính xếp lưới 3x4 (Topping Bar)
+  const toppingGrid = [
+    { id: 'pate', name: 'Pate Gan', icon: '🥫', color: '#8D6E63' },
+    { id: 'egg', name: 'Trứng Ốp La', icon: '🍳', color: '#FFF59D' },
+    { id: 'pork', name: 'Thịt Xá Xíu', icon: '🥩', color: '#EF5350' },
+    { id: 'cucumber', name: 'Dưa Leo Giòn', icon: '🥒', color: '#A5D6A7' },
+    { id: 'herb', name: 'Rau Thơm Ngò', icon: '🌿', color: '#81C784' },
+    { id: 'bread', name: 'Bánh Mì Giòn', icon: '🥖', color: '#FFE082' },
+    { id: 'tea', name: 'Trà Lài Thơm', icon: '🧋', color: '#80CBC4' },
+    { id: 'coffee', name: 'Cà Phê Phin', icon: '☕', color: '#6D4C41' },
+    { id: 'milk', name: 'Sữa Tươi', icon: '🥛', color: '#ECEFF1' },
+    { id: 'condensed_milk', name: 'Sữa Đặc', icon: '🍯', color: '#FFD54F' },
+    { id: 'sauce', name: 'Sốt Cay', icon: '🌶️', color: '#FF7043' },
+    { id: 'butter', name: 'Bơ Béo Ngậy', icon: '🧈', color: '#FFF176' },
+  ];
 
-  // Tổng điểm Cozy từ đồ trang trí đã trưng bày
-  const cozyScore = gameState.equippedDecorations.reduce((sum, decorId) => {
-    const item = DECORATION_ITEMS.find((d) => d.id === decorId);
-    return sum + (item ? item.cozyPoints : 0);
-  }, 0);
+  // Dãy 6 bình chứa cốt trên tầng 1 (Glass Dispenser Jars)
+  const dispenserJars = [
+    { id: 'tra_sua', name: 'TRÀ SỮA', color: '#D7CCC8', liquid: '#BCAAA4', icon: '🧋' },
+    { id: 'cafe', name: 'CÀ PHÊ', color: '#5D4037', liquid: '#3E2723', icon: '☕' },
+    { id: 'hong_tra', name: 'HỒNG TRÀ', color: '#EF9A9A', liquid: '#C62828', icon: '🍵' },
+    { id: 'luc_tra', name: 'LỤC TRÀ', color: '#C8E6C9', liquid: '#388E3C', icon: '🍃' },
+    { id: 'sot_dac', name: 'NƯỚC SỐT', color: '#FFCC80', liquid: '#E65100', icon: '🥫' },
+    { id: 'bo_vang', name: 'BƠ BÉO', color: '#FFF59D', liquid: '#FBC02D', icon: '🧈' },
+  ];
+
+  // Dãy 6 khay sốt & foam có muỗng múc ở tầng 3
+  const sauceFoamTubs = [
+    { name: 'FOAM CHEESE', color: '#FFF9C4', icon: '🧀' },
+    { name: 'FOAM MATCHA', color: '#C8E6C9', icon: '🍵' },
+    { name: 'FOAM MUỐI', color: '#FFFFFF', icon: '🧂' },
+    { name: 'SỐT MAYO', color: '#FFFDE7', icon: '🥚' },
+    { name: 'ĐÁ VIÊN', color: '#E1F5FE', icon: '🧊' },
+    { name: 'NƯỚC ĐƯỜNG', color: '#FFE082', icon: '🍯' },
+  ];
+
+  // Dãy chai siro bơm vòi ở tầng dưới cùng (Syrup Pump Bottles)
+  const syrupBottles = [
+    { name: 'Vải', color: '#FCE4EC', liquid: '#F48FB1' },
+    { name: 'Đào', color: '#FFF3E0', liquid: '#FFB74D' },
+    { name: 'Dâu', color: '#FFEBEE', liquid: '#E57373' },
+    { name: 'Nho', color: '#F3E5F5', liquid: '#BA68C8' },
+    { name: 'Xoài', color: '#FFFDE7', liquid: '#FFF176' },
+    { name: 'Táo', color: '#FFEBEE', liquid: '#EF5350' },
+    { name: 'Chuối', color: '#FFF8E1', liquid: '#FFE082' },
+    { name: 'Dưa Lưới', color: '#E8F5E9', liquid: '#81C784' },
+    { name: 'Cacao', color: '#EFEBE9', liquid: '#8D6E63' },
+  ];
+
+  const formatGameTime = (minutes: number) => {
+    const h = Math.floor(minutes / 60);
+    const m = Math.floor(minutes % 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
 
   return (
-    <div
-      className="w-full h-full flex flex-col overflow-hidden select-none transition-colors duration-300"
-      style={{ backgroundColor: activeTheme.bgColor }}
-    >
-      {/* 1. MÁI HIÊN & KHÔNG GIAN QUÁN CHIBI COZY */}
-      <div
-        className="relative border-b-2 pt-1 pb-3 px-3 shrink-0 shadow-sm overflow-hidden"
-        style={{
-          backgroundColor: activeTheme.accentColor,
-          borderColor: activeTheme.primaryColor,
-        }}
-      >
-        {/* Mái hiên sọc màu theo Theme phong cách Tiệm Trà Nhỏ */}
-        <div className="absolute top-0 left-0 right-0 h-4 bg-repeat-x flex opacity-90">
-          {Array.from({ length: 24 }).map((_, i) => (
+    <div className="w-full h-full flex flex-col overflow-y-auto select-none bg-[#FDF7EE] text-[#5D4037] relative pb-2">
+      {/* 1. MÁI HIÊN CONG SỌC HỒNG TRẮNG CUTE (TIỆM TRÀ NHỎ FORMAT) */}
+      <div className="relative shrink-0">
+        <div className="h-6 w-full flex overflow-hidden shadow-xs">
+          {Array.from({ length: 26 }).map((_, i) => (
             <div
               key={i}
-              className="flex-1 h-full"
+              className="flex-1 h-full rounded-b-md"
               style={{
-                backgroundColor: i % 2 === 0 ? activeTheme.primaryColor : '#FFFFFF',
+                backgroundColor: i % 2 === 0 ? '#F48FB1' : '#FFFFFF',
               }}
             />
           ))}
         </div>
-
-        {/* Đồ trang trí treo phía trên (Đèn chùm, Tranh mèo) */}
-        <div className="absolute top-4 right-14 flex items-center gap-2 pointer-events-none opacity-80">
-          {gameState.equippedDecorations.includes('deco_sun_lamp') && (
-            <span className="text-xl animate-bounce-short" title="Đèn Chùm Giọt Nắng">💡</span>
-          )}
-          {gameState.equippedDecorations.includes('deco_cat_painting') && (
-            <span className="text-lg" title="Tranh Mèo Thưởng Trà">🖼️</span>
-          )}
-        </div>
-
-        {/* Khung cảnh quầy bán hàng */}
-        <div className="mt-4 flex items-center justify-between gap-2">
-          {/* Nhân viên / Chủ tiệm sau quầy */}
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <ChibiAvatar type="player" emotion="happy" size={54} />
-              <span
-                className="absolute -bottom-1 -right-1 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white"
-                style={{ backgroundColor: activeTheme.primaryColor }}
-              >
-                Bếp
-              </span>
-            </div>
-
-            {/* Trợ lý nếu đã thuê */}
-            {gameState.hiredEmployees.includes('emp_mai') && (
-              <div className="relative">
-                <ChibiAvatar type="emp_mai" emotion="love" size={46} />
-                <span className="absolute -bottom-1 -right-1 bg-[#FF80AB] text-white text-[8px] font-black px-1 rounded-full border border-white">
-                  Mai
-                </span>
-              </div>
-            )}
-            {gameState.hiredEmployees.includes('emp_linh') && (
-              <div className="relative">
-                <ChibiAvatar type="emp_linh" emotion="happy" size={46} />
-                <span className="absolute -bottom-1 -right-1 bg-[#455A64] text-white text-[8px] font-black px-1 rounded-full border border-white">
-                  Linh
-                </span>
-              </div>
-            )}
-
-            {/* Đồ trang trí trên bàn quầy (Bình hoa, Menu phấn) */}
-            {gameState.equippedDecorations.includes('deco_flower_vase') && (
-              <span className="text-2xl animate-pulse" title="Bình Hoa Linh Lan">💐</span>
-            )}
-            {gameState.equippedDecorations.includes('deco_menu_chalk') && (
-              <span className="text-xl" title="Bảng Menu Vẽ Phấn">📋</span>
-            )}
-
-            <div className="leading-tight">
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-black text-xs sm:text-sm text-[#7C5C55]">
-                  {gameState.shopName || 'Tiệm Bánh Mì Của Tôi 🌸'}
-                </h3>
-                <button
-                  onClick={() => openModal('decor')}
-                  className="text-[#7C5C55]/60 hover:text-[#7C5C55] p-0.5"
-                  title="Đổi tên quán / Trang trí"
-                >
-                  <Sparkles className="w-3 h-3 text-[#F7A8C4]" />
-                </button>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-[#9C7C75]">
-                <button
-                  onClick={() => {
-                    soundManager.playClick();
-                    openModal('upgrades');
-                  }}
-                  className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-extrabold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 active:scale-95 transition-all"
-                  title="Cấp bậc vỉa hè - Bấm để nâng cấp cơ nghiệp"
-                >
-                  <span>{currentStage.icon}</span>
-                  <span>{currentStage.name}</span>
-                </button>
-                {cozyScore > 0 && (
-                  <span className="bg-[#FFE6A7] text-amber-800 font-bold px-1.5 py-0.2 rounded-full">
-                    +{cozyScore} Cozy ✨
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* Nút ra đường quan sát vỉa hè */}
-            <button
-              onClick={() => {
-                soundManager.playClick();
-                setCurrentView('street');
-              }}
-              className="flex items-center gap-1 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black px-2.5 py-1.5 rounded-2xl shadow-sm border border-amber-500 text-[11px] active:scale-95 transition-all animate-pulse"
-              title="Ra ngoài vỉa hè ngắm phố xá và các bàn ăn ngoài trời"
-            >
-              <span>👀</span>
-              <span>Ra Đường</span>
-            </button>
-
-            {/* Lò nướng đang bốc khói ấm áp */}
-            <div className="flex items-center gap-2 bg-[#FFF7ED] px-3 py-1.5 rounded-2xl border border-[#F7D7BA] shadow-sm">
-              <div className="text-xl animate-bounce-short">♨️</div>
-              <div className="text-right">
-                <div className="text-[10px] font-bold text-[#9C7C75]">Bếp Đang Nóng</div>
-                <div className="text-[11px] font-black text-amber-700">
-                  {orders.filter((o) => o.state === 'ready').length > 0
-                    ? '✨ Có Món Xong!'
-                    : 'Sẵn Sàng Nấu'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Banner đơn giao hàng mang đi Chú Năm nếu có */}
-        {deliveryOrders.length > 0 && (
-          <div
-            onClick={() => {
-              soundManager.playClick();
-              openModal('delivery');
-            }}
-            className="mt-2.5 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 text-white rounded-2xl p-2 px-3 flex items-center justify-between cursor-pointer shadow-md hover:brightness-105 active:scale-98 transition-all animate-pulse"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🛵</span>
-              <div>
-                <div className="text-[11px] font-black leading-tight flex items-center gap-1.5">
-                  <span>Có {deliveryOrders.length} Đơn Giao Hàng Chú Năm!</span>
-                  <span className="bg-amber-400 text-amber-950 text-[9px] px-1.5 py-0.2 rounded-full font-black">
-                    Nóng hổi
-                  </span>
-                </div>
-                <div className="text-[9px] text-sky-100 font-medium">
-                  Chạm để đóng gói & ship tận nơi cho bà con trong xóm
-                </div>
-              </div>
-            </div>
-            <span className="bg-white text-sky-700 text-[10px] font-black px-2.5 py-1 rounded-xl shrink-0 shadow-sm">
-              Giao Đơn 🚀
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* 2. HÀNG THẺ KHÁCH HÀNG & BÀ CON XÓM GIỀNG */}
-      <div className="p-2.5 bg-white/70 border-b border-[#F2E8E5] shrink-0 space-y-2">
-        {/* Thanh phím tắt xóm giềng vỉa hè nhanh */}
-        <div className="flex items-center justify-between gap-1.5 text-[10px]">
-          <HorizontalScrollBox className="flex items-center gap-1 scrollbar-none py-0.5">
-            <button
-              onClick={() => {
-                soundManager.playClick();
-                setCurrentView('street');
-              }}
-              className="px-2.5 py-0.5 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 border border-amber-500 font-black flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0 animate-pulse"
-              title="Ra ngoài vỉa hè quan sát phố xá và các bàn ghế ăn uống"
-            >
-              <span>👀</span>
-              <span>Ra Đường Quan Sát</span>
-            </button>
-
-            <button
-              onClick={() => {
-                soundManager.playClick();
-                openModal('neighbors');
-              }}
-              className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold flex items-center gap-1 hover:bg-rose-100 transition-all active:scale-95 shrink-0"
-            >
-              <span>👵</span>
-              <span>Bà Con Xóm</span>
-            </button>
-
-            <button
-              onClick={() => {
-                soundManager.playClick();
-                openModal('streetEvents');
-              }}
-              className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-bold flex items-center gap-1 hover:bg-sky-100 transition-all active:scale-95 shrink-0"
-            >
-              <span>📢</span>
-              <span>Chuyện Vỉa Hè</span>
-              {gameState.currentEvent && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />}
-            </button>
-
-            {gameState.activeLotteryTicket ? (
-              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-bold flex items-center gap-1 shrink-0">
-                <span>🎟️</span>
-                <span>Vé [{gameState.activeLotteryTicket.ticketNumber}]</span>
-              </span>
-            ) : (
-              <button
-                onClick={() => {
-                  soundManager.playClick();
-                  openModal('neighbors');
-                }}
-                className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold flex items-center gap-1 hover:bg-amber-100 transition-all active:scale-95 shrink-0"
-              >
-                <span>🎟️</span>
-                <span>Mua Vé Số Cô Bảy</span>
-              </button>
-            )}
-          </HorizontalScrollBox>
-
-          {!isShopOpen && (
-            <button
-              onClick={() => {
-                soundManager.playClick();
-                setShopOpen(true);
-              }}
-              className="px-2.5 py-0.5 bg-[#F7A8C4] hover:bg-[#f28bb1] text-white rounded-full font-black shadow-sm flex items-center gap-1 active:scale-95 animate-pulse shrink-0"
-            >
-              <Store className="w-3 h-3" />
-              <span>Mở Quán</span>
-            </button>
-          )}
-        </div>
-
-        {/* Header danh sách bàn */}
-        <div className="flex items-center justify-between text-[11px] font-black text-[#7C5C55]">
-          <span className="flex items-center gap-1">
-            <span>🪑</span> Ghế Nhựa Đang Đón Khách ({orders.length}/{maxTables} Bàn)
-          </span>
-          <span className="text-[10px] text-[#9C7C75] font-semibold">
-            {currentStage.name}
-          </span>
-        </div>
-
-        {/* Danh sách thẻ khách hàng cuộn ngang siêu nét */}
-        <HorizontalScrollBox showArrows={orders.length > 2} className="flex items-center gap-2.5 no-scrollbar pb-1">
-          {orders.length === 0 ? (
-            <div className="w-full py-3 bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA] text-center flex flex-col items-center justify-center gap-0.5">
-              <span className="text-xl">☕</span>
-              <p className="text-xs font-bold text-[#7C5C55]">
-                {isShopOpen
-                  ? 'Bà con khu phố đang tạt qua mua món...'
-                  : 'Quán đang dọn dẹp. Bấm [Mở Quán] để đón khách nhé!'}
-              </p>
-            </div>
-          ) : (
-            orders.map((order) => {
-              const recipe = RECIPES[order.recipeId];
-              const cType = CUSTOMER_TYPES[order.typeId];
-              const isSelected = (activeOrder?.id === order.id);
-              const patiencePercent = Math.max(0, order.patienceRemaining / order.maxPatience);
-
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => {
-                    soundManager.playClick();
-                    setSelectedOrderIndex(order.tableIndex);
-                  }}
-                  className={`relative shrink-0 w-44 bg-white rounded-2xl p-2.5 border-2 transition-all cursor-pointer shadow-sm ${
-                    isSelected
-                      ? 'border-[#F7A8C4] ring-2 ring-[#FFD6E5] bg-[#FFF1F6]/30'
-                      : 'border-[#F2E8E5] hover:border-[#F7D7BA]'
-                  }`}
-                >
-                  {/* Avatar và thông tin khách */}
-                  <div className="flex items-center gap-2">
+      {/* 2. KHUNG BONG BÓNG KHÁCH GỌI MÓN (SPEECH BUBBLE TO RÕ) */}
+      <div className="p-2 shrink-0">
+        <div className="bg-white rounded-3xl border-3 border-[#8D6E63] p-2.5 shadow-sm relative flex flex-col gap-1.5">
+          {activeOrder && currentRecipe ? (
+            <div>
+              {/* Header khách & Tabs chuyển bàn */}
+              <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-[#F2E8E5]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="relative shrink-0">
                     <ChibiAvatar
-                      type={order.neighborId || order.typeId}
+                      type={activeOrder.neighborId || activeOrder.typeId}
                       emotion={
-                        order.state === 'eating'
+                        activeOrder.state === 'eating'
                           ? 'eating'
-                          : order.state === 'ready'
+                          : activeOrder.state === 'ready'
                           ? 'love'
-                          : patiencePercent > 0.4
+                          : activeOrder.patienceRemaining / activeOrder.maxPatience > 0.4
                           ? 'waiting'
                           : 'angry'
                       }
                       size={44}
                     />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] font-black text-[#7C5C55] truncate">
-                          Bàn {order.tableIndex} ·{' '}
-                          {order.neighborId
-                            ? NEIGHBORS_DATA[order.neighborId].name
-                            : cType.name.split(' ')[0]}
-                        </span>
-                        {order.neighborId && (
-                          <span className="text-[8px] bg-rose-100 text-rose-700 font-extrabold px-1 py-0.2 rounded-full shrink-0">
-                            VIP
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] font-bold text-[#F7A8C4] truncate flex items-center gap-1">
-                        <span>{recipe.icon}</span>
-                        <span>{recipe.name}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Lời chào / Câu thoại tâm tình xóm giềng */}
-                  {order.dialogue && (
-                    <div className="mt-1.5 p-1.5 bg-[#FFF9F2] rounded-xl border border-amber-200 text-[10px] text-amber-900 leading-tight italic flex items-start gap-1">
-                      <span className="shrink-0 not-italic">💬</span>
-                      <span className="line-clamp-2">"{order.dialogue}"</span>
-                    </div>
-                  )}
-
-                  {/* Phím tắt tương tác nhanh nếu Cô Bảy ghé bàn */}
-                  {order.neighborId === 'co_bay' && !gameState.activeLotteryTicket && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        soundManager.playClick();
-                        buyLotteryTicket();
-                      }}
-                      className="w-full mt-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl text-[9px] font-black border border-amber-300 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                    >
-                      <span>🎟️ Mua Vé Số Cô Bảy (10k)</span>
-                    </button>
-                  )}
-
-                  {/* Phím tắt nhanh nếu Chú Năm ghé bàn */}
-                  {order.neighborId === 'chu_nam' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        soundManager.playClick();
-                        openModal('delivery');
-                      }}
-                      className="w-full mt-1.5 py-0.5 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-xl text-[9px] font-black border border-sky-300 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                    >
-                      <span>🛵 Đội Xe Ship Chú Năm</span>
-                    </button>
-                  )}
-
-
-                  {/* Thanh kiên nhẫn */}
-                  {order.state === 'waiting' && (
-                    <div className="mt-2">
-                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 rounded-full ${
-                            patiencePercent > 0.5
-                              ? 'bg-emerald-400'
-                              : patiencePercent > 0.25
-                              ? 'bg-amber-400'
-                              : 'bg-rose-500'
-                          }`}
-                          style={{ width: `${patiencePercent * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Nút hành động trực tiếp trên thẻ */}
-                  <div className="mt-2">
-                    {order.state === 'ready' ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleServeDish(order);
-                        }}
-                        className="w-full py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black shadow-sm flex items-center justify-center gap-1 animate-bounce-short active:scale-95"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>BƯNG MÓN NGAY 🤲</span>
-                      </button>
-                    ) : order.state === 'eating' ? (
-                      <div className="w-full py-1 bg-amber-50 text-amber-700 rounded-xl text-[10px] font-black text-center border border-amber-200">
-                        😋 Đang thưởng thức...
-                      </div>
-                    ) : (
-                      <div
-                        className={`w-full py-1 rounded-xl text-[10px] font-black text-center ${
-                          isSelected
-                            ? 'bg-[#F7A8C4] text-white shadow-sm'
-                            : 'bg-[#FFF7ED] text-[#7C5C55] border border-[#F7D7BA]'
-                        }`}
-                      >
-                        {isSelected ? 'Đang Chuẩn Bị' : 'Chạm Để Làm Món'}
-                      </div>
+                    {activeOrder.neighborId && (
+                      <span className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[8px] font-black px-1 rounded-full">
+                        VIP
+                      </span>
                     )}
                   </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black text-[#5D4037] truncate flex items-center gap-1">
+                      <span>Bàn {activeOrder.tableIndex}:</span>
+                      <span className="text-pink-600 font-extrabold truncate">
+                        {activeOrder.neighborId
+                          ? NEIGHBORS_DATA[activeOrder.neighborId].name
+                          : CUSTOMER_TYPES[activeOrder.typeId]?.name.split(' ')[0]}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate italic">
+                      "{activeOrder.dialogue || 'Cho mình gọi món nha chủ quán!'}"
+                    </div>
+                  </div>
                 </div>
-              );
-            })
-          )}
-        </HorizontalScrollBox>
-      </div>
 
-
-      {/* 3. KHU VỰC QUẦY CHẾ BIẾN TRỰC QUAN (COOKING STATION - FORMAT TIỆM TRÀ NHỎ) */}
-      <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
-        {activeOrder && currentRecipe ? (
-          <div className="bg-white rounded-3xl p-3.5 border-2 border-[#FFD6E5] shadow-sm flex flex-col gap-3">
-            {/* Header đơn đang chọn */}
-            <div className="flex items-center justify-between pb-2 border-b border-[#F2E8E5]">
-              <div className="flex items-center gap-2">
-                <span className="text-3xl bg-[#FFF1F6] p-2 rounded-2xl border border-[#FFD6E5]">
-                  {currentRecipe.icon}
-                </span>
-                <div>
-                  <h4 className="font-black text-sm text-[#7C5C55]">
-                    Đơn Bàn {activeOrder.tableIndex}: {currentRecipe.name}
-                  </h4>
-                  <p className="text-[11px] text-[#9C7C75]">
-                    Giá bán: <span className="font-extrabold text-[#F7A8C4]">{currentRecipe.basePrice.toLocaleString('vi-VN')} đ</span> · Cần {currentRecipe.requiredIngredients.length} nguyên liệu
-                  </p>
-                </div>
-              </div>
-
-              {activeOrder.state === 'ready' && (
-                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 font-black text-xs rounded-full border border-emerald-200">
-                  ✨ Đã Nấu Xong
-                </span>
-              )}
-            </div>
-
-            {/* Khay chọn nguyên liệu to rõ, sắc nét, chạm mượt */}
-            <div>
-              <div className="text-xs font-black text-[#7C5C55] mb-2 flex items-center justify-between">
-                <span>Chạm khay chọn nguyên liệu:</span>
-                <span className="text-[10px] text-[#9C7C75]">
-                  (Bấm đúng theo công thức)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {Object.values(INGREDIENTS).map((ing) => {
-                  const isChecked = !!selectedIngredients[ing.id];
-                  const stock = gameState.inventory[ing.id] || 0;
-                  const isRequired = currentRecipe.requiredIngredients.includes(ing.id as any);
-
-                  return (
+                {/* Tabs chuyển đổi giữa các bàn khách */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {orders.map((o) => (
                     <button
-                      key={ing.id}
-                      onClick={() => toggleIngredient(ing.id)}
-                      className={`p-2.5 rounded-2xl border-2 flex items-center gap-2 text-left transition-all active:scale-95 ${
-                        isChecked
-                          ? 'bg-[#FFD6E5] border-[#F7A8C4] font-bold text-[#7C5C55] shadow-sm'
-                          : 'bg-[#FFF9F2] border-[#F2E8E5] text-[#7C5C55]'
+                      key={o.id}
+                      onClick={() => {
+                        soundManager.playClick();
+                        setSelectedOrderIndex(o.tableIndex);
+                      }}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all ${
+                        o.tableIndex === activeOrder.tableIndex
+                          ? 'bg-[#F48FB1] text-white shadow-xs'
+                          : 'bg-[#FFF7ED] text-[#7C5C55] border border-[#F7D7BA]'
                       }`}
                     >
-                      <span className="text-2xl">{ing.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold truncate">{ing.name}</div>
-                        <div
-                          className={`text-[10px] ${
-                            stock > 0 ? 'text-[#9C7C75]' : 'text-rose-500 font-black'
-                          }`}
-                        >
-                          Kho: {stock} {stock <= 0 && '(Hết hàng)'}
-                        </div>
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] shrink-0 ${
-                          isChecked
-                            ? 'bg-[#F7A8C4] text-white border-[#F7A8C4]'
-                            : 'border-slate-300 bg-white'
-                        }`}
-                      >
-                        {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                      </div>
+                      B{o.tableIndex}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              {/* Tên món khách gọi & Thành phần cần */}
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl bg-pink-50 p-1 rounded-xl border border-pink-200">
+                    {currentRecipe.icon}
+                  </span>
+                  <div>
+                    <div className="text-xs font-black text-[#5D4037]">
+                      {currentRecipe.name}
+                    </div>
+                    <div className="text-[10px] text-pink-600 font-bold flex items-center gap-1 flex-wrap">
+                      <span>Cần:</span>
+                      {currentRecipe.requiredIngredients.map((ingId) => {
+                        const ing = INGREDIENTS[ingId];
+                        const isPicked = !!selectedIngredients[ingId];
+                        return (
+                          <span
+                            key={ingId}
+                            className={`px-1 rounded ${
+                              isPicked
+                                ? 'bg-emerald-100 text-emerald-800 font-black'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {ing?.icon} {ing?.name.split(' ')[0]}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Giá tiền */}
+                <div className="text-right shrink-0">
+                  <div className="text-xs font-black text-amber-700">
+                    {currentRecipe.basePrice.toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[9px] text-emerald-600 font-bold">
+                    + Tip tùy tốc độ
+                  </div>
+                </div>
+              </div>
+
+              {/* Thanh kiên nhẫn */}
+              <div className="mt-1.5 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-400 transition-all duration-300 rounded-full"
+                  style={{
+                    width: `${Math.max(
+                      0,
+                      (activeOrder.patienceRemaining / activeOrder.maxPatience) * 100
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Khi chưa có khách */
+            <div className="py-2.5 text-center flex flex-col items-center justify-center">
+              <span className="text-xl">🌸</span>
+              <div className="text-xs font-black text-[#5D4037] mt-0.5">
+                Đang chờ khách ghé quán...
+              </div>
+              <div className="text-[10px] text-[#9C7C75]">
+                {isShopOpen
+                  ? 'Ngồi chơi xíu đi, bà con xóm sắp ghé mua bánh mì & trà sữa rồi nè!'
+                  : 'Quán đang đóng cửa. Bấm [Mở Quán] để đón khách nha!'}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. TẦNG 1: QUẦY CỐT TRÀ & CÀ PHÊ & MÁY ÉP (DISPENSER JARS) */}
+      <div className="px-2 mb-1.5 shrink-0">
+        <div className="bg-[#EFEBE9] rounded-2xl border-2 border-[#8D6E63] p-2 shadow-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-black uppercase text-[#6D4C41] bg-white px-1.5 py-0.2 rounded border border-[#8D6E63]">
+              QUẦY CỐT NƯỚC & NƯỚNG
+            </span>
+            <span className="text-[9px] font-bold text-slate-500">
+              Vòi rót tự động
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-1.5">
+            {/* Chồng ly / Bánh mì bên trái */}
+            <div className="flex items-center gap-1 shrink-0">
+              <div
+                onClick={() => toggleIngredient('bread')}
+                className={`p-1 bg-white rounded-xl border border-[#8D6E63] flex flex-col items-center cursor-pointer active:scale-95 transition-all ${
+                  selectedIngredients['bread'] ? 'ring-2 ring-pink-400 bg-pink-50' : ''
+                }`}
+                title="Bánh Mì Giòn"
+              >
+                <span className="text-xl">🥖</span>
+                <span className="text-[7px] font-black">BÁNH MÌ</span>
+              </div>
+              <div
+                className="p-1 bg-white rounded-xl border border-[#8D6E63] flex flex-col items-center opacity-85"
+                title="Ly M / L"
+              >
+                <span className="text-xl">🥤</span>
+                <span className="text-[7px] font-black">LY M/L</span>
               </div>
             </div>
 
-            {/* Nút nấu hoặc bưng món */}
-            <div className="pt-2 border-t border-[#F2E8E5]">
-              {activeOrder.state === 'ready' ? (
-                <button
-                  onClick={() => handleServeDish(activeOrder)}
-                  className="w-full py-3.5 rounded-2xl font-black text-sm bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 active:scale-95"
+            {/* Dãy 6 bình chứa cốt thủy tinh có vòi rót inox */}
+            <div className="flex-1 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar px-1">
+              {dispenserJars.map((jar) => (
+                <div
+                  key={jar.id}
+                  onClick={() => {
+                    if (jar.id === 'tra_sua') toggleIngredient('tea');
+                    if (jar.id === 'cafe') toggleIngredient('coffee');
+                    soundManager.playClick();
+                  }}
+                  className="flex flex-col items-center cursor-pointer active:scale-95 group shrink-0"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>BƯNG RA BÀN CHO KHÁCH (THU TIỀN + TIP 💰)</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleCookCurrent}
-                  disabled={!hasMatchedRecipe() || !isStockAvailable()}
-                  className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 ${
-                    hasMatchedRecipe() && isStockAvailable()
-                      ? 'bg-[#F7A8C4] hover:bg-[#f28bb1] text-white shadow-pink-200'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  }`}
-                >
-                  <Utensils className="w-4 h-4" />
-                  <span>
-                    {!hasMatchedRecipe()
-                      ? `Chọn đúng nguyên liệu của ${currentRecipe.name}`
-                      : !isStockAvailable()
-                      ? 'Kho đã hết nguyên liệu!'
-                      : 'HOÀN THÀNH MÓN ĂN (3 ⚡)'}
+                  {/* Bình thủy tinh */}
+                  <div className="w-11 h-13 rounded-t-xl rounded-b-md border-2 border-[#795548] bg-white relative flex flex-col justify-end overflow-hidden shadow-xs">
+                    {/* Nắp bình màu bạc */}
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-[#CFD8DC] border-b border-[#795548]" />
+                    {/* Cốt nước bên trong */}
+                    <div
+                      className="w-full h-8 opacity-85"
+                      style={{ backgroundColor: jar.color }}
+                    />
+                    {/* Vòi vặn rót bên dưới */}
+                    <div className="w-2.5 h-1.5 bg-[#9E9E9E] rounded-xs mx-auto mb-0.5 border border-[#616161]" />
+                  </div>
+                  <span className="text-[7px] font-black text-[#5D4037] mt-0.5 truncate max-w-[44px]">
+                    {jar.name}
                   </span>
-                </button>
-              )}
+                </div>
+              ))}
+            </div>
+
+            {/* Máy ép nắp / Lò nướng bên phải */}
+            <div className="p-1.5 bg-[#455A64] rounded-xl border border-[#263238] text-white text-center shrink-0 flex flex-col items-center">
+              <span className="text-base">♨️</span>
+              <span className="text-[7px] font-black bg-emerald-500 px-1 rounded mt-0.5">
+                READY
+              </span>
             </div>
           </div>
-        ) : (
-          /* Trạng thái chưa có đơn hoặc quán vắng */
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-white rounded-3xl border-2 border-[#FFD6E5]">
-            <div className="w-16 h-16 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-3xl mb-2">
-              🌸
-            </div>
-            <h4 className="font-black text-base text-[#7C5C55]">Quầy Pha Chế Sẵn Sàng</h4>
-            <p className="text-xs text-[#9C7C75] max-w-xs mt-1">
-              Khi khách đến và gọi món, hãy chạm vào thẻ của khách ở trên để bắt đầu chuẩn bị món ăn nhé!
-            </p>
-            <button
-              onClick={() => openModal('market')}
-              className="mt-4 px-4 py-2 bg-[#FFF7ED] text-[#7C5C55] border-2 border-[#F7D7BA] hover:bg-[#FFD6E5] rounded-full text-xs font-black flex items-center gap-1.5 shadow-sm active:scale-95"
+        </div>
+      </div>
+
+      {/* 4. TẦNG 2: THỚT GỖ CHẾ BIẾN & KHAY INOX 12 Ô TOPPING (TRỌNG TÂM FORMAT) */}
+      <div className="px-2 mb-1.5 shrink-0 flex gap-2">
+        {/* Thớt gỗ chế biến (Bên trái) */}
+        <div className="w-28 shrink-0 bg-[#D7CCC8] rounded-2xl border-2 border-[#6D4C41] p-1.5 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between text-[8px] font-black text-[#5D4037]">
+            <span>THỚT CHẾ BIẾN</span>
+            {Object.values(selectedIngredients).some(Boolean) && (
+              <button
+                onClick={clearCuttingBoard}
+                className="text-rose-600 hover:text-rose-700 p-0.5"
+                title="Xóa làm lại"
+              >
+                <RotateCcw className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Mặt thớt vân gỗ */}
+          <div className="flex-1 my-1 bg-[#EFEBE9] rounded-xl border border-[#8D6E63] p-1.5 flex flex-col items-center justify-center relative overflow-hidden shadow-inner min-h-[90px]">
+            {Object.keys(selectedIngredients).filter((k) => selectedIngredients[k]).length >
+            0 ? (
+              <div className="flex flex-col items-center gap-0.5">
+                {/* Món đang hình thành trên thớt */}
+                <span className="text-2xl animate-bounce-short">
+                  {currentRecipe ? currentRecipe.icon : '🥖'}
+                </span>
+                <div className="flex flex-wrap justify-center gap-0.5 max-w-[90px]">
+                  {Object.keys(selectedIngredients)
+                    .filter((k) => selectedIngredients[k])
+                    .map((k) => (
+                      <span key={k} className="text-xs" title={k}>
+                        {INGREDIENTS[k as IngredientId]?.icon || '✨'}
+                      </span>
+                    ))}
+                </div>
+                <span className="text-[8px] font-black text-[#5D4037] mt-0.5 truncate max-w-[85px]">
+                  {currentRecipe?.name || 'Món Đang Làm'}
+                </span>
+              </div>
+            ) : (
+              <div className="text-center text-[8px] text-slate-400 font-medium">
+                Chạm khay chọn nguyên liệu
+              </div>
+            )}
+          </div>
+
+          {/* Ca đong inox */}
+          <div className="text-[8px] text-center font-bold text-slate-500 bg-white/70 rounded py-0.5">
+            🥛 Ca đong inox
+          </div>
+        </div>
+
+        {/* Khay Inox 12 Ô Topping / Nhân Bánh (Bên phải - Lưới 3x4 chuẩn hình mẫu) */}
+        <div className="flex-1 bg-[#ECEFF1] rounded-2xl border-2 border-[#78909C] p-1.5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[8px] font-black text-[#37474F] mb-1">
+            <span>KHAY NGUYÊN LIỆU & TOPPING INOX (12 KHAY)</span>
+            <span>Chạm để cho vào thớt</span>
+          </div>
+
+          {/* Lưới 12 ô vuông inox */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {toppingGrid.map((top) => {
+              const stock = gameState.inventory[top.id as IngredientId] ?? 99;
+              const isChecked = !!selectedIngredients[top.id];
+              const isNeeded = currentRecipe?.requiredIngredients.includes(top.id as any);
+
+              return (
+                <div
+                  key={top.id}
+                  onClick={() => toggleIngredient(top.id)}
+                  className={`relative rounded-xl border-2 p-1 flex flex-col items-center justify-center cursor-pointer transition-all active:scale-90 shadow-2xs ${
+                    isChecked
+                      ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-300'
+                      : isNeeded
+                      ? 'bg-white border-[#B0BEC5] hover:border-pink-300'
+                      : 'bg-white/80 border-[#CFD8DC]'
+                  }`}
+                  style={{ minHeight: '44px' }}
+                >
+                  {/* Số lượng tồn kho badge tròn nhỏ góc trên */}
+                  <span
+                    className={`absolute top-0.5 right-0.5 text-[7px] font-black px-1 rounded-full border ${
+                      stock > 0
+                        ? 'bg-white text-slate-700 border-slate-300'
+                        : 'bg-rose-500 text-white border-white'
+                    }`}
+                  >
+                    {stock > 99 ? '99+' : stock}
+                  </span>
+
+                  {/* Icon nguyên liệu */}
+                  <span className="text-base leading-none mb-0.5">{top.icon}</span>
+                  <span className="text-[7px] font-black text-[#37474F] truncate max-w-full leading-tight">
+                    {top.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. TẦNG 3: DÃY KHAY FOAM & SỐT CÓ MUỖNG MÚC (SAUCE TUBS) */}
+      <div className="px-2 mb-1.5 shrink-0">
+        <div className="bg-[#E0E0E0] rounded-2xl border-2 border-[#9E9E9E] p-1.5 shadow-xs">
+          <div className="text-[8px] font-black uppercase text-[#424242] mb-1 flex items-center justify-between">
+            <span>DÃY KHAY SỐT & FOAM & ĐÁ VIÊN</span>
+            <span>Muỗng múc inox</span>
+          </div>
+
+          <div className="grid grid-cols-6 gap-1">
+            {sauceFoamTubs.map((tub, idx) => (
+              <div
+                key={idx}
+                onClick={() => {
+                  soundManager.playClick();
+                  if (tub.name.includes('MUỐI') || tub.name.includes('SỐT')) {
+                    toggleIngredient('pate');
+                  }
+                }}
+                className="bg-white rounded-lg border border-[#BDBDBD] p-1 flex flex-col items-center relative cursor-pointer active:scale-95 hover:border-amber-400 shadow-2xs"
+              >
+                {/* Muỗng múc inox cán dài cắm trong khay */}
+                <div className="w-1 h-3 bg-[#9E9E9E] rounded-xs -mt-2 mb-0.5 shadow-xs" />
+                <span className="text-sm">{tub.icon}</span>
+                <span className="text-[6.5px] font-black text-[#424242] text-center truncate max-w-full mt-0.5">
+                  {tub.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 6. TẦNG 4: KỆ CHAI SIRO BƠM VÒI (SYRUP PUMP BOTTLES - NHƯ HÌNH MẪU) */}
+      <div className="px-2 mb-2 shrink-0">
+        <div className="bg-[#D7CCC8] rounded-xl border border-[#8D6E63] p-1 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
+          {syrupBottles.map((bot, i) => (
+            <div
+              key={i}
+              onClick={() => soundManager.playClick()}
+              className="flex flex-col items-center cursor-pointer active:scale-90 shrink-0"
+              title={`Siro hương ${bot.name}`}
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
-              <span>Kiểm Tra Kho & Mua Thêm Nguyên Liệu</span>
+              {/* Vòi nhấn đen */}
+              <div className="w-2 h-1 bg-[#424242] rounded-t-xs" />
+              {/* Thân chai siro thủy tinh */}
+              <div className="w-6 h-10 bg-white border border-[#8D6E63] rounded-t-sm rounded-b-md flex flex-col justify-end p-0.5 overflow-hidden shadow-2xs">
+                {/* Nước siro màu tươi tắn */}
+                <div
+                  className="w-full h-5 rounded-b-xs opacity-90"
+                  style={{ backgroundColor: bot.liquid }}
+                />
+              </div>
+              <span className="text-[6.5px] font-bold text-[#5D4037] mt-0.5">
+                {bot.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 7. NÚT HÀNH ĐỘNG CHÍNH (HOÀN THÀNH MÓN / BƯNG CHO KHÁCH / RA PHỐ) */}
+      <div className="px-2 mt-auto shrink-0 space-y-1.5">
+        {/* Nút Hoàn thành món hoặc Bưng món */}
+        {activeOrder ? (
+          activeOrder.state === 'ready' ? (
+            <button
+              onClick={() => handleServeDish(activeOrder)}
+              className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs shadow-md shadow-emerald-200 flex items-center justify-center gap-1.5 active:scale-95 animate-bounce-short transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>BƯNG RA BÀN {activeOrder.tableIndex} (THU TIỀN + TIP 💰)</span>
             </button>
+          ) : (
+            <button
+              onClick={handleCookCurrent}
+              disabled={!hasMatchedRecipe() || !isStockAvailable()}
+              className={`w-full py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 ${
+                hasMatchedRecipe() && isStockAvailable()
+                  ? 'bg-[#F48FB1] hover:bg-[#ec407a] text-white shadow-pink-200 animate-pulse'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+              }`}
+            >
+              <Utensils className="w-4 h-4" />
+              <span>
+                {!hasMatchedRecipe()
+                  ? `Chọn đủ nguyên liệu của ${currentRecipe?.name}`
+                  : !isStockAvailable()
+                  ? 'Kho đã hết nguyên liệu!'
+                  : `HOÀN THÀNH MÓN ${currentRecipe?.name.toUpperCase()} (3 ⚡)`}
+              </span>
+            </button>
+          )
+        ) : (
+          <div className="py-2.5 bg-white/70 rounded-2xl border border-dashed border-amber-300 text-center text-xs font-bold text-amber-800">
+            Quầy pha chế sẵn sàng! Khách ghé sẽ hiện ở bong bóng trên.
           </div>
         )}
+
+        {/* Thanh phím tắt dưới cùng: Ra Phố Quan Sát & Đơn Giao Hàng */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              setCurrentView('street');
+            }}
+            className="flex-1 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-xs border border-amber-500 flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Ra Đường Quan Sát (Bàn Ghế Vỉa Hè)</span>
+          </button>
+
+          {deliveryOrders.length > 0 && (
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                openModal('delivery');
+              }}
+              className="py-2 px-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs flex items-center gap-1 shadow-xs active:scale-95 transition-all animate-pulse"
+              title="Có đơn giao hàng Chú Năm"
+            >
+              <Bike className="w-3.5 h-3.5" />
+              <span>Đơn Ship ({deliveryOrders.length})</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
