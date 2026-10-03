@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { BUSINESS_STAGES } from '../../../shared/gameData';
 import { Play, Pause, FastForward, Clock, Zap, Award, Store, Volume2, VolumeX } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 
 export const TopBar: React.FC = () => {
-  const { gameState, isShopOpen, setShopOpen, timeSpeed, setTimeSpeed } = useGameStore();
+  const { gameState, isShopOpen, setShopOpen, timeSpeed, setTimeSpeed, openModal } = useGameStore();
   const [isMuted, setIsMuted] = useState(false);
 
   const toggleSound = () => {
@@ -19,23 +20,31 @@ export const TopBar: React.FC = () => {
   };
 
   const energyPercent = Math.round((gameState.player.energy / gameState.player.maxEnergy) * 100);
+  const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
 
   return (
     <header className="w-full bg-[#FAF5EE] border-b-2 border-[#FFD6E5] px-3 py-2 flex flex-col gap-1.5 shadow-sm z-30 shrink-0">
       {/* Hàng 1: Tên quán, Tiền mặt, Nút Mở/Đóng cửa */}
       <div className="w-full flex items-center justify-between gap-2">
         {/* Tên & Cấp độ */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-sm shadow-inner shrink-0">
-            🌸
+        <div
+          onClick={() => {
+            soundManager.playClick();
+            openModal('ledger');
+          }}
+          className="flex items-center gap-1.5 min-w-0 cursor-pointer group"
+          title="Bấm để xem Sổ Sách & Cơ Nghiệp Vỉa Hè"
+        >
+          <div className="w-8 h-8 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-sm shadow-inner shrink-0 group-hover:scale-105 transition-all">
+            {currentStage.icon}
           </div>
           <div className="leading-tight truncate">
             <div className="flex items-center gap-1">
-              <span className="font-extrabold text-[#7C5C55] text-xs truncate">
-                {gameState.player.name}
+              <span className="font-extrabold text-[#7C5C55] text-xs truncate group-hover:text-pink-600 transition-colors">
+                {gameState.shopName}
               </span>
-              <span className="text-[9px] bg-[#FFD6E5] text-[#7C5C55] px-1 py-0.2 rounded-full font-bold shrink-0">
-                Lv.{gameState.player.cookingLevel}
+              <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold shrink-0 border border-amber-200">
+                {currentStage.name}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-[#9C7C75] font-semibold">
@@ -50,6 +59,7 @@ export const TopBar: React.FC = () => {
             </div>
           </div>
         </div>
+
 
         {/* Tiền mặt & Nút Mở Cửa */}
         <div className="flex items-center gap-1.5 shrink-0">

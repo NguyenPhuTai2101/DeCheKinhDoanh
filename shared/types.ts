@@ -177,6 +177,75 @@ export interface PlayerStats {
   cookingExp: number;
 }
 
+// === V0.4 - V0.5: ĐẾ CHẾ VỈA HÈ (decheviahe.com) ===
+
+export type BusinessStageId = 'cart' | 'corner' | 'awning' | 'eatery' | 'empire';
+
+export interface BusinessStage {
+  id: BusinessStageId;
+  name: string;
+  tagline: string;
+  icon: string;
+  maxTables: number;
+  customerRateMs: number;
+  cost: number;
+  requiredReputation: number;
+  description: string;
+}
+
+export type NeighborId = 'bac_ba' | 'co_bay' | 'chu_nam' | 'be_bong' | 'chi_lan';
+
+export interface NeighborStorySecret {
+  level: number;
+  title: string;
+  story: string;
+}
+
+export interface NeighborData {
+  id: NeighborId;
+  name: string;
+  nickname: string;
+  role: string;
+  avatar: string;
+  gender: 'male' | 'female';
+  favoriteDishId: RecipeId;
+  dialogues: Record<number, string>; // 1 -> 5 sao
+  secrets: NeighborStorySecret[];
+  perkDescription: string;
+}
+
+export interface NeighborRelationship {
+  level: number; // 1 đến 5 tim
+  intimacyExp: number;
+  unlockedSecretIds: number[];
+  lastInteractedDay: number;
+}
+
+export interface StreetEventChoice {
+  text: string;
+  cost?: number;
+  gainMoney?: number;
+  gainReputation?: number;
+  outcomeText: string;
+}
+
+export interface StreetEvent {
+  id: string;
+  title: string;
+  icon: string;
+  description: string;
+  choices: StreetEventChoice[];
+}
+
+export interface LotteryTicket {
+  ticketNumber: string; // 2 chữ số (ví dụ: '68')
+  boughtDay: number;
+  cost: number;
+  drawnNumber?: string;
+  prizeType?: 'jackpot' | 'prize2' | 'prize3' | 'none';
+  prizeAmount?: number;
+}
+
 export interface GameSaveState {
   version: string;
   playerId: string;
@@ -198,4 +267,12 @@ export interface GameSaveState {
   storageCapacity: number;
   historySummaries: DailySummary[];
   lastSavedAt: string;
+
+  // Thuộc tính mới V0.4 - V0.5: Đế Chế Vỉa Hè
+  businessStage: BusinessStageId;
+  neighbors: Record<NeighborId, NeighborRelationship>;
+  activeLotteryTicket?: LotteryTicket | null;
+  lotteryHistory: LotteryTicket[];
+  currentEvent?: StreetEvent | null;
 }
+

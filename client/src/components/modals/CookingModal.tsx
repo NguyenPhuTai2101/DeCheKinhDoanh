@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { RECIPES, INGREDIENTS } from '../../../../shared/gameData';
 import { RecipeId, IngredientId } from '../../../../shared/types';
-import { gameBridge } from '../../game/gameBridge';
 import { soundManager } from '../../utils/soundManager';
 import { X, Check, Utensils, Sparkles } from 'lucide-react';
 
@@ -81,11 +80,9 @@ export const CookingModal: React.FC = () => {
 
   const handleFinishCooking = () => {
     const tableIndex = selectedTableForCooking || 1;
-    const success = completeCooking(selectedRecipeId, tableIndex);
-    if (success) {
-      gameBridge.markFoodReady(tableIndex);
-    }
+    completeCooking(selectedRecipeId, tableIndex);
   };
+
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">

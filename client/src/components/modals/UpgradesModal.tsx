@@ -1,19 +1,15 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { SHOP_UPGRADES } from '../../../../shared/gameData';
-import { gameBridge } from '../../game/gameBridge';
 import { X, Sparkles, Check, ArrowUpRight } from 'lucide-react';
 
 export const UpgradesModal: React.FC = () => {
   const { closeModal, gameState, purchaseUpgrade } = useGameStore();
 
   const handleBuyUpgrade = (upgradeId: string) => {
-    const success = purchaseUpgrade(upgradeId);
-    if (success) {
-      // Cập nhật lại các bàn hoặc nội thất trên Phaser Scene
-      gameBridge.syncStaff();
-    }
+    purchaseUpgrade(upgradeId);
   };
+
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { CUSTOMER_TYPES, RECIPES, INGREDIENTS, SHOP_THEMES, DECORATION_ITEMS } from '../../../../shared/gameData';
+import { CUSTOMER_TYPES, RECIPES, INGREDIENTS, SHOP_THEMES, DECORATION_ITEMS, BUSINESS_STAGES, NEIGHBORS_DATA } from '../../../../shared/gameData';
 import { CustomerTypeId, RecipeId, IngredientId } from '../../../../shared/types';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
-import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag } from 'lucide-react';
+import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag, HeartHandshake, Megaphone, Ticket } from 'lucide-react';
 
 interface ActiveOrder {
   id: string;
@@ -38,9 +38,10 @@ export const CozyShopView: React.FC = () => {
   // Khay nguyên liệu người chơi đang chọn cho đơn hiện tại
   const [selectedIngredients, setSelectedIngredients] = useState<Record<string, boolean>>({});
 
-  // 1. Quản lý số bàn tối đa từ nâng cấp
+  // 1. Quản lý số bàn tối đa từ Cơ Nghiệp Vỉa Hè (decheviahe.com)
+  const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const upgrades = gameState.purchasedUpgrades;
-  const maxTables = 2 + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+  const maxTables = currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
 
   // 2. Vòng lặp thời gian & sinh khách
   useEffect(() => {
@@ -73,12 +74,13 @@ export const CozyShopView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isShopOpen, timeSpeed, tickTime, handleCustomerLeaveAngry]);
 
-  // 3. Định kỳ sinh khách mới nếu còn bàn trống
+  // 3. Định kỳ sinh khách mới theo cấp độ vỉa hè
   useEffect(() => {
     if (!isShopOpen || timeSpeed === 0) return;
 
     const hasSignboard = (gameState.purchasedUpgrades['flower_signboard'] || 0) > 0;
-    const spawnRate = hasSignboard ? 4500 : 6000;
+    const baseRate = currentStage.customerRateMs;
+    const spawnRate = hasSignboard ? Math.round(baseRate * 0.85) : baseRate;
 
     const spawnInterval = setInterval(() => {
       setOrders((prev) => {
@@ -117,7 +119,8 @@ export const CozyShopView: React.FC = () => {
     }, spawnRate / timeSpeed);
 
     return () => clearInterval(spawnInterval);
-  }, [isShopOpen, timeSpeed, maxTables, gameState.purchasedUpgrades]);
+  }, [isShopOpen, timeSpeed, maxTables, currentStage.customerRateMs, gameState.purchasedUpgrades]);
+
 
   // 4. Tự động phục vụ nếu có nhân viên
   useEffect(() => {
@@ -357,13 +360,51 @@ export const CozyShopView: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. HÀNG THẺ KHÁCH HÀNG (CUSTOMER CARDS - FORMAT TIỆM TRÀ NHỎ) */}
-      <div className="p-3 bg-white/70 border-b border-[#F2E8E5] shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-[#7C5C55] uppercase tracking-wider">
-              Khách Đang Chờ ({orders.length}/{maxTables} Bàn)
-            </span>
+      {/* 2. HÀNG THẺ KHÁCH HÀNG & BÀ CON XÓM GIỀNG */}
+      <div className="p-2.5 bg-white/70 border-b border-[#F2E8E5] shrink-0 space-y-2">
+        {/* Thanh phím tắt xóm giềng vỉa hè nhanh */}
+        <div className="flex items-center justify-between gap-1.5 text-[10px]">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                openModal('neighbors');
+              }}
+              className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold flex items-center gap-1 hover:bg-rose-100 transition-all active:scale-95 shrink-0"
+            >
+              <span>👵</span>
+              <span>Bà Con Xóm</span>
+            </button>
+
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                openModal('streetEvents');
+              }}
+              className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-bold flex items-center gap-1 hover:bg-sky-100 transition-all active:scale-95 shrink-0"
+            >
+              <span>📢</span>
+              <span>Chuyện Vỉa Hè</span>
+              {gameState.currentEvent && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />}
+            </button>
+
+            {gameState.activeLotteryTicket ? (
+              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-bold flex items-center gap-1 shrink-0">
+                <span>🎟️</span>
+                <span>Vé [{gameState.activeLotteryTicket.ticketNumber}]</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  soundManager.playClick();
+                  openModal('neighbors');
+                }}
+                className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold flex items-center gap-1 hover:bg-amber-100 transition-all active:scale-95 shrink-0"
+              >
+                <span>🎟️</span>
+                <span>Mua Vé Số Cô Bảy</span>
+              </button>
+            )}
           </div>
 
           {!isShopOpen && (
@@ -372,23 +413,33 @@ export const CozyShopView: React.FC = () => {
                 soundManager.playClick();
                 setShopOpen(true);
               }}
-              className="px-3 py-1 bg-[#F7A8C4] hover:bg-[#f28bb1] text-white rounded-full text-xs font-black shadow-sm flex items-center gap-1 active:scale-95 animate-pulse"
+              className="px-2.5 py-0.5 bg-[#F7A8C4] hover:bg-[#f28bb1] text-white rounded-full font-black shadow-sm flex items-center gap-1 active:scale-95 animate-pulse shrink-0"
             >
-              <Store className="w-3.5 h-3.5" />
-              <span>Mở Cửa Đón Khách</span>
+              <Store className="w-3 h-3" />
+              <span>Mở Quán</span>
             </button>
           )}
         </div>
 
+        {/* Header danh sách bàn */}
+        <div className="flex items-center justify-between text-[11px] font-black text-[#7C5C55]">
+          <span className="flex items-center gap-1">
+            <span>🪑</span> Ghế Nhựa Đang Đón Khách ({orders.length}/{maxTables} Bàn)
+          </span>
+          <span className="text-[10px] text-[#9C7C75] font-semibold">
+            {currentStage.name}
+          </span>
+        </div>
+
         {/* Danh sách thẻ khách hàng cuộn ngang siêu nét */}
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-0.5">
           {orders.length === 0 ? (
-            <div className="w-full py-4 bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA] text-center flex flex-col items-center justify-center gap-1">
-              <span className="text-2xl">☕</span>
+            <div className="w-full py-3 bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA] text-center flex flex-col items-center justify-center gap-0.5">
+              <span className="text-xl">☕</span>
               <p className="text-xs font-bold text-[#7C5C55]">
                 {isShopOpen
-                  ? 'Khách đang trên đường ghé tiệm...'
-                  : 'Quán đang đóng cửa. Bấm [Mở Cửa] để đón khách nhé!'}
+                  ? 'Bà con khu phố đang tạt qua mua món...'
+                  : 'Quán đang dọn dẹp. Bấm [Mở Quán] để đón khách nhé!'}
               </p>
             </div>
           ) : (
@@ -436,6 +487,7 @@ export const CozyShopView: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
 
                   {/* Thanh kiên nhẫn */}
                   {order.state === 'waiting' && (

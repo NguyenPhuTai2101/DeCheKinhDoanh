@@ -448,13 +448,302 @@ export const DECORATION_ITEMS: DecorationItem[] = [
   },
 ];
 
+// === V0.4 - V0.5: ĐẾ CHẾ VỈA HÈ CATALOGS ===
+
+export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = {
+  cart: {
+    id: 'cart',
+    name: 'Xe Đẩy Lề Đường',
+    tagline: 'Khởi đầu bình dị với chiếc xe nhôm và ghế nhựa đỏ ven đường.',
+    icon: '🛒',
+    maxTables: 2,
+    customerRateMs: 5500,
+    cost: 0,
+    requiredReputation: 0,
+    description: 'Chỉ vỏn vẹn chiếc xe đẩy nhỏ nép bên vỉa hè, nhưng thơm nức mũi mùi pate bơ.',
+  },
+  corner: {
+    id: 'corner',
+    name: 'Góc Cây Me / Quán Cóc',
+    tagline: 'Thêm dù che nắng mưa, quầy trà đá cà phê phin mát rượi.',
+    icon: '🌳',
+    maxTables: 3,
+    customerRateMs: 4500,
+    cost: 150000,
+    requiredReputation: 25,
+    description: 'Khách ngồi râm mát dưới bóng cây, tán gẫu chuyện thế thái nhân tình.',
+  },
+  awning: {
+    id: 'awning',
+    name: 'Tiệm Mái Hiên Bình Dân',
+    tagline: 'Bảng hiệu bạt Hiflex sáng đèn, bàn xếp inox sạch sẽ.',
+    icon: '🏮',
+    maxTables: 4,
+    customerRateMs: 3800,
+    cost: 350000,
+    requiredReputation: 60,
+    description: 'Có mái hiên di động che kín, đón lượng khách đông đúc giờ cao điểm.',
+  },
+  eatery: {
+    id: 'eatery',
+    name: 'Quán Ăn Phố Lớn',
+    tagline: 'Mặt tiền trung tâm, bếp mở hiện đại, thực khách xếp hàng.',
+    icon: '🏪',
+    maxTables: 5,
+    customerRateMs: 3000,
+    cost: 800000,
+    requiredReputation: 120,
+    description: 'Thương hiệu nức tiếng gần xa, ai ghé ngang qua cũng phải trầm trồ khen ngợi.',
+  },
+  empire: {
+    id: 'empire',
+    name: 'Chuỗi Đế Chế Vỉa Hè',
+    tagline: 'Biểu tượng ẩm thực đường phố, chi nhánh phủ khắp phố phường!',
+    icon: '👑',
+    maxTables: 6,
+    customerRateMs: 2400,
+    cost: 2000000,
+    requiredReputation: 250,
+    description: 'Đỉnh cao của sự nghiệp ẩm thực vỉa hè, doanh thu tiền triệu mỗi ngày!',
+  },
+};
+
+export const NEIGHBORS_DATA: Record<import('./types').NeighborId, import('./types').NeighborData> = {
+  bac_ba: {
+    id: 'bac_ba',
+    name: 'Bác Ba',
+    nickname: 'Tổ Trưởng Khu Phố',
+    role: 'Tổ Trưởng Dân Phố',
+    avatar: '👴',
+    gender: 'male',
+    favoriteDishId: 'cafe_sua',
+    dialogues: {
+      1: 'Vỉa hè buôn bán phải nhớ quét dọn sạch sẽ nha cháu! Đừng để rác bừa bãi kẻo lối xóm phiền lòng.',
+      2: 'Cà phê của cháu pha đậm đà đấy! Bác đi tuần tra sáng nào cũng muốn ghé làm một ly cho tỉnh táo.',
+      3: 'Bác nghe nói mấy bữa nữa có đoàn trật tự đô thị đi nhắc nhở. Cháu nhớ xếp bàn ghế gọn gàng nghe!',
+      4: 'Cả xóm này ai cũng khen cháu chịu thương chịu khó. Bác đang tính xét tặng quán cháu danh hiệu Điểm Sáng Văn Hóa!',
+      5: 'Cháu như con cháu trong nhà của bác vậy! Có ai làm khó cháu trên vỉa hè này, cứ bảo Bác Ba một tiếng!',
+    },
+    secrets: [
+      {
+        level: 2,
+        title: 'Bí Mật Chiếc Sổ Tay Bác Ba',
+        story: 'Bác Ba đã làm tổ trưởng hơn 20 năm, cuốn sổ tay cũ kỹ ghi chép sinh nhật của từng đứa trẻ trong xóm!',
+      },
+      {
+        level: 4,
+        title: 'Tấm Lòng Bác Tổ Trưởng',
+        story: 'Ngày xưa Bác Ba từng là đầu bếp trong quân ngũ, nên bác sành ăn và rất quý những người nấu nướng có tâm.',
+      },
+    ],
+    perkDescription: 'Bác Ba che chở: Giảm 50% nguy cơ bị nhắc nhở phạt lấn chiếm lề đường.',
+  },
+  co_bay: {
+    id: 'co_bay',
+    name: 'Cô Bảy',
+    nickname: 'Bảy Vé Số May Mắn',
+    role: 'Người Bán Vé Số Dạo',
+    avatar: '👵',
+    gender: 'female',
+    favoriteDishId: 'banh_mi_trung',
+    dialogues: {
+      1: 'Mua giùm cô tờ vé số đi con ơi! Chiều nay 16h30 xổ số, biết đâu đổi đời trúng độc đắc tiền tỷ nhen!',
+      2: 'Bánh mì trứng con chiên thơm phức hà. Cô đi bộ mỏi chân, ngửi mùi là muốn ghé ngồi nghỉ liền.',
+      3: 'Sáng nay cô nghe mấy bà ngoài chợ đồn giá thịt heo với trứng sắp hạ nhiệt đấy, con tha hồ lấy hàng rẻ!',
+      4: 'Cô để dành sẵn cho con cặp vé số có đuôi lộc phát 68 - 86 nè, chúc quán con hôm nay khách nườm nượp!',
+      5: 'Con tốt bụng với cô quá! Cô coi con như con gái/con trai ruột vậy. Cầu trời phật phù hộ cho con buôn may bán đắt!',
+    },
+    secrets: [
+      {
+        level: 2,
+        title: 'Ước Mơ Của Cô Bảy',
+        story: 'Cô Bảy bán vé số suốt 15 năm qua để nuôi hai người con ăn học đỗ đại học trên thành phố.',
+      },
+      {
+        level: 4,
+        title: 'Tấm Vé Số Định Mệnh',
+        story: 'Năm ngoái một vị khách quen mua vé của cô đã trúng giải an ủi 50 triệu và biếu lại cô một chiếc xe đạp mới.',
+      },
+    ],
+    perkDescription: 'Vé số tài lộc: Mua vé số mỗi ngày và nhận cơ hội trúng giải thưởng lớn lúc 16:30!',
+  },
+  chu_nam: {
+    id: 'chu_nam',
+    name: 'Chú Năm',
+    nickname: 'Năm Xe Ôm Biker',
+    role: 'Tài Xế Công Nghệ & Xe Ôm',
+    avatar: '🛵',
+    gender: 'male',
+    favoriteDishId: 'banh_mi_thit',
+    dialogues: {
+      1: 'Cho chú một ổ bánh mì thịt nhiều ớt với ly trà đá lẹ lẹ nha em trai, chú đang đợi nổ cuốc xe mới!',
+      2: 'Bánh mì quán này ướp thịt nướng ngon số dách! Chú giới thiệu cả hội anh em tài xế ghé qua ủng hộ luôn rồi đó.',
+      3: 'Chú chạy khắp hang cùng ngõ hẻm, thấy quán nào đông là biết ngay bí quyết. Quán cháu vừa rẻ vừa ngon, chắc chắn sẽ phất lên!',
+      4: 'Trời sắp đổ mưa to đó cháu ơi, chuẩn bị kéo bạt che bàn kẻo khách ướt mem bây giờ!',
+      5: 'Anh em tài xế bảo nhau: cứ thèm bánh mì là phải tạt vô quán này! Chú nhận ship đồ ăn độc quyền cho quán cháu luôn!',
+    },
+    secrets: [
+      {
+        level: 2,
+        title: 'Chiếc Xe Máy Cổ',
+        story: 'Chiếc xe Cup 50 chú Năm chạy là kỷ vật người cha để lại, bền bỉ qua hơn 30 năm mưa nắng vỉa hè.',
+      },
+      {
+        level: 4,
+        title: 'Hiệp Sĩ Đường Phố',
+        story: 'Chú Năm từng nhiều lần giúp bà con bắt trộm và đưa người già lạc đường về tận nhà.',
+      },
+    ],
+    perkDescription: 'Đội xe hỗ trợ: Tăng 20% tiền boa và nhận cảnh báo sớm trước khi thời tiết xấu ập tới.',
+  },
+  be_bong: {
+    id: 'be_bong',
+    name: 'Bé Bông',
+    nickname: 'Học Sinh Lớp 3',
+    role: 'Học Sinh Tiểu Học Trong Xóm',
+    avatar: '👧',
+    gender: 'female',
+    favoriteDishId: 'tra_sua',
+    dialogues: {
+      1: 'Anh/Chị ơi, cho em xin một ly trà sữa trân châu thật nhiều thạch nha! Em để dành tiền ăn sáng cả tuần đó ạ!',
+      2: 'Quán của anh/chị thơm quá chừng! Mỗi lần tan học đi ngang em đều nhìn hoài luôn.',
+      3: 'Hôm nay em được điểm 10 môn toán nè! Mẹ thưởng cho em tiền mua bánh mì pate đặc biệt ăn mừng!',
+      4: 'Em có vẽ tặng quán một bức tranh hình bánh mì cute nè, anh/chị dán lên xe đẩy nha!',
+      5: 'Lớn lên em cũng muốn mở một tiệm bánh mì dễ thương như quán của anh/chị vậy á!',
+    },
+    secrets: [
+      {
+        level: 2,
+        title: 'Heo Đất Tiết Kiệm Của Bông',
+        story: 'Bé Bông có chú heo đất màu hồng, đang tiết kiệm tiền để mua quà sinh nhật tặng mẹ.',
+      },
+      {
+        level: 4,
+        title: 'Bức Tranh Giải Nhất Trường',
+        story: 'Bức tranh vẽ quán vỉa hè của bạn đã đoạt giải Nhất hội thi vẽ nét đẹp quê hương cấp trường!',
+      },
+    ],
+    perkDescription: 'Nụ cười thiên thần: Mang lại may mắn, tăng 15% lượng khách học sinh sinh viên ghé quán.',
+  },
+  chi_lan: {
+    id: 'chi_lan',
+    name: 'Chị Lan',
+    nickname: 'Lan Văn Phòng Sành Ăn',
+    role: 'Nhân Viên Công Sở Tòa Nhà Đối Diện',
+    avatar: '👩‍💼',
+    gender: 'female',
+    favoriteDishId: 'banh_mi_dac_biet',
+    dialogues: {
+      1: 'Làm cho chị 1 ổ bánh mì đặc biệt mang đi nha, nhớ cắt đôi giùm chị, bọc giấy cẩn thận nhé.',
+      2: 'Vỏ bánh mì giòn rụm mà pate thơm béo ngậy chuẩn vị Pháp luôn! Chị mê tít từ miếng cắn đầu tiên.',
+      3: 'Hôm nay phòng Marketing tụi chị tăng ca, chị gom đơn 5 ổ bánh mì với 5 ly cà phê sữa đá cho cả nhóm nè!',
+      4: 'Chị đã review 5 sao quán em lên nhóm "Hội Ăn Sạch Uống Lành Văn Phòng" rồi đấy, chuẩn bị đông khách nha!',
+      5: 'Chị coi quán này như căn tin riêng của công ty vậy! Cứ đói là nghĩ ngay đến thương hiệu của em!',
+    },
+    secrets: [
+      {
+        level: 2,
+        title: 'Food Blogger Giấu Mặt',
+        story: 'Chị Lan ngoài làm công sở còn sở hữu một trang blog ẩm thực với hơn 50.000 lượt theo dõi!',
+      },
+      {
+        level: 4,
+        title: 'Hợp Đồng Cung Cấp Bữa Sáng',
+        story: 'Chị Lan đã đề xuất ban giám đốc ký hợp đồng đặt bữa sáng cố định mỗi tuần từ quán vỉa hè của bạn.',
+      },
+    ],
+    perkDescription: 'Khách sành điệu: Khách văn phòng tip hào phóng +25% tiền boa và thường xuyên gọi combo lớn.',
+  },
+};
+
+export const STREET_EVENTS: import('./types').StreetEvent[] = [
+  {
+    id: 'rain_shower',
+    title: '🌦️ Cơn Mưa Rào Vỉa Hè Bất Chợt',
+    icon: '🌧️',
+    description: 'Bầu trời bỗng tối sầm và những giọt mưa rào lộp độp rơi xuống mặt đường. Bà con vội vã tìm chỗ trú mưa!',
+    choices: [
+      {
+        text: 'Bung bạt dù che cho toàn bộ khách',
+        cost: 15000,
+        gainReputation: 4,
+        gainMoney: 35000,
+        outcomeText: 'Khách ấm lòng ngồi trú mưa, gọi thêm trà đá và cà phê nóng! (+35,000 đ doanh thu, +4 Uy tín)',
+      },
+      {
+        text: 'Chỉ che xe đẩy, xin lỗi mời khách dọn vào hiên',
+        gainReputation: 1,
+        outcomeText: 'Khách thông cảm chia sẻ nỗi vất vả của hàng quán vỉa hè ngày mưa.',
+      },
+    ],
+  },
+  {
+    id: 'urban_patrol',
+    title: '👮 Đoàn Trật Tự Đô Thị Đi Tuần',
+    icon: '🚨',
+    description: 'Chiếc xe trật tự đô thị chạy chầm chậm qua phố, kiểm tra việc chấp hành giữ gìn lòng lề đường văn minh.',
+    choices: [
+      {
+        text: 'Lập tức xếp bàn ghế gọn gàng sát mép tường',
+        gainReputation: 3,
+        outcomeText: 'Đoàn kiểm tra mỉm cười gật đầu khen ngợi quán ý thức tốt! (+3 Uy tín)',
+      },
+      {
+        text: 'Mời Bác Ba Tổ Trưởng giải thích giúp',
+        gainReputation: 2,
+        outcomeText: 'Bác Ba xuất hiện đỡ lời bảo lãnh: "Cháu nó buôn bán ngoan ngoãn lắm các anh ạ!". Mọi chuyện êm đẹp!',
+      },
+    ],
+  },
+  {
+    id: 'tiktoker_visit',
+    title: '📱 Tiktoker Ẩm Thực Ghé Review',
+    icon: '✨',
+    description: 'Một bạn trẻ cầm chân máy quay và đèn livestream ghé lại: "Quán này trên mạng đồn bánh mì pate đỉnh lắm nè!"',
+    choices: [
+      {
+        text: 'Tự tay làm một ổ Bánh Mì Thượng Hạng tặng kèm sốt đặc biệt',
+        cost: 10000,
+        gainReputation: 6,
+        gainMoney: 50000,
+        outcomeText: 'Clip triệu view lên xu hướng! Rất nhiều bạn trẻ kéo tới check-in và ủng hộ nhiệt tình! (+50,000 đ, +6 Uy tín)',
+      },
+      {
+        text: 'Bán bình thường như mọi khách khác',
+        gainReputation: 2,
+        gainMoney: 20000,
+        outcomeText: 'Review chân thực mộc mạc nhận được thiện cảm lớn từ cộng đồng mạng! (+20,000 đ)',
+      },
+    ],
+  },
+  {
+    id: 'market_sale',
+    title: '🥬 Chợ Đầu Mối Giảm Giá Giờ Vàng',
+    icon: '🎉',
+    description: 'Cô tiểu thương quen ngoài chợ đầu mối gọi điện: "Sáng nay hàng tươi về nhiều quá, ghé lấy giá gốc nè cháu!"',
+    choices: [
+      {
+        text: 'Tranh thủ lấy thêm lô bánh mì & trứng gà tươi giá sỉ',
+        cost: 30000,
+        gainReputation: 2,
+        outcomeText: 'Kho hàng của bạn được bổ sung thêm nguyên liệu dồi dào với giá hời!',
+      },
+      {
+        text: 'Cảm ơn cô, hiện tại kho vẫn còn đủ dùng',
+        gainReputation: 0,
+        outcomeText: 'Bạn tiếp tục tập trung phục vụ khách buổi sáng.',
+      },
+    ],
+  },
+];
+
 export const INITIAL_GAME_STATE: GameSaveState = {
-  version: '0.3.0',
+  version: '0.4.0',
   playerId: 'player_default',
-  shopName: 'Tiệm Bánh Mì Của Tôi 🌸',
+  shopName: 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
   day: 1,
   gameTimeMinutes: 360, // 06:00 sáng
-  money: 100000, // 100,000 VND vốn khởi nghiệp
+  money: 100000, // 100,000 VND vốn khởi nghiệp vỉa hè
   reputation: 10,
   player: {
     name: 'Chủ Quán Dễ Thương',
@@ -468,14 +757,14 @@ export const INITIAL_GAME_STATE: GameSaveState = {
     egg: 6,
     pork: 4,
     cucumber: 8,
-    pate: 2,
-    herb: 5,
-    tea: 6,
+    pate: 4,
+    herb: 6,
+    tea: 8,
     milk: 6,
-    condensed_milk: 6,
-    coffee: 6,
+    condensed_milk: 8,
+    coffee: 8,
   },
-  unlockedRecipes: ['banh_mi_trung', 'banh_mi_thit', 'tra_sua', 'cafe_sua'],
+  unlockedRecipes: ['banh_mi_trung', 'banh_mi_thit', 'banh_mi_dac_biet', 'tra_sua', 'cafe_sua'],
   purchasedUpgrades: {},
   hiredEmployees: [],
   employeeDetails: {},
@@ -486,5 +775,44 @@ export const INITIAL_GAME_STATE: GameSaveState = {
   storageCapacity: 60,
   historySummaries: [],
   lastSavedAt: new Date().toISOString(),
+
+  // Dữ liệu Đế Chế Vỉa Hè
+  businessStage: 'cart',
+  neighbors: {
+    bac_ba: {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    },
+    co_bay: {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    },
+    chu_nam: {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    },
+    be_bong: {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    },
+    chi_lan: {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    },
+  },
+  activeLotteryTicket: null,
+  lotteryHistory: [],
+  currentEvent: null,
 };
+
 

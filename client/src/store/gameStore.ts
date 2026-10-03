@@ -8,6 +8,10 @@ import {
   Employee,
   ShopThemeId,
   CareerTier,
+  BusinessStageId,
+  NeighborId,
+  StreetEvent,
+  LotteryTicket,
 } from '../../../shared/types';
 import {
   INITIAL_GAME_STATE,
@@ -17,9 +21,12 @@ import {
   EMPLOYEES,
   SHOP_THEMES,
   DECORATION_ITEMS,
+  BUSINESS_STAGES,
+  NEIGHBORS_DATA,
+  STREET_EVENTS,
 } from '../../../shared/gameData';
 
-const LOCAL_STORAGE_KEY = 'cozy_empire_save_v3';
+const LOCAL_STORAGE_KEY = 'cozy_empire_save_v4';
 
 export type ModalType =
   | 'cooking'
@@ -29,6 +36,9 @@ export type ModalType =
   | 'decor'
   | 'dailySummary'
   | 'settings'
+  | 'neighbors'
+  | 'streetEvents'
+  | 'ledger'
   | null;
 
 export interface FloatingFeedback {
@@ -58,6 +68,10 @@ export interface GameStoreState {
   dailyCustomersLost: number;
   isDailySummaryShown: boolean;
   
+  // V0.4: Sự kiện & Xổ số runtime flags
+  hasEventTriggeredToday: boolean;
+  isLotteryDrawnToday: boolean;
+
   // UI Toast message
   toastMessage: string | null;
 
@@ -93,6 +107,15 @@ export interface GameStoreState {
   buyDecoration: (decorId: string) => boolean;
   toggleEquipDecoration: (decorId: string) => void;
   
+  // V0.4 - V0.5: Đế Chế Vỉa Hè (decheviahe.com)
+  interactNeighbor: (neighborId: NeighborId) => void;
+  giveGiftToNeighbor: (neighborId: NeighborId, recipeId: RecipeId) => boolean;
+  buyLotteryTicket: (chosenNum?: string) => boolean;
+  checkLotteryDraw: () => void;
+  triggerStreetEvent: (event?: StreetEvent) => void;
+  resolveStreetEventChoice: (choiceIndex: number) => void;
+  upgradeBusinessStage: () => boolean;
+
   // Day Cycle
   endDayAndSleep: () => void;
   
@@ -102,6 +125,7 @@ export interface GameStoreState {
   syncCloud: () => Promise<void>;
   resetGame: () => void;
 }
+
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
   gameState: INITIAL_GAME_STATE,
@@ -116,11 +140,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   dailyCustomersServed: 0,
   dailyCustomersLost: 0,
   isDailySummaryShown: false,
+  hasEventTriggeredToday: false,
+  isLotteryDrawnToday: false,
   toastMessage: null,
 
   setShopOpen: (open) => {
     set({ isShopOpen: open });
-    get().showToast(open ? '🌸 Cửa hàng đã mở cửa đón khách!' : '🌙 Đã tạm đóng cửa nhận khách!');
+    get().showToast(open ? '🥖 Quán vỉa hè mở cửa đón bà con!' : '🌙 Đã tạm dọn bàn ghế nghỉ ngơi!');
   },
 
   setTimeSpeed: (speed) => set({ timeSpeed: speed }),
@@ -154,10 +180,20 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   tickTime: (deltaMinutes) => {
-    const { gameState, isShopOpen, isDailySummaryShown } = get();
+    const { gameState, isShopOpen, isDailySummaryShown, hasEventTriggeredToday, isLotteryDrawnToday } = get();
     if (!isShopOpen || isDailySummaryShown) return;
 
     const newTime = gameState.gameTimeMinutes + deltaMinutes;
+
+    // Kích hoạt sự kiện đường phố ngẫu nhiên vào khoảng 08:30 - 15:00
+    if (!hasEventTriggeredToday && newTime >= 520 && newTime <= 900 && Math.random() < 0.25) {
+      get().triggerStreetEvent();
+    }
+
+    // Tự động xổ số lúc 16:30 (990 phút) nếu đã mua vé
+    if (!isLotteryDrawnToday && newTime >= 990 && gameState.activeLotteryTicket) {
+      get().checkLotteryDraw();
+    }
 
     // Giờ đóng cửa: 22:00 = 1320 phút
     if (newTime >= 1320 && !isDailySummaryShown) {
@@ -605,8 +641,301 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().saveLocal();
   },
 
+  // === V0.4 - V0.5: ĐẾ CHẾ VỈA HÈ METHODS ===
+
+  interactNeighbor: (neighborId) => {
+    const { gameState } = get();
+    const neighbor = gameState.neighbors[neighborId] || {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    };
+    const data = NEIGHBORS_DATA[neighborId];
+
+    const newExp = neighbor.intimacyExp + 20;
+    let newLevel = neighbor.level;
+    const newSecrets = [...neighbor.unlockedSecretIds];
+
+    if (newExp >= 100 && newLevel < 5) {
+      newLevel += 1;
+      const secretToUnlock = data?.secrets.find((s) => s.level === newLevel);
+      if (secretToUnlock && !newSecrets.includes(newLevel)) {
+        newSecrets.push(newLevel);
+      }
+      get().showToast(`💖 Tình thân với ${data?.name || 'Hàng xóm'} đạt cấp ${newLevel}! Đã mở khóa tâm sự mới.`);
+    } else {
+      get().showToast(`💬 Đã trò chuyện cùng ${data?.name || 'Hàng xóm'} (+20 Thân thiết)`);
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        neighbors: {
+          ...gameState.neighbors,
+          [neighborId]: {
+            ...neighbor,
+            level: newLevel,
+            intimacyExp: newExp >= 100 && newLevel < 5 ? newExp - 100 : newExp,
+            unlockedSecretIds: newSecrets,
+            lastInteractedDay: gameState.day,
+          },
+        },
+      },
+    });
+    get().saveLocal();
+  },
+
+  giveGiftToNeighbor: (neighborId, recipeId) => {
+    const { gameState } = get();
+    const neighbor = gameState.neighbors[neighborId] || {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    };
+    const data = NEIGHBORS_DATA[neighborId];
+    const recipe = RECIPES[recipeId];
+    if (!recipe || !data) return false;
+
+    // Chi phí làm quà tặng cho hàng xóm
+    const giftCost = Math.round(recipe.basePrice * 0.5);
+    if (gameState.money < giftCost) {
+      get().showToast('❌ Không đủ tiền chuẩn bị món quà này!');
+      return false;
+    }
+
+    const isFavorite = data.favoriteDishId === recipeId;
+    const addedExp = isFavorite ? 45 : 25;
+    const newExp = neighbor.intimacyExp + addedExp;
+    let newLevel = neighbor.level;
+    const newSecrets = [...neighbor.unlockedSecretIds];
+
+    if (newExp >= 100 && newLevel < 5) {
+      newLevel += 1;
+      const secretToUnlock = data.secrets.find((s) => s.level === newLevel);
+      if (secretToUnlock && !newSecrets.includes(newLevel)) {
+        newSecrets.push(newLevel);
+      }
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - giftCost,
+        neighbors: {
+          ...gameState.neighbors,
+          [neighborId]: {
+            ...neighbor,
+            level: newLevel,
+            intimacyExp: newExp >= 100 && newLevel < 5 ? newExp - 100 : newExp,
+            unlockedSecretIds: newSecrets,
+            lastInteractedDay: gameState.day,
+          },
+        },
+      },
+    });
+
+    if (isFavorite) {
+      get().showToast(`✨ ${data.name} vô cùng xúc động vì đây là món tủ yêu thích! (+${addedExp} Thân thiết)`);
+    } else {
+      get().showToast(`🎁 Đã tặng ${recipe.name} cho ${data.name}! (+${addedExp} Thân thiết)`);
+    }
+
+    get().saveLocal();
+    return true;
+  },
+
+  buyLotteryTicket: (chosenNum) => {
+    const { gameState } = get();
+    const TICKET_COST = 10000;
+
+    if (gameState.money < TICKET_COST) {
+      get().showToast('❌ Cần 10,000 đ để mua 1 tờ vé số may mắn!');
+      return false;
+    }
+
+    if (gameState.activeLotteryTicket) {
+      get().showToast('ℹ️ Bạn đã mua vé số hôm nay rồi! Đợi 16:30 chiều xem kết quả nhé.');
+      return false;
+    }
+
+    const ticketNumber = chosenNum || Math.floor(Math.random() * 100).toString().padStart(2, '0');
+
+    // Tăng thiện cảm với Cô Bảy khi mua ủng hộ
+    const coBay = gameState.neighbors.co_bay || {
+      level: 1,
+      intimacyExp: 0,
+      unlockedSecretIds: [],
+      lastInteractedDay: 0,
+    };
+    const newExp = coBay.intimacyExp + 25;
+
+    const newTicket: LotteryTicket = {
+      ticketNumber,
+      boughtDay: gameState.day,
+      cost: TICKET_COST,
+    };
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - TICKET_COST,
+        activeLotteryTicket: newTicket,
+        neighbors: {
+          ...gameState.neighbors,
+          co_bay: {
+            ...coBay,
+            intimacyExp: newExp,
+            lastInteractedDay: gameState.day,
+          },
+        },
+      },
+    });
+
+    get().showToast(`🎟️ Đã mua vé số may mắn số [${ticketNumber}] của Cô Bảy! Chiều 16h30 sẽ quay số.`);
+    get().saveLocal();
+    return true;
+  },
+
+  checkLotteryDraw: () => {
+    const { gameState } = get();
+    const ticket = gameState.activeLotteryTicket;
+    if (!ticket) return;
+
+    // Quay số ngẫu nhiên 2 chữ số
+    const drawnNumber = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    let prizeType: 'jackpot' | 'prize2' | 'prize3' | 'none' = 'none';
+    let prizeAmount = 0;
+
+    if (drawnNumber === ticket.ticketNumber) {
+      prizeType = 'jackpot';
+      prizeAmount = 300000;
+      get().showToast(`🎉 ĐỘC ĐẮC VỈA HÈ! Số trúng: [${drawnNumber}]. Bạn nhận được 300,000 đ!`);
+    } else if (drawnNumber[1] === ticket.ticketNumber[1]) {
+      prizeType = 'prize2';
+      prizeAmount = 40000;
+      get().showToast(`✨ TRÚNG GIẢI NHÌ! Đuôi số [${drawnNumber[1]}] trùng khớp! Nhận 40,000 đ!`);
+    } else if (Math.abs(parseInt(drawnNumber, 10) - parseInt(ticket.ticketNumber, 10)) === 1) {
+      prizeType = 'prize3';
+      prizeAmount = 20000;
+      get().showToast(`⭐ TRÚNG GIẢI AN ỦI! Số trúng: [${drawnNumber}]. Nhận 20,000 đ!`);
+    } else {
+      get().showToast(`🎟️ Kết quả chiều nay: [${drawnNumber}]. Vé của bạn là [${ticket.ticketNumber}]. Chúc bạn may mắn lần sau!`);
+    }
+
+    const completedTicket: LotteryTicket = {
+      ...ticket,
+      drawnNumber,
+      prizeType,
+      prizeAmount,
+    };
+
+    set((state) => ({
+      isLotteryDrawnToday: true,
+      dailyRevenue: state.dailyRevenue + prizeAmount,
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money + prizeAmount,
+        activeLotteryTicket: null,
+        lotteryHistory: [completedTicket, ...state.gameState.lotteryHistory].slice(0, 15),
+      },
+    }));
+
+    get().saveLocal();
+  },
+
+  triggerStreetEvent: (event) => {
+    const { gameState, hasEventTriggeredToday } = get();
+    if (gameState.currentEvent) return;
+
+    const chosen = event || STREET_EVENTS[Math.floor(Math.random() * STREET_EVENTS.length)];
+    set({
+      hasEventTriggeredToday: true,
+      activeModal: 'streetEvents',
+      gameState: {
+        ...gameState,
+        currentEvent: chosen,
+      },
+    });
+  },
+
+  resolveStreetEventChoice: (choiceIndex) => {
+    const { gameState } = get();
+    const event = gameState.currentEvent;
+    if (!event || !event.choices[choiceIndex]) return;
+
+    const choice = event.choices[choiceIndex];
+    const cost = choice.cost || 0;
+    const gain = choice.gainMoney || 0;
+    const rep = choice.gainReputation || 0;
+
+    if (cost > 0 && gameState.money < cost) {
+      get().showToast('❌ Không đủ tiền để thực hiện lựa chọn này!');
+      return;
+    }
+
+    set((state) => ({
+      dailyRevenue: state.dailyRevenue + gain,
+      dailyCost: state.dailyCost + cost,
+      activeModal: null,
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money - cost + gain,
+        reputation: Math.max(0, state.gameState.reputation + rep),
+        currentEvent: null,
+      },
+    }));
+
+    get().showToast(choice.outcomeText);
+    get().saveLocal();
+  },
+
+  upgradeBusinessStage: () => {
+    const { gameState } = get();
+    const stageOrder: BusinessStageId[] = ['cart', 'corner', 'awning', 'eatery', 'empire'];
+    const currentIdx = stageOrder.indexOf(gameState.businessStage);
+
+    if (currentIdx >= stageOrder.length - 1) {
+      get().showToast('👑 Chúc mừng! Bạn đã đạt danh hiệu Chuỗi Đế Chế Vỉa Hè cao nhất!');
+      return false;
+    }
+
+    const nextStageId = stageOrder[currentIdx + 1];
+    const nextStage = BUSINESS_STAGES[nextStageId];
+
+    if (!nextStage) return false;
+
+    if (gameState.reputation < nextStage.requiredReputation) {
+      get().showToast(`❌ Cần tối thiểu ${nextStage.requiredReputation} điểm Uy Tín để mở rộng lên ${nextStage.name}!`);
+      return false;
+    }
+
+    if (gameState.money < nextStage.cost) {
+      get().showToast(`❌ Cần ${nextStage.cost.toLocaleString('vi-VN')} đ để nâng cấp cơ nghiệp vỉa hè!`);
+      return false;
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - nextStage.cost,
+        businessStage: nextStageId,
+      },
+    });
+
+    get().showToast(`🎉 Thăng cấp thành công! Chào mừng đến với "${nextStage.name}"!`);
+    get().saveLocal();
+    return true;
+  },
+
   endDayAndSleep: () => {
     const { gameState, dailyRevenue, dailyCost, dailyCustomersServed, dailyCustomersLost } = get();
+
+    // Nếu còn vé số chưa quay trước khi ngủ, tự động quay thưởng
+    if (gameState.activeLotteryTicket) {
+      get().checkLotteryDraw();
+    }
 
     // Tính lương nhân viên
     let totalSalaries = 0;
@@ -658,6 +987,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       },
       employeeDetails: updatedEmployees,
       historySummaries: [summary, ...gameState.historySummaries],
+      currentEvent: null,
       lastSavedAt: new Date().toISOString(),
     };
 
@@ -665,6 +995,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: nextDayState,
       isShopOpen: false,
       isDailySummaryShown: false,
+      hasEventTriggeredToday: false,
+      isLotteryDrawnToday: false,
       activeModal: null,
       dailyRevenue: 0,
       dailyCost: 0,
@@ -703,7 +1035,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             ownedDecorations: parsed.ownedDecorations || [],
             equippedDecorations: parsed.equippedDecorations || [],
             employeeDetails: parsed.employeeDetails || {},
-            shopName: parsed.shopName || 'Tiệm Bánh Mì Của Tôi 🌸',
+            shopName: parsed.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
+            businessStage: parsed.businessStage || 'cart',
+            neighbors: {
+              ...INITIAL_GAME_STATE.neighbors,
+              ...(parsed.neighbors || {}),
+            },
+            lotteryHistory: parsed.lotteryHistory || [],
+            activeLotteryTicket: parsed.activeLotteryTicket || null,
           },
         });
       }
@@ -726,7 +1065,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                 ownedDecorations: cloudState.ownedDecorations || [],
                 equippedDecorations: cloudState.equippedDecorations || [],
                 employeeDetails: cloudState.employeeDetails || {},
-                shopName: cloudState.shopName || 'Tiệm Bánh Mì Của Tôi 🌸',
+                shopName: cloudState.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
+                businessStage: cloudState.businessStage || 'cart',
+                neighbors: {
+                  ...INITIAL_GAME_STATE.neighbors,
+                  ...(cloudState.neighbors || {}),
+                },
+                lotteryHistory: cloudState.lotteryHistory || [],
+                activeLotteryTicket: cloudState.activeLotteryTicket || null,
               },
             });
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
@@ -761,8 +1107,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCustomersServed: 0,
       dailyCustomersLost: 0,
       activeModal: null,
+      hasEventTriggeredToday: false,
+      isLotteryDrawnToday: false,
       isDailySummaryShown: false,
     });
     get().showToast('🔄 Đã khởi động lại tiệm từ đầu!');
   },
 }));
+
