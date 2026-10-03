@@ -21,6 +21,8 @@ export const GameCanvas: React.FC = () => {
       width: 800,
       height: 600,
       backgroundColor: '#FFF1F6',
+      pixelArt: true, // Chống mờ pixel, giữ hình ảnh sắc nét
+      roundPixels: true,
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -46,11 +48,11 @@ export const GameCanvas: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FFF1F6] p-1 sm:p-2 select-none relative overflow-hidden">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FAF5EE] p-1 sm:p-2 select-none relative overflow-hidden">
       <div
         ref={gameContainerRef}
         id="phaser-game-container"
-        className="w-full h-full max-w-[900px] max-h-[675px] rounded-2xl overflow-hidden shadow-lg border-2 sm:border-4 border-[#FFD6E5] flex items-center justify-center"
+        className="w-full h-full max-w-[900px] max-h-[675px] rounded-2xl overflow-hidden shadow-lg border-2 border-[#FFD6E5] flex items-center justify-center [&_canvas]:[image-rendering:pixelated]"
       />
       
       {/* Phím điều hướng ảo cho Mobile */}

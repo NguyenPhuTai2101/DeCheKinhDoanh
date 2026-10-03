@@ -14,7 +14,7 @@ export const BottomBar: React.FC = () => {
   const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
 
   return (
-    <nav className="w-full bg-white/95 backdrop-blur-md border-t-2 border-[#FFD6E5] py-1.5 px-2 flex items-center justify-around gap-1 shadow-lg z-30 shrink-0">
+    <nav className="w-full bg-[#FAF5EE] border-t-2 border-[#FFD6E5] py-1.5 px-2 flex items-center justify-around gap-1 shadow-lg z-30 shrink-0">
       {/* 1. Nấu ăn */}
       <button
         onClick={() => handleOpen('cooking')}

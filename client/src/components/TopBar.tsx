@@ -21,41 +21,42 @@ export const TopBar: React.FC = () => {
   const energyPercent = Math.round((gameState.player.energy / gameState.player.maxEnergy) * 100);
 
   return (
-    <header className="w-full bg-white/95 backdrop-blur-md border-b-2 border-[#FFD6E5] px-3 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-sm z-30 shrink-0">
-      {/* Hàng 1 trên Mobile: Tên quán, Tiền mặt, Nút Mở/Đóng */}
-      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-lg shadow-inner">
+    <header className="w-full bg-[#FAF5EE] border-b-2 border-[#FFD6E5] px-3 py-2 flex flex-col gap-1.5 shadow-sm z-30 shrink-0">
+      {/* Hàng 1: Tên quán, Tiền mặt, Nút Mở/Đóng cửa */}
+      <div className="w-full flex items-center justify-between gap-2">
+        {/* Tên & Cấp độ */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-sm shadow-inner shrink-0">
             🌸
           </div>
-          <div className="leading-tight">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-[#7C5C55] text-xs sm:text-sm">
+          <div className="leading-tight truncate">
+            <div className="flex items-center gap-1">
+              <span className="font-extrabold text-[#7C5C55] text-xs truncate">
                 {gameState.player.name}
               </span>
-              <span className="text-[10px] bg-[#FFD6E5] text-[#7C5C55] px-1.5 py-0.2 rounded-full font-bold">
-                Cấp {gameState.player.cookingLevel}
+              <span className="text-[9px] bg-[#FFD6E5] text-[#7C5C55] px-1 py-0.2 rounded-full font-bold shrink-0">
+                Lv.{gameState.player.cookingLevel}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-[#9C7C75] font-semibold">
+            <div className="flex items-center gap-1.5 text-[10px] text-[#9C7C75] font-semibold">
               <span className="flex items-center gap-0.5">
-                <Clock className="w-3 h-3 text-[#F7A8C4]" />
-                N{gameState.day} • {formatTime(gameState.gameTimeMinutes)}
+                <Clock className="w-2.5 h-2.5 text-[#F7A8C4]" />
+                N{gameState.day} · {formatTime(gameState.gameTimeMinutes)}
               </span>
               <span className="flex items-center gap-0.5">
-                <Award className="w-3 h-3 text-amber-500" />
+                <Award className="w-2.5 h-2.5 text-amber-500" />
                 {gameState.reputation}⭐
               </span>
             </div>
           </div>
         </div>
 
-        {/* Tiền mặt & Nút Mở cửa trên Mobile */}
-        <div className="flex items-center gap-1.5 sm:hidden">
-          <div className="flex items-center gap-1 bg-[#FFF1F6] px-2.5 py-1 rounded-full border border-[#F7A8C4]">
+        {/* Tiền mặt & Nút Mở Cửa */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 bg-[#FFF1F6] px-2.5 py-1 rounded-full border border-[#F7A8C4] shadow-sm">
             <span className="text-xs">💰</span>
             <span className="font-black text-xs text-[#7C5C55]">
-              {gameState.money.toLocaleString('vi-VN')} đ
+              {gameState.money.toLocaleString('vi-VN')} <span className="text-[9px] font-bold">đ</span>
             </span>
           </div>
 
@@ -64,44 +65,36 @@ export const TopBar: React.FC = () => {
               soundManager.playClick();
               setShopOpen(!isShopOpen);
             }}
-            className={`px-3 py-1 rounded-full font-black text-[11px] shadow-sm transition-all active:scale-95 ${
+            className={`px-3 py-1 rounded-full font-black text-[11px] shadow-sm transition-all active:scale-95 flex items-center gap-1 ${
               isShopOpen
-                ? 'bg-rose-400 text-white'
-                : 'bg-[#F7A8C4] text-white'
+                ? 'bg-rose-400 text-white hover:bg-rose-500'
+                : 'bg-[#F7A8C4] text-white hover:bg-[#f28bb1] animate-pulse'
             }`}
           >
-            {isShopOpen ? 'Nghỉ' : 'Mở Cửa'}
+            <Store className="w-3 h-3" />
+            <span>{isShopOpen ? 'Nghỉ' : 'Mở Cửa'}</span>
           </button>
         </div>
       </div>
 
-      {/* Hàng 2 trên Mobile / Cụm giữa & phải trên Desktop */}
-      <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-wrap">
-        {/* Năng lượng */}
-        <div className="flex items-center gap-1.5 bg-[#FFF7ED] px-2.5 py-1 rounded-full border border-[#F7D7BA]">
-          <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-          <div className="flex items-center gap-1 text-[10px] font-bold text-[#7C5C55]">
-            <span>{energyPercent}%</span>
-            <div className="w-12 sm:w-16 h-1.5 bg-[#FFE6A7]/50 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  energyPercent > 30 ? 'bg-amber-400' : 'bg-rose-500'
-                }`}
-                style={{ width: `${energyPercent}%` }}
-              />
-            </div>
+      {/* Hàng 2: Năng lượng, Tốc độ thời gian, Âm thanh */}
+      <div className="w-full flex items-center justify-between gap-2 pt-1 border-t border-[#F2E8E5] text-[10px]">
+        {/* Năng lượng (Sức lực) */}
+        <div className="flex items-center gap-1.5 bg-[#FFF7ED] px-2 py-0.5 rounded-full border border-[#F7D7BA]">
+          <Zap className="w-3 h-3 text-amber-500 fill-amber-400" />
+          <span className="font-bold text-[#7C5C55]">Sức lực</span>
+          <div className="w-16 h-1.5 bg-[#FFE6A7]/50 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                energyPercent > 30 ? 'bg-amber-400' : 'bg-rose-500'
+              }`}
+              style={{ width: `${energyPercent}%` }}
+            />
           </div>
+          <span className="font-extrabold text-[#7C5C55] text-[9px]">{energyPercent}%</span>
         </div>
 
-        {/* Tiền mặt trên Desktop */}
-        <div className="hidden sm:flex items-center gap-1.5 bg-[#FFF1F6] px-3 py-1 rounded-full border-2 border-[#F7A8C4]">
-          <span>💰</span>
-          <span className="font-black text-sm text-[#7C5C55]">
-            {gameState.money.toLocaleString('vi-VN')} <span className="text-[10px]">đ</span>
-          </span>
-        </div>
-
-        {/* Bộ điều khiển tốc độ & Âm thanh */}
+        {/* Tốc độ & Âm thanh */}
         <div className="flex items-center gap-1">
           <div className="flex items-center bg-[#FFF1F6] p-0.5 rounded-full border border-[#FFD6E5]">
             <button
@@ -114,7 +107,7 @@ export const TopBar: React.FC = () => {
               }`}
               title="Tạm dừng"
             >
-              <Pause className="w-3 h-3" />
+              <Pause className="w-2.5 h-2.5" />
             </button>
             <button
               onClick={() => {
@@ -126,7 +119,7 @@ export const TopBar: React.FC = () => {
               }`}
               title="1x"
             >
-              <Play className="w-3 h-3" />
+              <Play className="w-2.5 h-2.5" />
             </button>
             <button
               onClick={() => {
@@ -138,32 +131,16 @@ export const TopBar: React.FC = () => {
               }`}
               title="2x"
             >
-              <FastForward className="w-3 h-3" />
+              <FastForward className="w-2.5 h-2.5" />
             </button>
           </div>
 
           <button
             onClick={toggleSound}
-            className="p-1.5 rounded-full bg-[#FFF1F6] border border-[#FFD6E5] text-[#7C5C55] hover:bg-white transition-all shadow-sm"
+            className="p-1 rounded-full bg-[#FFF1F6] border border-[#FFD6E5] text-[#7C5C55] hover:bg-white transition-all shadow-sm"
             title={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
           >
-            {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-[#F7A8C4]" />}
-          </button>
-
-          {/* Nút Mở/Đóng cửa trên Desktop */}
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              setShopOpen(!isShopOpen);
-            }}
-            className={`hidden sm:flex px-4 py-1.5 rounded-full font-bold text-xs items-center gap-1.5 shadow-sm transition-all active:scale-95 ${
-              isShopOpen
-                ? 'bg-rose-400 text-white hover:bg-rose-500'
-                : 'bg-[#F7A8C4] text-white hover:bg-[#f28bb1]'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5" />
-            <span>{isShopOpen ? 'Tạm Nghỉ' : 'Mở Cửa Đón Khách'}</span>
+            {isMuted ? <VolumeX className="w-3 h-3 text-rose-400" /> : <Volume2 className="w-3 h-3 text-[#F7A8C4]" />}
           </button>
         </div>
       </div>
