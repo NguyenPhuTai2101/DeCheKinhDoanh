@@ -4,6 +4,8 @@ import { NEIGHBORS_DATA, RECIPES } from '../../../../shared/gameData';
 import { NeighborId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import { X, Heart, MessageCircle, Gift, Sparkles, Ticket, BookOpen, Check } from 'lucide-react';
+import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
+
 
 export const NeighborsModal: React.FC = () => {
   const {
@@ -70,7 +72,10 @@ export const NeighborsModal: React.FC = () => {
         </div>
 
         {/* Danh sách Avatar hàng xóm nằm ngang */}
-        <div className="bg-white/80 px-3 py-2.5 border-b border-[#FFD6E5] flex gap-2.5 overflow-x-auto shrink-0 scrollbar-none">
+        <HorizontalScrollBox
+          showArrows={true}
+          className="bg-white/80 px-3 py-2.5 border-b border-[#FFD6E5] flex gap-2.5 shrink-0 scrollbar-none"
+        >
           {(Object.keys(NEIGHBORS_DATA) as NeighborId[]).map((id) => {
             const n = NEIGHBORS_DATA[id];
             const rel = gameState.neighbors[id] || { level: 1, intimacyExp: 0, unlockedSecretIds: [] };
@@ -100,7 +105,8 @@ export const NeighborsModal: React.FC = () => {
               </button>
             );
           })}
-        </div>
+        </HorizontalScrollBox>
+
 
         {/* Nội dung chi tiết nhân vật đang chọn */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">

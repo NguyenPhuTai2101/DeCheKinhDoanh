@@ -6,6 +6,8 @@ import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
 import { Utensils, Sparkles, Check, Heart, Clock, Store, Plus, AlertCircle, ShoppingBag, HeartHandshake, Megaphone, Ticket } from 'lucide-react';
+import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
+
 
 interface ActiveOrder {
   id: string;
@@ -364,7 +366,7 @@ export const CozyShopView: React.FC = () => {
       <div className="p-2.5 bg-white/70 border-b border-[#F2E8E5] shrink-0 space-y-2">
         {/* Thanh phím tắt xóm giềng vỉa hè nhanh */}
         <div className="flex items-center justify-between gap-1.5 text-[10px]">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+          <HorizontalScrollBox className="flex items-center gap-1 scrollbar-none py-0.5">
             <button
               onClick={() => {
                 soundManager.playClick();
@@ -405,7 +407,7 @@ export const CozyShopView: React.FC = () => {
                 <span>Mua Vé Số Cô Bảy</span>
               </button>
             )}
-          </div>
+          </HorizontalScrollBox>
 
           {!isShopOpen && (
             <button
@@ -432,7 +434,7 @@ export const CozyShopView: React.FC = () => {
         </div>
 
         {/* Danh sách thẻ khách hàng cuộn ngang siêu nét */}
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-0.5">
+        <HorizontalScrollBox showArrows={orders.length > 2} className="flex items-center gap-2.5 no-scrollbar pb-1">
           {orders.length === 0 ? (
             <div className="w-full py-3 bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA] text-center flex flex-col items-center justify-center gap-0.5">
               <span className="text-xl">☕</span>
@@ -540,8 +542,9 @@ export const CozyShopView: React.FC = () => {
               );
             })
           )}
-        </div>
+        </HorizontalScrollBox>
       </div>
+
 
       {/* 3. KHU VỰC QUẦY CHẾ BIẾN TRỰC QUAN (COOKING STATION - FORMAT TIỆM TRÀ NHỎ) */}
       <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-3">

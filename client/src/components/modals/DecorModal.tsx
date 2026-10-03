@@ -4,6 +4,8 @@ import { SHOP_THEMES, DECORATION_ITEMS } from '../../../../shared/gameData';
 import { ShopThemeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import { X, Palette, Sparkles, Check, Home, Edit3, Heart } from 'lucide-react';
+import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
+
 
 export const DecorModal: React.FC = () => {
   const {
@@ -82,7 +84,10 @@ export const DecorModal: React.FC = () => {
         </div>
 
         {/* Tab chuyển đổi */}
-        <div className="flex items-center bg-[#FFF7ED] border-b border-[#F7D7BA] px-3 py-1.5 gap-2 shrink-0 overflow-x-auto no-scrollbar">
+        <HorizontalScrollBox
+          showArrows={true}
+          className="flex items-center bg-[#FFF7ED] border-b border-[#F7D7BA] px-3 py-1.5 gap-2 shrink-0 scrollbar-none"
+        >
           <button
             onClick={() => {
               soundManager.playClick();
@@ -127,7 +132,8 @@ export const DecorModal: React.FC = () => {
             <Edit3 className="w-3.5 h-3.5" />
             <span>Biển Hiệu & Tên Tiệm</span>
           </button>
-        </div>
+        </HorizontalScrollBox>
+
 
         {/* Nội dung theo Tab */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 flex flex-col gap-3">

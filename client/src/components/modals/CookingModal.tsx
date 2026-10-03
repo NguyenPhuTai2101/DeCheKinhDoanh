@@ -4,6 +4,8 @@ import { RECIPES, INGREDIENTS } from '../../../../shared/gameData';
 import { RecipeId, IngredientId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import { X, Check, Utensils, Sparkles } from 'lucide-react';
+import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
+
 
 export const CookingModal: React.FC = () => {
   const {
@@ -112,7 +114,10 @@ export const CookingModal: React.FC = () => {
         </div>
 
         {/* Thanh cuộn ngang chọn món trên Mobile */}
-        <div className="px-3 py-2 bg-[#FFF7ED] border-b border-[#F7D7BA] overflow-x-auto flex items-center gap-2 shrink-0 no-scrollbar">
+        <HorizontalScrollBox
+          showArrows={true}
+          className="px-3 py-2 bg-[#FFF7ED] border-b border-[#F7D7BA] flex items-center gap-2 shrink-0 scrollbar-none"
+        >
           {Object.values(RECIPES).map((item) => {
             const isSelected = item.id === selectedRecipeId;
             return (
@@ -133,7 +138,8 @@ export const CookingModal: React.FC = () => {
               </button>
             );
           })}
-        </div>
+        </HorizontalScrollBox>
+
 
         {/* Khu vực chọn nguyên liệu */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 flex flex-col gap-3">

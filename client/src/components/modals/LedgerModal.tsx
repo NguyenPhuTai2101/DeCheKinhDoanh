@@ -4,6 +4,8 @@ import { BUSINESS_STAGES } from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import { X, BookMarked, TrendingUp, DollarSign, Award, ChevronRight, Crown, History, Ticket } from 'lucide-react';
+import { HorizontalScrollBox } from '../common/HorizontalScrollBox';
+
 
 export const LedgerModal: React.FC = () => {
   const {
@@ -57,52 +59,56 @@ export const LedgerModal: React.FC = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="bg-white px-4 py-2 border-b border-[#FFD6E5] flex gap-2 shrink-0">
+        <HorizontalScrollBox
+          showArrows={true}
+          className="bg-white px-3 py-2 border-b border-[#FFD6E5] flex gap-2 shrink-0 scrollbar-none"
+        >
           <button
             onClick={() => setActiveTab('today')}
-            className={`flex-1 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'today'
                 ? 'bg-[#F7A8C4] text-white shadow-sm'
                 : 'bg-[#FFF1F6] text-[#7C5C55] hover:bg-pink-100'
             }`}
           >
             <DollarSign className="w-3.5 h-3.5" />
-            Hôm Nay
+            <span>Hôm Nay</span>
           </button>
           <button
             onClick={() => setActiveTab('empire')}
-            className={`flex-1 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'empire'
                 ? 'bg-[#F7A8C4] text-white shadow-sm'
                 : 'bg-[#FFF1F6] text-[#7C5C55] hover:bg-pink-100'
             }`}
           >
             <Crown className="w-3.5 h-3.5" />
-            Cơ Nghiệp ({currentStage.name})
+            <span>Cơ Nghiệp ({currentStage.name})</span>
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'history'
                 ? 'bg-[#F7A8C4] text-white shadow-sm'
                 : 'bg-[#FFF1F6] text-[#7C5C55] hover:bg-pink-100'
             }`}
           >
             <History className="w-3.5 h-3.5" />
-            Nhật Ký Các Ngày
+            <span>Nhật Ký Các Ngày</span>
           </button>
           <button
             onClick={() => setActiveTab('lottery')}
-            className={`flex-1 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 ${
               activeTab === 'lottery'
                 ? 'bg-amber-500 text-white shadow-sm'
                 : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
             }`}
           >
             <Ticket className="w-3.5 h-3.5" />
-            Vé Số ({gameState.lotteryHistory.length})
+            <span>Vé Số ({gameState.lotteryHistory.length})</span>
           </button>
-        </div>
+        </HorizontalScrollBox>
+
 
         {/* Nội dung theo Tab */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">

@@ -17,7 +17,7 @@
     color: #7C5C55;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: manipulation;
+    touch-action: pan-x pan-y;
     overscroll-behavior: none;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
@@ -25,6 +25,30 @@
     padding-right: env(safe-area-inset-right);
   }
 }
+
+/* Tối ưu cuộn ngang mượt mà cho mọi thiết bị (Touch & Mouse) */
+.scroll-x-touch {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
 
 /* Mobile Bottom Sheet slide-up */
 @keyframes slideUp {
