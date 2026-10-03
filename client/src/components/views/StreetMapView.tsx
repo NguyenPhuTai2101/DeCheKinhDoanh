@@ -7,6 +7,7 @@ import {
   NEIGHBORS_DATA,
   SHOP_THEMES,
 } from '../../../../shared/gameData';
+import { BusinessStageId } from '../../../../shared/types';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -24,6 +25,7 @@ import {
   Clock,
   Heart,
   Coffee,
+  Plus,
 } from 'lucide-react';
 
 export const StreetMapView: React.FC = () => {
@@ -36,6 +38,8 @@ export const StreetMapView: React.FC = () => {
     serveDishOrder,
     openModal,
     buyLotteryTicket,
+    purchaseUpgrade,
+    upgradeBusinessStage,
   } = useGameStore();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -47,6 +51,74 @@ export const StreetMapView: React.FC = () => {
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
+
+  // Xác định gói nâng cấp bàn tiếp theo
+  let nextTableType: 'extra_1' | 'extra_2' | 'stage_upgrade' | 'max' = 'max';
+  let nextTableCost = 0;
+  let nextTableTitle = 'Tối Đa';
+  let canAffordNextTable = false;
+
+  if (!upgrades['extra_table_1']) {
+    nextTableType = 'extra_1';
+    nextTableCost = 50000;
+    nextTableTitle = 'Kê Bàn Phụ 1';
+    canAffordNextTable = gameState.money >= 50000;
+  } else if (!upgrades['extra_table_2']) {
+    nextTableType = 'extra_2';
+    nextTableCost = 120000;
+    nextTableTitle = 'Kê Bàn Phụ 2';
+    canAffordNextTable = gameState.money >= 120000;
+  } else {
+    const stageOrder: BusinessStageId[] = ['cart', 'corner', 'awning', 'eatery', 'empire'];
+    const currentIdx = stageOrder.indexOf(gameState.businessStage);
+    if (currentIdx < stageOrder.length - 1) {
+      const nextStage = BUSINESS_STAGES[stageOrder[currentIdx + 1]];
+      nextTableType = 'stage_upgrade';
+      nextTableCost = nextStage.cost;
+      nextTableTitle = `Lên: ${nextStage.name.split('/')[0].trim()}`;
+      canAffordNextTable =
+        gameState.money >= nextStage.cost && gameState.reputation >= nextStage.requiredReputation;
+    }
+  }
+
+  const handleBuyNextTable = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundManager.playClick();
+    if (nextTableType === 'extra_1') {
+      const ok = purchaseUpgrade('extra_table_1');
+      if (ok) {
+        soundManager.playCoin();
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+          colors: ['#F59E0B', '#10B981', '#EC4899'],
+        });
+      }
+    } else if (nextTableType === 'extra_2') {
+      const ok = purchaseUpgrade('extra_table_2');
+      if (ok) {
+        soundManager.playCoin();
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+          colors: ['#F59E0B', '#10B981', '#EC4899'],
+        });
+      }
+    } else if (nextTableType === 'stage_upgrade') {
+      const ok = upgradeBusinessStage();
+      if (ok) {
+        soundManager.playCoin();
+        confetti({
+          particleCount: 70,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#F59E0B', '#EF4444', '#10B981', '#6366F1'],
+        });
+      }
+    }
+  };
 
   // Lăn chuột hoặc bấm nút để cuộn ngang phố xá
   const handleScroll = (direction: 'left' | 'right') => {
@@ -500,8 +572,8 @@ export const StreetMapView: React.FC = () => {
               </div>
             </div>
 
-            {/* DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG TRẢI DÀI TRÊN VỈA HÈ */}
-            <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+            {/* DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG & Ô THÊM BÀN */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
               {Array.from({ length: maxTables }).map((_, idx) => {
                 const tableNum = idx + 1;
                 const order = activeOrders.find((o) => o.tableIndex === tableNum);
@@ -519,24 +591,24 @@ export const StreetMapView: React.FC = () => {
                       soundManager.playClick();
                       setSelectedTable(tableNum);
                     }}
-                    className={`relative shrink-0 w-44 rounded-2xl p-2 transition-all cursor-pointer border-2 ${
+                    className={`relative shrink-0 w-32 sm:w-34 rounded-2xl p-1.5 transition-all cursor-pointer border-2 shadow-xs ${
                       isSelected
-                        ? 'bg-amber-100/90 border-amber-500 ring-2 ring-amber-300 shadow-md'
+                        ? 'bg-amber-100/90 border-amber-500 ring-2 ring-amber-300'
                         : order
-                        ? 'bg-white border-[#F2E8E5] hover:border-amber-400 shadow-sm'
-                        : 'bg-white/60 border-dashed border-amber-300'
+                        ? 'bg-white border-[#F2E8E5] hover:border-amber-400'
+                        : 'bg-white/70 border-dashed border-amber-300'
                     }`}
                   >
-                    {/* Số bàn */}
-                    <div className="flex items-center justify-between text-[10px] font-black text-[#7C5C55] mb-1">
+                    {/* Header bàn: Số bàn & Trạng thái */}
+                    <div className="flex items-center justify-between text-[9px] font-black text-[#7C5C55] mb-1">
                       <span className="bg-[#FFE082] px-1.5 py-0.2 rounded-md">
                         Bàn {tableNum}
                       </span>
                       {order && (
                         <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                          className={`text-[8px] font-bold px-1 py-0.2 rounded-full ${
                             order.state === 'ready'
-                              ? 'bg-emerald-100 text-emerald-700 animate-pulse'
+                              ? 'bg-emerald-100 text-emerald-700 animate-pulse font-extrabold'
                               : order.state === 'eating'
                               ? 'bg-amber-100 text-amber-700'
                               : 'bg-slate-100 text-slate-600'
@@ -551,8 +623,8 @@ export const StreetMapView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Khung cảnh bàn ăn: Ghế nhựa + Khách + Đĩa món ăn */}
-                    <div className="h-20 bg-[#FFF9F2] rounded-xl border border-[#F7D7BA] flex items-center justify-around px-1 relative overflow-hidden">
+                    {/* Khung cảnh bàn ăn nhỏ gọn: Ghế nhựa + Khách + Món ăn */}
+                    <div className="h-16 bg-[#FFF9F2] rounded-xl border border-[#F7D7BA] flex items-center justify-around px-1 relative overflow-hidden">
                       {order ? (
                         <>
                           {/* Khách Chibi ngồi trên ghế đẩu */}
@@ -568,9 +640,9 @@ export const StreetMapView: React.FC = () => {
                                   ? 'waiting'
                                   : 'angry'
                               }
-                              size={44}
+                              size={34}
                             />
-                            <span className="text-[8px] font-black text-[#7C5C55] truncate max-w-[60px]">
+                            <span className="text-[7px] font-black text-[#7C5C55] truncate max-w-[48px] leading-tight">
                               {order.neighborId
                                 ? NEIGHBORS_DATA[order.neighborId].name
                                 : cType?.name.split(' ')[0]}
@@ -579,34 +651,29 @@ export const StreetMapView: React.FC = () => {
 
                           {/* Chiếc Bàn Nhựa Đỏ ở giữa */}
                           <div className="flex flex-col items-center">
-                            {/* Món ăn trên bàn */}
-                            <div className="text-xl animate-bounce-short" title={recipe?.name}>
+                            <div className="text-base animate-bounce-short leading-none" title={recipe?.name}>
                               {recipe?.icon || '🥖'}
                             </div>
-
-                            {/* Mặt bàn nhựa đỏ Song Long */}
-                            <div className="w-10 h-3 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs flex items-center justify-center">
-                              <span className="text-[6px] text-white font-black">SONG LONG</span>
+                            <div className="w-7 h-2 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs flex items-center justify-center my-0.5">
+                              <span className="text-[4.5px] text-white font-black leading-none">SLONG</span>
                             </div>
-                            {/* 2 chân bàn */}
-                            <div className="w-8 flex justify-between">
-                              <div className="w-1 h-3 bg-[#C62828]" />
-                              <div className="w-1 h-3 bg-[#C62828]" />
+                            <div className="w-6 flex justify-between">
+                              <div className="w-0.5 h-2 bg-[#C62828]" />
+                              <div className="w-0.5 h-2 bg-[#C62828]" />
                             </div>
                           </div>
                         </>
                       ) : (
-                        /* Bàn trống sẵn sàng đón khách */
+                        /* Bàn trống */
                         <div className="flex flex-col items-center justify-center text-center py-1 opacity-75">
-                          <div className="w-10 h-3 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs mb-1" />
-                          <span className="text-xs">🪑</span>
-                          <span className="text-[9px] font-bold text-slate-500">Bàn Trống</span>
+                          <div className="w-7 h-2 bg-[#E53935] rounded-xs border border-[#B71C1C] shadow-xs mb-0.5" />
+                          <span className="text-[8px] font-bold text-slate-500">Bàn Trống ☕</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Nút hành động trực tiếp ngoài vỉa hè */}
-                    <div className="mt-1.5">
+                    {/* Nút hành động trực tiếp nhỏ gọn */}
+                    <div className="mt-1">
                       {order ? (
                         order.state === 'ready' ? (
                           <button
@@ -614,14 +681,14 @@ export const StreetMapView: React.FC = () => {
                               e.stopPropagation();
                               handleServeOnStreet(order.id);
                             }}
-                            className="w-full py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black shadow-sm flex items-center justify-center gap-1 animate-bounce-short active:scale-95"
+                            className="w-full py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 animate-bounce-short active:scale-95"
                           >
-                            <Sparkles className="w-3 h-3" />
-                            <span>BƯNG MÓN (THU TIỀN 💰)</span>
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>Bưng Món 💰</span>
                           </button>
                         ) : order.state === 'eating' ? (
-                          <div className="w-full py-0.5 text-center text-[9px] font-bold text-amber-700 bg-amber-50 rounded-lg">
-                            Khách đang thưởng thức...
+                          <div className="w-full py-0.5 text-center text-[8px] font-bold text-amber-700 bg-amber-50 rounded-lg">
+                            Đang ăn...
                           </div>
                         ) : (
                           <button
@@ -629,21 +696,81 @@ export const StreetMapView: React.FC = () => {
                               e.stopPropagation();
                               setCurrentView('shop');
                             }}
-                            className="w-full py-1 bg-amber-400 hover:bg-amber-500 text-amber-950 rounded-xl text-[10px] font-black flex items-center justify-center gap-1 active:scale-95"
+                            className="w-full py-0.5 bg-amber-400 hover:bg-amber-500 text-amber-950 rounded-lg text-[8.5px] font-black flex items-center justify-center gap-0.5 active:scale-95"
                           >
-                            <Utensils className="w-3 h-3" />
-                            <span>Vào Bếp Nấu {recipe?.name.split(' ')[0]}</span>
+                            <Utensils className="w-2.5 h-2.5" />
+                            <span>Vào Nấu 🍳</span>
                           </button>
                         )
                       ) : (
-                        <div className="text-center text-[9px] text-slate-400 py-0.5">
-                          Đang chờ khách ghé
+                        <div className="text-center text-[8px] text-slate-400 py-0.5">
+                          Chờ khách ghé
                         </div>
                       )}
                     </div>
                   </div>
                 );
               })}
+
+              {/* Ô 'THÊM BÀN' ĐỂ USER CÓ THỂ THÊM BÀN TRỰC TIẾP TẠI ĐÂY */}
+              <div
+                onClick={handleBuyNextTable}
+                className={`relative shrink-0 w-32 sm:w-34 rounded-2xl p-1.5 transition-all cursor-pointer border-2 border-dashed flex flex-col justify-between shadow-xs active:scale-95 ${
+                  canAffordNextTable
+                    ? 'bg-amber-50/90 border-amber-400 hover:bg-amber-100 ring-2 ring-amber-300 animate-pulse'
+                    : 'bg-slate-50 border-slate-300 hover:border-slate-400'
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between text-[9px] font-black text-amber-950 mb-1">
+                  <span className="flex items-center gap-0.5 text-amber-700">
+                    <Plus className="w-2.5 h-2.5 stroke-[3]" /> Thêm Bàn
+                  </span>
+                  <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded text-[7.5px] font-black">
+                    {nextTableCost > 0 ? `${(nextTableCost / 1000).toFixed(0)}k` : 'MAX'}
+                  </span>
+                </div>
+
+                {/* Khung cảnh thêm bàn */}
+                <div className="h-16 rounded-xl border border-dashed border-amber-300 bg-white/70 flex flex-col items-center justify-center p-1 text-center">
+                  <span className="text-lg">🪑➕</span>
+                  <div className="text-[8px] font-black text-amber-900 truncate max-w-full">
+                    {nextTableTitle}
+                  </div>
+                  <div className="text-[7px] text-slate-500 font-medium">
+                    {nextTableType === 'max'
+                      ? 'Đạt số bàn tối đa'
+                      : '+1 Bàn Nhựa Đón Khách'}
+                  </div>
+                </div>
+
+                {/* Nút bấm mua bàn */}
+                <div className="mt-1">
+                  {nextTableType === 'max' ? (
+                    <div className="w-full py-0.5 text-center text-[8px] font-bold text-slate-400 bg-slate-100 rounded-lg">
+                      Đã Tối Đa
+                    </div>
+                  ) : canAffordNextTable ? (
+                    <button
+                      onClick={handleBuyNextTable}
+                      className="w-full py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 active:scale-95"
+                    >
+                      <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                      <span>Kê Thêm Bàn</span>
+                    </button>
+                  ) : (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal('upgrades');
+                      }}
+                      className="w-full py-0.5 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-bold text-center truncate"
+                    >
+                      Thiếu {nextTableCost.toLocaleString('vi-VN')} đ
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -676,20 +803,6 @@ export const StreetMapView: React.FC = () => {
       >
         <ChevronRight className="w-5 h-5" />
       </button>
-
-      {/* 4. NÚT NỔI CHUYỂN NHANH VỀ BẾP TRÊN MOBILE */}
-      <div className="absolute bottom-16 right-3 z-30">
-        <button
-          onClick={() => {
-            soundManager.playClick();
-            setCurrentView('shop');
-          }}
-          className="px-3 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl shadow-xl font-black text-xs flex items-center gap-1.5 border-2 border-white active:scale-95 transition-all animate-bounce-short"
-        >
-          <Utensils className="w-4 h-4" />
-          <span>Vào Bếp 🍳</span>
-        </button>
-      </div>
     </div>
   );
 };
