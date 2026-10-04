@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import {
   BUSINESS_STAGES,
@@ -10,29 +10,23 @@ import {
 } from '../../../../shared/gameData';
 import { BusinessStageId, RestaurantTypeId, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
+import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
 import {
   Utensils,
   Sparkles,
   Award,
-  UserPlus,
-  X,
-  Building2,
-  HardHat,
-  Coins,
+  ChevronLeft,
+  ChevronRight,
   AlertTriangle,
-  ZoomIn,
-  ZoomOut,
-  Crosshair,
+  Users,
+  Coins,
   Store,
-  Trees,
-  CheckCircle2,
+  ChefHat,
+  ArrowRight,
+  Plus,
 } from 'lucide-react';
-
-// KÍCH THƯỚC Ô LƯỚI ISOMETRIC 2.5D (Isometric Grid Geometry)
-const TILE_W = 110;
-const TILE_H = 55;
 
 export const StreetMapView: React.FC = () => {
   const {
@@ -42,39 +36,40 @@ export const StreetMapView: React.FC = () => {
     serveDishOrder,
     openModal,
     switchActiveRestaurant,
+    purchaseUpgrade,
   } = useGameStore();
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedTable, setSelectedTable] = useState<number | null>(null);
 
-  // Vị trí Pan (kéo rê camera 2.5D) & Tỷ lệ Zoom
-  const [pan, setPan] = useState({ x: 0, y: -40 });
-  const [zoom, setZoom] = useState(1);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  const hasDraggedRef = useRef(false);
+  // Trạng thái cuộn ngang
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [scrollPercent, setScrollPercent] = useState(0);
 
-  // Công trình / Lô đất đang được chọn mở bảng thông tin
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  // Kéo chuột trên Desktop (Mouse drag-to-scroll)
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const initialScrollLeft = useRef(0);
+  const hasMoved = useRef(false);
 
-  // Chu kỳ xe cộ di chuyển trên đường 2.5D
-  const [vehicleOffset, setVehicleOffset] = useState(0);
-
+  // Chu kỳ xe cộ chạy ngang lòng đường
+  const [trafficTick, setTrafficTick] = useState(0);
   useEffect(() => {
-    let animId: number;
-    let start = performance.now();
-    const loop = (now: number) => {
-      const elapsed = (now - start) / 1000;
-      setVehicleOffset((elapsed * 0.12) % 1);
-      animId = requestAnimationFrame(loop);
-    };
-    animId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animId);
+    const timer = setInterval(() => {
+      setTrafficTick((prev) => (prev + 1) % 100);
+    }, 200);
+    return () => clearInterval(timer);
   }, []);
 
   // Cấu hình cấp bậc vỉa hè & quán ăn hiện tại
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
+  const upgrades = gameState.purchasedUpgrades;
+  const maxTables =
+    currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
 
   // Lấy danh sách nhân viên được phân công cho từng quán
@@ -84,931 +79,1174 @@ export const StreetMapView: React.FC = () => {
       .filter((e): e is Employee => Boolean(e) && (e.assignedRestaurantId || 'banh_mi') === restKey);
   };
 
-  // Helper tính tọa độ màn hình từ tọa độ ô lưới (Grid to Screen Isometric)
-  const gridToScreen = (gx: number, gy: number) => {
-    return {
-      x: (gx - gy) * (TILE_W / 2) + 600,
-      y: (gx + gy) * (TILE_H / 2) + 160,
-    };
+  // Cập nhật chỉ số thanh cuộn
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 10);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 10);
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll > 0) {
+      setScrollPercent(Math.min(100, Math.max(0, (el.scrollLeft / maxScroll) * 100)));
+    }
   };
 
-  // DANH SÁCH CÁC CÔNG TRÌNH & LÔ ĐẤT ẨM THỰC 2.5D (Zoning Plots)
-  const buildings = useMemo(() => {
-    return [
-      // 1. QUÁN BÁNH MÌ SÀI GÒN
-      {
-        id: 'banh_mi',
-        type: 'restaurant' as const,
-        restKey: 'banh_mi' as RestaurantTypeId,
-        title: 'Bánh Mì Sài Gòn',
-        tagline: 'Giòn rụm pate bơ Pháp',
-        icon: '🥖',
-        gx: 2,
-        gy: 1,
-        width: 1,
-        length: 1,
-        height: 65,
-        themeColor: '#EA580C',
-        wallColor: '#FDBA74',
-        roofColor: '#C2410C',
-      },
-      // 2. QUÁN PHỞ BÒ GIA TRUYỀN
-      {
-        id: 'pho',
-        type: 'restaurant' as const,
-        restKey: 'pho' as RestaurantTypeId,
-        title: 'Phở Bò Gia Truyền',
-        tagline: 'Nước dùng ninh xương 24h',
-        icon: '🍜',
-        gx: 4,
-        gy: 1,
-        width: 1,
-        length: 1,
-        height: 72,
-        themeColor: '#DC2626',
-        wallColor: '#FCA5A5',
-        roofColor: '#B91C1C',
-      },
-      // 3. QUÁN BÚN BÒ HUẾ & BÚN RIÊU
-      {
-        id: 'bun',
-        type: 'restaurant' as const,
-        restKey: 'bun' as RestaurantTypeId,
-        title: 'Bún Bò Huế & Riêu',
-        tagline: 'Sa tế cay nồng đậm vị',
-        icon: '🍲',
-        gx: 6,
-        gy: 1,
-        width: 1,
-        length: 1,
-        height: 68,
-        themeColor: '#7C3AED',
-        wallColor: '#DDD6FE',
-        roofColor: '#6D28D9',
-      },
-      // 4. TIỆM BÒ NÉ & STEAK CHẢO GANG
-      {
-        id: 'beefsteak',
-        type: 'restaurant' as const,
-        restKey: 'beefsteak' as RestaurantTypeId,
-        title: 'Bò Né Xèo Xèo',
-        tagline: 'Chảo gang bơ thơm lừng',
-        icon: '🥩',
-        gx: 2,
-        gy: 4,
-        width: 1,
-        length: 1,
-        height: 66,
-        themeColor: '#B91C1C',
-        wallColor: '#FED7AA',
-        roofColor: '#991B1B',
-      },
-      // 5. QUÁN CƠM TẤM SƯỜN NƯỚNG THAN
-      {
-        id: 'com_tam',
-        type: 'restaurant' as const,
-        restKey: 'com_tam' as RestaurantTypeId,
-        title: 'Cơm Tấm Sườn Bì Chả',
-        tagline: 'Sườn nướng mật ong than hồng',
-        icon: '🍛',
-        gx: 4,
-        gy: 4,
-        width: 1,
-        length: 1,
-        height: 70,
-        themeColor: '#D97706',
-        wallColor: '#FDE68A',
-        roofColor: '#B45309',
-      },
-      // 6. CHỢ ĐẦU MỐI NÔNG SẢN BẾN THÀNH (Market)
-      {
-        id: 'market',
-        type: 'facility' as const,
-        facilityType: 'market' as const,
-        title: 'Chợ Sỉ Đầu Mối',
-        tagline: 'Rau củ thịt cá bơ trứng',
-        icon: '🛒',
-        gx: 7,
-        gy: 3,
-        width: 2,
-        length: 1,
-        height: 55,
-        themeColor: '#10B981',
-        wallColor: '#A7F3D0',
-        roofColor: '#059669',
-      },
-      // 7. CÀ PHÊ BÁC BA & CÂY ME CỔ THỤ (Neighbors / Park)
-      {
-        id: 'neighbors',
-        type: 'facility' as const,
-        facilityType: 'neighbors' as const,
-        title: 'Cà Phê Bác Ba & Cây Me',
-        tagline: 'Bàn cờ tướng & radio xưa',
-        icon: '☕',
-        gx: 6,
-        gy: 5,
-        width: 1,
-        length: 1,
-        height: 48,
-        themeColor: '#0284C7',
-        wallColor: '#BAE6FD',
-        roofColor: '#0369A1',
-      },
-      // 8. TIỆM SỬA XE MÁY CHÚ NĂM
-      {
-        id: 'delivery',
-        type: 'facility' as const,
-        facilityType: 'delivery' as const,
-        title: 'Đội Xe Giao Hàng & Sửa Xe',
-        tagline: 'Bơm vá & shipper nổ cuốc',
-        icon: '🔧',
-        gx: 1,
-        gy: 3,
-        width: 1,
-        length: 1,
-        height: 52,
-        themeColor: '#64748B',
-        wallColor: '#CBD5E1',
-        roofColor: '#475569',
-      },
-      // 9. ĐẠI LÝ VÉ SỐ CÔ BẢY
-      {
-        id: 'lottery',
-        type: 'facility' as const,
-        facilityType: 'lottery' as const,
-        title: 'Vé Số & Đề Học Cô Bảy',
-        tagline: 'Cơ hội trúng độc đắc x70',
-        icon: '🎟️',
-        gx: 1,
-        gy: 5,
-        width: 1,
-        length: 1,
-        height: 45,
-        themeColor: '#E11D48',
-        wallColor: '#FECDD3',
-        roofColor: '#BE123C',
-      },
-    ];
+  // Hỗ trợ con lăn chuột
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > 0 || Math.abs(e.deltaX) > 0) {
+        e.preventDefault();
+        const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        el.scrollLeft += delta * 1.2;
+        updateScrollState();
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    updateScrollState();
+    window.addEventListener('resize', updateScrollState);
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      window.removeEventListener('resize', updateScrollState);
+    };
   }, []);
 
-  // Xử lý kéo rê chuột / cảm ứng (Mouse & Touch Pan Drag)
-  const handlePointerDown = (e: React.PointerEvent) => {
-    setIsDragging(true);
-    hasDraggedRef.current = false;
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    };
+  // Kéo thả chuột mượt mà trên Desktop
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    isDragging.current = true;
+    hasMoved.current = false;
+    startX.current = e.pageX - el.offsetLeft;
+    initialScrollLeft.current = el.scrollLeft;
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-      hasDraggedRef.current = true;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    const el = scrollRef.current;
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startX.current) * 1.3;
+    if (Math.abs(walk) > 4) {
+      hasMoved.current = true;
     }
-    setPan({
-      x: dragStartRef.current.panX + dx,
-      y: dragStartRef.current.panY + dy,
-    });
+    el.scrollLeft = initialScrollLeft.current - walk;
+    updateScrollState();
   };
 
-  const handlePointerUp = () => {
-    setIsDragging(false);
+  const handleMouseUpOrLeave = () => {
+    isDragging.current = false;
+    setTimeout(() => {
+      hasMoved.current = false;
+    }, 100);
   };
 
-  // Chuyển sang quản lý chi nhánh
-  const handleSwitchBranch = (id: RestaurantTypeId) => {
+  const safeClick = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (hasMoved.current) return;
+    fn();
+  };
+
+  const handleScrollBy = (offset: number) => {
+    if (!scrollRef.current) return;
+    soundManager.playClick();
+    scrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    setTimeout(updateScrollState, 250);
+  };
+
+  const scrollToElement = (id: string) => {
+    const el = document.getElementById(id);
+    if (el && scrollRef.current) {
+      soundManager.playClick();
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      setTimeout(updateScrollState, 300);
+    }
+  };
+
+  const handleSwitchToBranch = (id: RestaurantTypeId) => {
     soundManager.playClick();
     switchActiveRestaurant(id);
-    setSelectedBuildingId(null);
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 },
-    });
+    setCurrentView('shop');
   };
 
-  // Thu hoạch nhanh tiền thụ động chi nhánh
-  const handleHarvestBranch = (restKey: RestaurantTypeId, e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundManager.playCoin();
-    confetti({
-      particleCount: 30,
-      spread: 45,
-      origin: { y: 0.6 },
-      colors: ['#F59E0B', '#10B981', '#EC4899'],
-    });
-  };
-
-  // Zoom In / Out
-  const handleZoom = (delta: number) => {
+  const handleServeOnStreet = (orderId: string) => {
+    if (hasMoved.current) return;
     soundManager.playClick();
-    setZoom((prev) => Math.max(0.75, Math.min(1.4, +(prev + delta).toFixed(2))));
+    const success = serveDishOrder(orderId);
+    if (success) {
+      soundManager.playCoin();
+      confetti({
+        particleCount: 40,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#F59E0B', '#EF4444', '#10B981', '#EC4899', '#0284C7'],
+      });
+    }
   };
 
-  const handleResetCenter = () => {
-    soundManager.playClick();
-    setPan({ x: 0, y: -40 });
-    setZoom(1);
-  };
+  // Render từng mặt tiền quán ẩm thực (Compact & Chân Thực)
+  const renderStorefrontLot = (restKey: RestaurantTypeId, width = 280) => {
+    const rest = RESTAURANT_TYPES[restKey];
+    if (!rest) return null;
+    const isUnlocked = gameState.unlockedRestaurants?.includes(restKey);
+    const isActive = activeRestId === restKey;
+    const assignedStaff = getStaffForRest(restKey);
+    const isAutomated = assignedStaff.length > 0;
 
-  // Tìm thông tin công trình đang chọn
-  const activeBuilding = buildings.find((b) => b.id === selectedBuildingId);
-
-  return (
-    <div className="w-full h-full flex flex-col overflow-hidden select-none bg-[#74A747] relative">
-      {/* CSS KEYFRAMES CHO HOẠT HỌA SIMCITY 2.5D */}
-      <style>{`
-        @keyframes floatHat {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-7px) scale(1.08); }
-        }
-        @keyframes coinBounce {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-6px) scale(1.12); }
-        }
-        @keyframes smokePuff {
-          0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
-          50% { transform: translateY(-12px) scale(1.2); opacity: 0.4; }
-          100% { transform: translateY(-24px) scale(1.6); opacity: 0; }
-        }
-      `}</style>
-
-      {/* ========================================================================= */}
-      {/* 1. THANH TOP HUD PHONG CÁCH SIMCITY BUILDIT ĐẲNG CẤP                     */}
-      {/* ========================================================================= */}
-      <div className="relative z-40 shrink-0 bg-gradient-to-b from-black/80 via-black/50 to-transparent p-2 sm:px-4 text-white flex items-center justify-between pointer-events-auto">
-        {/* Góc trái: Level Badge Tím, Dân số, Độ hài lòng, Kho hàng */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Huy hiệu Level Tím (Giống icon số 3 trong ảnh mẫu) */}
-          <div
-            onClick={() => openModal('upgrades')}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-purple-700 via-fuchsia-600 to-pink-500 border-2 border-white flex items-center justify-center font-black text-sm sm:text-base shadow-lg cursor-pointer active:scale-95 transition-transform"
-            title="Cấp bậc vỉa hè"
-          >
-            <span>
-              {gameState.businessStage === 'cart'
-                ? '1'
-                : gameState.businessStage === 'corner'
-                ? '2'
-                : gameState.businessStage === 'awning'
-                ? '3'
-                : gameState.businessStage === 'eatery'
-                ? '4'
-                : '5'}
-            </span>
-          </div>
-
-          {/* Khách hàng & Độ hài lòng */}
-          <div className="bg-black/60 backdrop-blur-xs rounded-full border border-white/20 px-2 py-0.5 flex items-center gap-1.5 text-[11px] font-black">
-            <span className="text-amber-400">👥</span>
-            <span>{800 + gameState.reputation * 12}</span>
-            <span className="text-white/40">|</span>
-            <span className="text-emerald-400">😊</span>
-            <span>{Math.min(100, 75 + Math.round(gameState.reputation / 3))}%</span>
-          </div>
-
-          {/* Sức chứa kho nguyên liệu */}
-          <div
-            onClick={() => openModal('market')}
-            className="bg-black/60 backdrop-blur-xs rounded-full border border-white/20 px-2 py-0.5 flex items-center gap-1 text-[11px] font-black cursor-pointer hover:border-amber-400 active:scale-95"
-            title="Kho nguyên liệu & Chợ sỉ"
-          >
-            <span className="text-sky-400">📦</span>
-            <span className="text-sky-200">
-              {Object.values(gameState.inventory).reduce((a, b) => a + b, 0)}/{gameState.storageCapacity}
-            </span>
-          </div>
-        </div>
-
-        {/* Góc phải: Tiền Vàng 🪙 và Vốn Đầu Tư 💵 */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Tiền Vàng (Coins Bar chuẩn SimCity) */}
-          <div className="bg-black/60 backdrop-blur-xs rounded-full border border-white/20 px-2.5 py-0.5 flex items-center gap-1.5 shadow-md">
-            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 border border-yellow-100 flex items-center justify-center text-[11px] shadow-xs">
-              🪙
+    // TRƯỜNG HỢP 1: QUÁN ĐANG ĐỨNG BẾP CHÍNH (ACTIVE)
+    if (isActive) {
+      return (
+        <div
+          id={`lot-${restKey}`}
+          style={{
+            width: `${width}px`,
+            backgroundColor: stageVisual.storefront.facadeBg,
+            borderColor: stageVisual.storefront.facadeBorder,
+          }}
+          className={`h-56 border-3 rounded-t-2xl relative flex flex-col justify-between p-2 shadow-md shrink-0 transition-all ${
+            stageVisual.storefront.hasNeonGlow ? 'ring-2 ring-amber-300 shadow-amber-200/50' : ''
+          }`}
+        >
+          {/* Mái hiên theo cấp bậc quán */}
+          <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
+            <div className={`h-4 w-full flex overflow-hidden shadow-2xs ${stageVisual.storefront.roofRounds}`}>
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex-1 h-full"
+                  style={{
+                    backgroundColor:
+                      i % 2 === 0
+                        ? stageVisual.storefront.roofColors[0]
+                        : stageVisual.storefront.roofColors[1],
+                  }}
+                />
+              ))}
             </div>
-            <span className="font-black text-amber-300 text-xs sm:text-sm">
-              {gameState.money.toLocaleString('vi-VN')}
-            </span>
+
+            {/* Huy hiệu Trụ Sở Chính */}
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border border-amber-500 whitespace-nowrap z-10 animate-pulse">
+              <span>👑</span>
+              <span>TRỤ SỞ ĐỨNG BẾP</span>
+            </div>
+          </div>
+
+          {/* Biển hiệu quán chính */}
+          <div
+            className="rounded-xl p-1.5 flex items-center justify-between border shadow-2xs"
+            style={{
+              backgroundColor: stageVisual.storefront.signboardBg,
+              borderColor: stageVisual.storefront.signboardBorder,
+            }}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xl animate-bounce-short shrink-0">{rest.icon}</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1">
+                  <h3
+                    className="font-black text-xs leading-tight truncate"
+                    style={{ color: stageVisual.storefront.signboardTextColor }}
+                  >
+                    {rest.name}
+                  </h3>
+                </div>
+                <div className="text-[8.5px] font-bold text-rose-600 flex items-center gap-1 truncate">
+                  <span>{currentStage.name}</span>
+                  <span>·</span>
+                  <span>⭐ {gameState.reputation}</span>
+                </div>
+              </div>
+            </div>
+
             <button
-              onClick={() => openModal('market')}
-              className="w-4 h-4 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center ml-0.5"
+              onClick={safeClick(() => setCurrentView('shop'))}
+              className="px-2 py-1 bg-white hover:bg-rose-50 border border-rose-300 rounded-lg text-[10px] font-black text-rose-700 shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0"
             >
-              +
+              <Utensils className="w-2.5 h-2.5" />
+              <span>Vào Bếp 🍳</span>
             </button>
           </div>
 
-          {/* Điểm Danh Tiếng / Uy Tín ⭐ */}
-          <div className="bg-black/60 backdrop-blur-xs rounded-full border border-white/20 px-2 py-0.5 flex items-center gap-1 shadow-md text-xs font-black text-emerald-300">
-            <span>⭐</span>
-            <span>{gameState.reputation}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 2. KHÔNG GIAN BẢN ĐỒ ISOMETRIC 2.5D (SIMCITY CANVAS)                     */}
-      {/* ========================================================================= */}
-      <div
-        ref={containerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        className={`flex-1 w-full relative overflow-hidden touch-none ${
-          isDragging ? 'cursor-grabbing' : 'cursor-grab'
-        }`}
-      >
-        {/* CONTAINER ZOOM & PAN NỘI BỘ */}
-        <div
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center center',
-            transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-            width: '1200px',
-            height: '800px',
-          }}
-          className="relative pointer-events-auto"
-        >
-          {/* SVG LỚP 1: NỀN ĐẤT CỎ, ĐƯỜNG NHỰA 2.5D, VẠCH SƠN VÀ XE CỘ */}
-          <svg
-            viewBox="0 0 1200 800"
-            className="absolute inset-0 w-full h-full pointer-events-none"
+          {/* Quầy bếp & Nhân sự quán chính */}
+          <div
+            onClick={safeClick(() => setCurrentView('shop'))}
+            className="bg-white/95 rounded-xl border p-1.5 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-xs group"
+            style={{ borderColor: stageVisual.storefront.signboardBorder }}
           >
-            {/* 1. NỀN THẢM CỎ XANH TƯƠI MÁT */}
-            <defs>
-              <pattern id="grassGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <rect width="40" height="40" fill="#75A642" />
-                <circle cx="20" cy="20" r="1.5" fill="#6A973A" />
-                <circle cx="8" cy="8" r="1" fill="#7EB247" />
-                <circle cx="32" cy="30" r="1" fill="#7EB247" />
-              </pattern>
-
-              <linearGradient id="roadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#3F4A57" />
-                <stop offset="100%" stopColor="#2E3742" />
-              </linearGradient>
-
-              {/* Bộ lọc bóng đổ mềm cho công trình 2.5D */}
-              <filter id="shadowFilter" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="4" dy="8" stdDeviation="5" floodOpacity="0.32" />
-              </filter>
-            </defs>
-
-            <rect width="1200" height="800" fill="url(#grassGrid)" />
-
-            {/* CÂY XANH RỪNG RẬM Ở CÁC RÌA BẢN ĐỒ */}
-            {[
-              { x: 100, y: 80 }, { x: 150, y: 110 }, { x: 80, y: 150 },
-              { x: 1050, y: 100 }, { x: 1120, y: 130 }, { x: 1080, y: 180 },
-              { x: 1100, y: 650 }, { x: 1050, y: 700 }, { x: 980, y: 680 },
-              { x: 120, y: 650 }, { x: 180, y: 700 }, { x: 80, y: 720 },
-            ].map((tree, i) => (
-              <g key={i} transform={`translate(${tree.x}, ${tree.y})`}>
-                <ellipse cx="0" cy="8" rx="14" ry="6" fill="#000000" opacity="0.25" />
-                <circle cx="0" cy="-2" r="14" fill="#3D7E2F" />
-                <circle cx="-3" cy="-5" r="10" fill="#4B9B3A" />
-                <circle cx="3" cy="-7" r="7" fill="#67B847" />
-              </g>
-            ))}
-
-            {/* 2. MẠNG LƯỚI ĐƯỜNG NHỰA ISOMETRIC (Road Network) */}
-            {/* Đường trục 1: Tây Bắc sang Đông Nam (gx: 0..8, gy: 2.5) */}
-            {(() => {
-              const start = gridToScreen(0, 2.7);
-              const end = gridToScreen(8, 2.7);
-              return (
-                <g>
-                  {/* Vỉa hè bê tông xám */}
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#CBD5E1" strokeWidth="44" strokeLinecap="round"
-                  />
-                  {/* Lòng đường nhựa */}
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="url(#roadGradient)" strokeWidth="36" strokeLinecap="round"
-                  />
-                  {/* Vạch kẻ đường đứt nét vàng */}
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#FDE047" strokeWidth="2.5" strokeDasharray="8 8" opacity="0.85"
-                  />
-                </g>
-              );
-            })()}
-
-            {/* Đường trục 2: Tây Bắc sang Đông Nam (gx: 0..8, gy: 5.5) */}
-            {(() => {
-              const start = gridToScreen(0, 5.7);
-              const end = gridToScreen(8, 5.7);
-              return (
-                <g>
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#CBD5E1" strokeWidth="44" strokeLinecap="round"
-                  />
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="url(#roadGradient)" strokeWidth="36" strokeLinecap="round"
-                  />
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#FDE047" strokeWidth="2.5" strokeDasharray="8 8" opacity="0.85"
-                  />
-                </g>
-              );
-            })()}
-
-            {/* Đường trục nối dọc: Tây Nam sang Đông Bắc (gy: 0..8, gx: 3.5) */}
-            {(() => {
-              const start = gridToScreen(3.5, 0);
-              const end = gridToScreen(3.5, 8);
-              return (
-                <g>
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#CBD5E1" strokeWidth="42" strokeLinecap="round"
-                  />
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="url(#roadGradient)" strokeWidth="34" strokeLinecap="round"
-                  />
-                  <line
-                    x1={start.x} y1={start.y}
-                    x2={end.x} y2={end.y}
-                    stroke="#FFFFFF" strokeWidth="2" strokeDasharray="7 7" opacity="0.8"
-                  />
-                </g>
-              );
-            })()}
-
-            {/* 3. XE CỘ CHẠY TRÊN ĐƯỜNG 2.5D (Animated Traffic) */}
-            {/* Xe 1: Xe taxi vàng trên đường trục 1 */}
-            {(() => {
-              const start = gridToScreen(0, 2.6);
-              const end = gridToScreen(8, 2.6);
-              const curX = start.x + (end.x - start.x) * vehicleOffset;
-              const curY = start.y + (end.y - start.y) * vehicleOffset;
-              return (
-                <g transform={`translate(${curX}, ${curY})`}>
-                  <ellipse cx="0" cy="2" rx="9" ry="4" fill="#000" opacity="0.4" />
-                  <rect x="-8" y="-5" width="16" height="8" rx="2" fill="#EAB308" stroke="#713F12" strokeWidth="1" />
-                  <rect x="-5" y="-7" width="10" height="4" rx="1" fill="#FEF08A" />
-                </g>
-              );
-            })()}
-
-            {/* Xe 2: Xe máy Dream chở hàng trên đường trục 2 */}
-            {(() => {
-              const start = gridToScreen(8, 5.8);
-              const end = gridToScreen(0, 5.8);
-              const curX = start.x + (end.x - start.x) * vehicleOffset;
-              const curY = start.y + (end.y - start.y) * vehicleOffset;
-              return (
-                <g transform={`translate(${curX}, ${curY})`}>
-                  <ellipse cx="0" cy="2" rx="6" ry="3" fill="#000" opacity="0.35" />
-                  <circle cx="-3" cy="0" r="3" fill="#1E293B" />
-                  <circle cx="3" cy="0" r="3" fill="#1E293B" />
-                  <rect x="-4" y="-6" width="7" height="4" fill="#DC2626" rx="1" />
-                </g>
-              );
-            })()}
-
-            {/* Xe 3: Xe con màu trắng trên trục dọc */}
-            {(() => {
-              const start = gridToScreen(3.6, 0.5);
-              const end = gridToScreen(3.6, 7.5);
-              const offset2 = (vehicleOffset + 0.5) % 1;
-              const curX = start.x + (end.x - start.x) * offset2;
-              const curY = start.y + (end.y - start.y) * offset2;
-              return (
-                <g transform={`translate(${curX}, ${curY})`}>
-                  <ellipse cx="0" cy="2" rx="9" ry="4" fill="#000" opacity="0.4" />
-                  <rect x="-8" y="-5" width="16" height="8" rx="2" fill="#F8FAFC" stroke="#475569" strokeWidth="1" />
-                  <rect x="-4" y="-7" width="8" height="4" rx="1" fill="#94A3B8" />
-                </g>
-              );
-            })()}
-          </svg>
-
-          {/* LỚP 2: CÁC KHỐI NHÀ 2.5D ISOMETRIC VÀ BONG BÓNG NỔI (HTML Interactive Elements) */}
-          <div className="absolute inset-0 pointer-events-none">
-            {buildings.map((b) => {
-              const pos = gridToScreen(b.gx, b.gy);
-              const isSelected = selectedBuildingId === b.id;
-
-              // Kiểm tra trạng thái nếu là quán ẩm thực
-              const isRest = b.type === 'restaurant';
-              const restKey = b.restKey as RestaurantTypeId;
-              const isCurrent = isRest && restKey === activeRestId;
-              const isUnlocked = isRest && gameState.unlockedRestaurants?.includes(restKey);
-              const staff = isRest ? getStaffForRest(restKey) : [];
-              const isStaffed = staff.length > 0;
-              const canAffordUnlock =
-                isRest &&
-                !isUnlocked &&
-                gameState.money >= (RESTAURANT_TYPES[restKey]?.unlockCost || 0) &&
-                gameState.reputation >= (RESTAURANT_TYPES[restKey]?.requiredReputation || 0);
-
-              return (
-                <div
-                  key={b.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    soundManager.playClick();
-                    setSelectedBuildingId(b.id);
-                  }}
-                  style={{
-                    left: `${pos.x}px`,
-                    top: `${pos.y}px`,
-                    transform: 'translate(-50%, -100%)',
-                    zIndex: Math.round(b.gx + b.gy) * 10,
-                  }}
-                  className="absolute pointer-events-auto cursor-pointer group"
-                >
-                  {/* BÓNG ĐỔ KHỐI NHÀ DƯỚI ĐẤT */}
-                  <div
-                    style={{
-                      width: `${TILE_W * 0.9}px`,
-                      height: `${TILE_H * 0.8}px`,
-                      transform: 'translate(-50%, 65%) scale(1, 0.5)',
-                      backgroundColor: 'rgba(0,0,0,0.28)',
-                      borderRadius: '50%',
-                    }}
-                    className="absolute left-1/2 bottom-0 pointer-events-none"
-                  />
-
-                  {/* KHỐI NHÀ 2.5D ISOMETRIC (Building Mesh) */}
-                  <div
-                    style={{
-                      width: `${TILE_W * 0.85}px`,
-                      height: `${b.height + 35}px`,
-                    }}
-                    className={`relative flex flex-col justify-end transition-all duration-200 ${
-                      isSelected ? 'scale-105 brightness-110' : 'group-hover:scale-102 group-hover:brightness-105'
-                    }`}
-                  >
-                    {/* TRƯỜNG HỢP A: QUÁN CHƯA MỞ (LÔ ĐẤT ĐANG THI CÔNG / CÔNG TRƯỜNG GIỐNG SIMCITY) */}
-                    {isRest && !isUnlocked ? (
-                      <div className="relative w-full h-14 bg-amber-100/90 border-2 border-dashed border-amber-500 rounded-xl p-1 flex flex-col justify-between items-center shadow-md">
-                        {/* Hàng rào công trình vàng sọc đen */}
-                        <div className="w-full h-2 rounded-t flex overflow-hidden">
-                          {Array.from({ length: 6 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="flex-1 h-full"
-                              style={{ backgroundColor: i % 2 === 0 ? '#F59E0B' : '#78350F' }}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="text-xl opacity-75">{b.icon}</div>
-
-                        <div className="text-[8px] font-black text-amber-950 bg-amber-300 px-1.5 rounded-full">
-                          {canAffordUnlock ? 'SẴN SÀNG 🚀' : 'CHƯA MỞ ⏳'}
-                        </div>
-                      </div>
-                    ) : (
-                      /* TRƯỜNG HỢP B: TÒA NHÀ 2.5D HOÀN CHỈNH CÓ MẶT NÓC, MẶT TRƯỚC VÀ MẶT HÔNG */
-                      <div className="relative w-full flex flex-col justify-end">
-                        {/* 1. MẶT MÁI NHÀ (Roof - Nhìn từ trên xuống) */}
-                        <div
-                          style={{
-                            backgroundColor: b.roofColor,
-                            borderColor: b.themeColor,
-                            height: '24px',
-                            clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-                          }}
-                          className="w-full relative flex items-center justify-center shadow-xs"
-                        >
-                          {/* Khói nghi ngút bốc lên từ nóc nhà */}
-                          {isUnlocked && (
-                            <span
-                              style={{ animation: 'smokePuff 2.2s infinite ease-out' }}
-                              className="absolute -top-3 text-xs pointer-events-none"
-                            >
-                              ♨️
-                            </span>
-                          )}
-                        </div>
-
-                        {/* 2. MẶT TRƯỚC TÒA NHÀ 2.5D (Front Facade) */}
-                        <div
-                          style={{
-                            backgroundColor: b.wallColor,
-                            borderColor: b.themeColor,
-                            borderWidth: '2px',
-                          }}
-                          className={`w-full rounded-b-xl p-1.5 flex flex-col justify-between shadow-lg relative overflow-hidden ${
-                            isCurrent ? 'ring-2 ring-amber-400' : ''
-                          }`}
-                        >
-                          {/* Mái hiên sọc đặc trưng */}
-                          <div className="h-2 w-full rounded flex overflow-hidden mb-1">
-                            {Array.from({ length: 6 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="flex-1 h-full"
-                                style={{
-                                  backgroundColor:
-                                    i % 2 === 0 ? b.themeColor : '#FFFFFF',
-                                }}
-                              />
-                            ))}
-                          </div>
-
-                          {/* Icon công trình & Bảng hiệu */}
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-xl sm:text-2xl drop-shadow-xs">{b.icon}</span>
-                            <div className="text-right min-w-0">
-                              <div className="text-[9px] font-black text-slate-900 leading-tight truncate">
-                                {b.title.split(' ')[0]}
-                              </div>
-                              <div className="text-[7.5px] font-bold text-slate-700 truncate">
-                                {isRest ? (isCurrent ? 'Trụ Sở 👑' : `${staff.length} NV`) : 'Dịch vụ'}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ================================================================= */}
-                    {/* BONG BÓNG NỔI ĐẶC TRƯNG SIMCITY (Floating Interactive Bubbles)    */}
-                    {/* ================================================================= */}
-                    {/* 1. Mũ Bảo Hộ Màu Vàng 👷‍♂️ (Khi đủ điều kiện mở chi nhánh) */}
-                    {isRest && !isUnlocked && canAffordUnlock && (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundManager.playClick();
-                          openModal('franchise');
-                        }}
-                        style={{ animation: 'floatHat 2s infinite ease-in-out' }}
-                        className="absolute -top-6 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-amber-400 border-2 border-white shadow-xl flex items-center justify-center cursor-pointer hover:scale-110 active:scale-90 z-30"
-                        title="Đủ điều kiện mở chi nhánh! Chạm để xây dựng"
-                      >
-                        <span className="text-base">👷‍♂️</span>
-                      </div>
-                    )}
-
-                    {/* 2. Bong Bóng Tiền Vàng 💰 (Chi nhánh tự động có doanh thu thụ động) */}
-                    {isRest && isUnlocked && !isCurrent && isStaffed && (
-                      <div
-                        onClick={(e) => handleHarvestBranch(restKey, e)}
-                        style={{ animation: 'coinBounce 2.5s infinite ease-in-out' }}
-                        className="absolute -top-7 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 border-2 border-white shadow-xl flex items-center justify-center cursor-pointer hover:scale-110 active:scale-90 z-30"
-                        title="Chi nhánh đang tự động kiếm tiền! Chạm để thu hoạch"
-                      >
-                        <span className="text-base">💰</span>
-                      </div>
-                    )}
-
-                    {/* 3. Bong Bóng Cảnh Báo ⚠️ (Chi nhánh chưa có nhân viên phụ trách) */}
-                    {isRest && isUnlocked && !isCurrent && !isStaffed && (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundManager.playClick();
-                          openModal('employees');
-                        }}
-                        className="absolute -top-6 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-rose-500 border-2 border-white shadow-xl flex items-center justify-center cursor-pointer animate-pulse hover:scale-110 active:scale-90 z-30"
-                        title="Cần phân công nhân viên để tự động bán hàng!"
-                      >
-                        <span className="text-sm">⚠️</span>
-                      </div>
-                    )}
-
-                    {/* 4. Vương Miện Trụ Sở 👑 */}
-                    {isCurrent && (
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-amber-400 border border-amber-600 text-amber-950 font-black text-[7.5px] px-1.5 py-0.2 rounded-full shadow-md flex items-center gap-0.5 whitespace-nowrap z-20">
-                        <span>👑</span> Trụ Sở
-                      </div>
-                    )}
-
-                    {/* 5. Bong bóng Sự Kiện 🚨 tại Cây Me Bác Ba */}
-                    {b.id === 'neighbors' && gameState.currentEvent && (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundManager.playClick();
-                          openModal('streetEvents');
-                        }}
-                        className="absolute -top-7 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-red-600 border-2 border-yellow-300 shadow-xl flex items-center justify-center cursor-pointer animate-bounce hover:scale-110 active:scale-90 z-30"
-                        title="Có biến cố đường phố!"
-                      >
-                        <span className="text-base">🚨</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* NÚT ĐIỀU KHIỂN ZOOM & CĂN GIỮA CAMERA (Floating Map Controls) */}
-        <div className="absolute right-3 bottom-20 z-40 flex flex-col gap-1.5 pointer-events-auto">
-          <button
-            onClick={() => handleZoom(0.15)}
-            className="w-8 h-8 rounded-xl bg-white/90 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:bg-white active:scale-90"
-            title="Phóng to"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => handleZoom(-0.15)}
-            className="w-8 h-8 rounded-xl bg-white/90 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:bg-white active:scale-90"
-            title="Thu nhỏ"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={handleResetCenter}
-            className="w-8 h-8 rounded-xl bg-amber-500 border border-amber-600 shadow-md flex items-center justify-center text-white hover:bg-amber-600 active:scale-90"
-            title="Căn giữa camera"
-          >
-            <Crosshair className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. BẢNG ĐIỀU KHIỂN CÔNG TRÌNH 2.5D KHI CHẠM VÀO (Building Inspector Sheet) */}
-      {/* ========================================================================= */}
-      {activeBuilding && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-2xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in pointer-events-auto">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-300 w-full max-w-md overflow-hidden shadow-2xl p-4 flex flex-col gap-3 animate-slide-up">
-            {/* Header thẻ công trình */}
-            <div className="flex items-start justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div
-                  style={{ backgroundColor: activeBuilding.wallColor }}
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-3xl shadow-xs border border-black/5"
-                >
-                  {activeBuilding.icon}
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-slate-900 leading-tight">
-                    {activeBuilding.title}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    {activeBuilding.tagline}
-                  </p>
-                </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div
+                className="w-11 h-13 rounded-lg border flex flex-col justify-around items-center p-0.5 shadow-inner shrink-0 relative"
+                style={{
+                  backgroundColor: stageVisual.storefront.tagBg,
+                  borderColor: stageVisual.storefront.signboardBorder,
+                }}
+              >
+                <span className="text-lg animate-bounce-short">{rest.equipmentIcon}</span>
+                <span className="text-[6.5px] font-black px-0.5 rounded text-amber-900 bg-amber-200/80 truncate max-w-[40px]">
+                  {rest.shortName}
+                </span>
+                {/* Khói nghi ngút */}
+                <span className="absolute -top-1.5 -right-1 text-[9px] animate-pulse">♨️</span>
               </div>
 
-              <button
-                onClick={() => setSelectedBuildingId(null)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-90"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="min-w-0">
+                <div className="text-[10px] font-black text-slate-800 flex items-center gap-1 truncate">
+                  <span className="truncate">{rest.equipmentName}</span>
+                </div>
+                <div className="text-[8.5px] text-slate-500 font-medium truncate max-w-[120px]">
+                  {rest.tagline}
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[7px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 rounded-md font-bold">
+                    🟢 Đang đứng bếp
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Chi tiết theo từng loại công trình */}
-            {activeBuilding.type === 'restaurant' ? (
-              (() => {
-                const restKey = activeBuilding.restKey as RestaurantTypeId;
-                const rest = RESTAURANT_TYPES[restKey];
-                const isCurrent = restKey === activeRestId;
-                const isUnlocked = gameState.unlockedRestaurants?.includes(restKey);
-                const staff = getStaffForRest(restKey);
-
-                return (
-                  <div className="space-y-2.5">
-                    {/* Thiết bị đặc sản */}
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
-                      <span className="font-black text-slate-700 flex items-center gap-1">
-                        <span>{rest.equipmentIcon}</span>
-                        <span>{rest.equipmentName}</span>
-                      </span>
-                      <span className="font-bold text-slate-500">{rest.primaryRecipeIds.length} món đặc sản</span>
-                    </div>
-
-                    {/* Tình trạng chi nhánh & nhân sự */}
-                    {isUnlocked ? (
-                      <div
-                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                          staff.length > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'
-                        }`}
-                      >
-                        <div>
-                          <div className="font-black text-slate-800 flex items-center gap-1">
-                            <span>{staff.length > 0 ? '🟢 TỰ ĐỘNG BÁN HÀNG' : '⚠️ CHƯA CÓ NHÂN VIÊN'}</span>
-                          </div>
-                          <div className="text-[10.5px] text-slate-600 mt-0.5">
-                            {staff.length > 0
-                              ? `Đang trực: ${staff.map((s) => s.name).join(', ')}`
-                              : 'Cần phân công nhân viên để tự động kinh doanh'}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            setSelectedBuildingId(null);
-                            openModal('employees');
-                          }}
-                          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-[10px] font-black text-slate-700 shadow-2xs active:scale-95 flex items-center gap-1"
-                        >
-                          <UserPlus className="w-3 h-3 text-amber-600" />
-                          <span>Giao Việc</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-xs space-y-1">
-                        <div className="flex justify-between font-black text-slate-800">
-                          <span>Chi phí mở chi nhánh:</span>
-                          <span className="text-rose-600">{rest.unlockCost.toLocaleString('vi-VN')} đ</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-slate-600 text-[11px]">
-                          <span>Uy tín yêu cầu:</span>
-                          <span className="text-emerald-700">{rest.requiredReputation} ⭐</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Các nút hành động chính */}
-                    <div className="pt-1 flex items-center gap-2">
-                      {isCurrent ? (
-                        <button
-                          onClick={() => {
-                            setSelectedBuildingId(null);
-                            setCurrentView('shop');
-                          }}
-                          className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                        >
-                          <Utensils className="w-4 h-4" />
-                          <span>VÀO BẾP NẤU NƯỚNG 🍳</span>
-                        </button>
-                      ) : isUnlocked ? (
-                        <button
-                          onClick={() => handleSwitchBranch(restKey)}
-                          className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                        >
-                          <Building2 className="w-4 h-4" />
-                          <span>CHUYỂN QUẢN LÝ QUÁN NÀY 🔀</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setSelectedBuildingId(null);
-                            openModal('franchise');
-                          }}
-                          className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                          <span>MỞ CHI NHÁNH NÀY 🚀</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              /* Dịch vụ tiện ích dân cư (Chợ, Bác Ba, Giao hàng, Vé số) */
-              <div className="space-y-2.5">
-                <p className="text-xs text-slate-600">
-                  {activeBuilding.facilityType === 'market' && 'Ghé Chợ Đầu Mối để mua sỉ các loại nguyên liệu thịt, bánh mì, rau củ tươi ngon.'}
-                  {activeBuilding.facilityType === 'neighbors' && 'Trò chuyện cùng Bác Ba và bà con lối xóm để tăng độ thân thiết và mở khóa bí mật.'}
-                  {activeBuilding.facilityType === 'delivery' && 'Nhận cuốc giao hàng siêu tốc bằng xe máy để kiếm thêm tiền tip và kinh nghiệm.'}
-                  {activeBuilding.facilityType === 'lottery' && 'Thử vận may mua vé số kiến thiết chiều nay hoặc tra cứu sổ mơ lô đề x70.'}
-                </p>
-
-                <button
-                  onClick={() => {
-                    const fType = activeBuilding.facilityType;
-                    setSelectedBuildingId(null);
-                    if (fType === 'market') openModal('market');
-                    else if (fType === 'neighbors') openModal('neighbors');
-                    else if (fType === 'delivery') openModal('delivery');
-                    else if (fType === 'lottery') openModal('lotteryDraw');
-                  }}
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                >
-                  <span>GHÉ THĂM ĐỊA ĐIỂM NÀY 👉</span>
-                </button>
+            {/* Nhân sự đang đứng bếp */}
+            <div className="flex items-center -space-x-1 shrink-0 pl-1">
+              <div className="relative" title="Chủ quán">
+                <ChibiAvatar type="player" emotion="happy" size={32} />
+                <span className="absolute -bottom-0.5 -right-0.5 bg-amber-500 text-white text-[6px] font-black px-0.5 rounded-full">
+                  Bếp
+                </span>
               </div>
-            )}
+              {assignedStaff.slice(0, 2).map((staff) => (
+                <div key={staff.id} className="relative" title={`${staff.name} (${staff.role})`}>
+                  <ChibiAvatar type={staff.id} emotion="happy" size={28} />
+                  <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full">
+                    {staff.role === 'cook' ? 'Nấu' : 'Bưng'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Dải thảm chân tiệm */}
+          <div className="h-1 w-full bg-amber-400 rounded-b-md opacity-80" />
+        </div>
+      );
+    }
+
+    // TRƯỜNG HỢP 2: CHI NHÁNH ĐÃ MỞ (UNLOCKED BRANCH)
+    if (isUnlocked) {
+      return (
+        <div
+          id={`lot-${restKey}`}
+          style={{
+            width: `${width}px`,
+            backgroundColor: rest.accentColor,
+            borderColor: rest.themeColor,
+          }}
+          className="h-56 border-3 rounded-t-2xl relative flex flex-col justify-between p-2 shadow-md shrink-0 transition-all hover:brightness-102"
+        >
+          {/* Mái hiên thương hiệu chi nhánh */}
+          <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
+            <div className="h-4 w-full flex overflow-hidden shadow-2xs rounded-t-xl">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex-1 h-full"
+                  style={{
+                    backgroundColor: i % 2 === 0 ? rest.themeColor : '#FFFFFF',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Huy hiệu Chi Nhánh */}
+            <div
+              className={`absolute -top-3 left-1/2 -translate-x-1/2 font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border whitespace-nowrap z-10 ${
+                isAutomated
+                  ? 'bg-emerald-600 text-white border-emerald-400'
+                  : 'bg-amber-500 text-white border-amber-600 animate-pulse'
+              }`}
+            >
+              <span>{isAutomated ? '🟢' : '⚠️'}</span>
+              <span>
+                {isAutomated ? `TỰ ĐỘNG BÁN (${assignedStaff.length} NV)` : 'CẦN NHÂN VIÊN'}
+              </span>
+            </div>
+          </div>
+
+          {/* Biển hiệu chi nhánh */}
+          <div
+            className="rounded-xl p-1.5 flex items-center justify-between border bg-white/95 shadow-2xs"
+            style={{ borderColor: rest.themeColor }}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xl animate-bounce-short shrink-0">{rest.icon}</span>
+              <div className="min-w-0">
+                <h3 className="font-black text-xs text-slate-900 leading-tight truncate">
+                  {rest.name}
+                </h3>
+                <div className="text-[8.5px] font-bold text-emerald-800 flex items-center gap-1 truncate">
+                  <Award className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>{rest.badge}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={safeClick(() => handleSwitchToBranch(restKey))}
+              className="px-2 py-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-[9.5px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0"
+              title={`Chuyển sang quản lý ${rest.shortName}`}
+            >
+              <span>Đổi Quán 🔀</span>
+            </button>
+          </div>
+
+          {/* Quầy thiết bị & Trạng thái hoạt động */}
+          <div
+            className="bg-white/95 rounded-xl border p-1.5 flex items-center justify-between shadow-2xs relative"
+            style={{ borderColor: rest.themeColor }}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div
+                className="w-11 h-13 rounded-lg border flex flex-col justify-around items-center p-0.5 shadow-inner shrink-0 relative"
+                style={{ backgroundColor: rest.accentColor, borderColor: rest.themeColor }}
+              >
+                <span className="text-lg animate-bounce-short">{rest.equipmentIcon}</span>
+                <span className="text-[6.5px] font-black px-0.5 rounded text-slate-800 bg-white/80 truncate max-w-[40px]">
+                  {rest.shortName}
+                </span>
+                {isAutomated && (
+                  <span className="absolute -top-1.5 -right-1 text-[9px] animate-pulse">♨️</span>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="text-[10px] font-black text-slate-800 truncate">
+                  {rest.equipmentName}
+                </div>
+                <div className="text-[8px] text-slate-500 italic truncate max-w-[120px]">
+                  "{rest.tagline}"
+                </div>
+
+                {isAutomated ? (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[7.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 rounded-md font-bold flex items-center gap-0.5">
+                      <Coins className="w-2 h-2 text-amber-500" />
+                      <span>Thu lời tự động</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[7.5px] bg-amber-100 text-amber-900 border border-amber-300 px-1 rounded-md font-bold">
+                      ⚠️ Tạm ngưng (cần NV)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Nhân sự chi nhánh */}
+            <div className="flex flex-col items-center shrink-0 pl-1">
+              {isAutomated ? (
+                <div className="flex items-center -space-x-1.5">
+                  {assignedStaff.slice(0, 2).map((staff) => (
+                    <div key={staff.id} className="relative" title={`${staff.name} (${staff.role})`}>
+                      <ChibiAvatar type={staff.id} emotion="happy" size={28} />
+                      <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full">
+                        {staff.role === 'cook' ? '♨️' : '🏃'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  onClick={safeClick(() => openModal('employees'))}
+                  className="px-1.5 py-1 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-lg text-[8px] font-black flex flex-col items-center leading-tight active:scale-95 transition-all"
+                  title="Giao nhân viên phụ trách"
+                >
+                  <Users className="w-3 h-3 text-amber-700" />
+                  <span>+ Giao NV</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Dải chân tiệm */}
+          <div
+            className="h-1 w-full rounded-b-md opacity-80"
+            style={{ backgroundColor: rest.themeColor }}
+          />
+        </div>
+      );
+    }
+
+    // TRƯỜNG HỢP 3: MẶT BẰNG QUY HOẠCH SẮP MỞ (UPCOMING / LOCKED)
+    return (
+      <div
+        id={`lot-${restKey}`}
+        style={{ width: `${width}px` }}
+        className="h-56 border-3 border-dashed border-amber-400 bg-gradient-to-b from-[#FFFBEB] to-[#FEF3C7] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0 transition-all opacity-95"
+      >
+        {/* Rào chắn công trình quy hoạch */}
+        <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
+          <div className="h-4 w-full flex overflow-hidden shadow-2xs rounded-t-xl">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 h-full"
+                style={{
+                  backgroundColor: i % 2 === 0 ? '#F59E0B' : '#78350F',
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-600 text-white font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border border-amber-500 whitespace-nowrap z-10">
+            <span>🏗️</span>
+            <span>MẶT BẰNG QUY HOẠCH</span>
           </div>
         </div>
-      )}
+
+        {/* Biển báo dự án sắp mở */}
+        <div className="rounded-xl p-1.5 flex items-center justify-between border border-amber-300 bg-white/95 shadow-2xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xl shrink-0 opacity-70">{rest.icon}</span>
+            <div className="min-w-0">
+              <h3 className="font-black text-xs text-slate-800 leading-tight truncate">
+                Dự Án: {rest.name}
+              </h3>
+              <div className="text-[8.5px] font-bold text-amber-800 flex items-center gap-1 truncate">
+                <span className="text-rose-600 font-extrabold">
+                  {rest.unlockCost.toLocaleString('vi-VN')} đ
+                </span>
+                <span>·</span>
+                <span className="text-amber-700">{rest.requiredReputation}⭐</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={safeClick(() => openModal('franchise'))}
+            className={`px-2 py-1 text-white rounded-lg text-[9.5px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0 ${
+              gameState.money >= rest.unlockCost && gameState.reputation >= rest.requiredReputation
+                ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
+                : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600'
+            }`}
+            title="Mở chi nhánh mới này"
+          >
+            <Sparkles className="w-2.5 h-2.5" />
+            <span>Mở Quán 🚀</span>
+          </button>
+        </div>
+
+        {/* Khu vực chuẩn bị mặt bằng */}
+        <div
+          onClick={safeClick(() => openModal('franchise'))}
+          className="bg-white/80 rounded-xl border border-dashed border-amber-300 p-1.5 flex items-center justify-between cursor-pointer hover:bg-white transition-all shadow-2xs"
+          title="Chạm để xem điều kiện mở chi nhánh"
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="w-11 h-13 rounded-lg border border-dashed border-amber-400 bg-amber-50 flex flex-col justify-around items-center p-0.5 shrink-0">
+              <span className="text-lg opacity-60">{rest.equipmentIcon}</span>
+              <span className="text-[6.5px] font-black text-amber-900 bg-amber-200/60 px-0.5 rounded truncate">
+                Sắp Nhập
+              </span>
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-[9.5px] font-black text-slate-800 truncate">
+                Thiết bị: {rest.equipmentName}
+              </div>
+              <div className="text-[8px] text-slate-600 font-medium line-clamp-2 mt-0.5">
+                {rest.starterDescription}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-right shrink-0 pl-1">
+            <span
+              className={`text-[8px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap border ${
+                gameState.money >= rest.unlockCost && gameState.reputation >= rest.requiredReputation
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300 animate-pulse'
+                  : 'bg-orange-100 text-orange-800 border-orange-200'
+              }`}
+            >
+              {gameState.money >= rest.unlockCost && gameState.reputation >= rest.requiredReputation
+                ? 'ĐỦ ĐIỀU KIỆN! ✨'
+                : 'TÍCH VỐN ⏳'}
+            </span>
+          </div>
+        </div>
+
+        {/* Chân mặt bằng */}
+        <div className="h-1 w-full bg-amber-400 rounded-b-md opacity-60" />
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col overflow-hidden select-none bg-[#FDF8F0] relative">
+      {/* 1. THANH TRẠNG THÁI PHỐ XÁ & PHÍM NHẢY NHANH ĐẾN TỪNG QUÁN (STICKY QUICK JUMP) */}
+      <div className="relative z-30 shrink-0 bg-white/95 backdrop-blur-xs border-b border-amber-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 text-xs font-black text-amber-950 shrink-0">
+            <span>📍</span>
+            <span className="truncate">Phố Ẩm Thực</span>
+          </div>
+
+          <div className="flex items-center gap-1 text-[11px] font-black text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+            <span>🪑 Bàn:</span>
+            <span className="text-rose-600 font-extrabold">
+              {activeOrders.length}/{maxTables}
+            </span>
+          </div>
+
+          {/* Quick jump chips đến từng quán và hàng xóm */}
+          <div className="flex items-center gap-1 text-[10px] font-bold shrink-0">
+            {/* 5 Quán ẩm thực */}
+            <button
+              onClick={() => scrollToElement('lot-banh_mi')}
+              className={`px-2 py-0.5 rounded-full border text-[9.5px] font-black active:scale-95 transition-all flex items-center gap-0.5 ${
+                activeRestId === 'banh_mi'
+                  ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950'
+              }`}
+            >
+              <span>🥖 Bánh mì</span>
+              {activeRestId === 'banh_mi' ? (
+                <span className="text-[7.5px]">👑</span>
+              ) : gameState.unlockedRestaurants?.includes('banh_mi') ? (
+                <span className="text-[7.5px]">🟢</span>
+              ) : null}
+            </button>
+
+            <button
+              onClick={() => scrollToElement('lot-pho')}
+              className={`px-2 py-0.5 rounded-full border text-[9.5px] font-black active:scale-95 transition-all flex items-center gap-0.5 ${
+                activeRestId === 'pho'
+                  ? 'bg-red-600 text-white border-red-700 shadow-2xs'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950'
+              }`}
+            >
+              <span>🍜 Phở bò</span>
+              {activeRestId === 'pho' ? (
+                <span className="text-[7.5px]">👑</span>
+              ) : gameState.unlockedRestaurants?.includes('pho') ? (
+                <span className="text-[7.5px]">🟢</span>
+              ) : (
+                <span className="text-[7.5px] opacity-60">🏗️</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => scrollToElement('lot-bun')}
+              className={`px-2 py-0.5 rounded-full border text-[9.5px] font-black active:scale-95 transition-all flex items-center gap-0.5 ${
+                activeRestId === 'bun'
+                  ? 'bg-orange-600 text-white border-orange-700 shadow-2xs'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950'
+              }`}
+            >
+              <span>🍲 Bún bò</span>
+              {activeRestId === 'bun' ? (
+                <span className="text-[7.5px]">👑</span>
+              ) : gameState.unlockedRestaurants?.includes('bun') ? (
+                <span className="text-[7.5px]">🟢</span>
+              ) : (
+                <span className="text-[7.5px] opacity-60">🏗️</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => scrollToElement('lot-beefsteak')}
+              className={`px-2 py-0.5 rounded-full border text-[9.5px] font-black active:scale-95 transition-all flex items-center gap-0.5 ${
+                activeRestId === 'beefsteak'
+                  ? 'bg-purple-600 text-white border-purple-700 shadow-2xs'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950'
+              }`}
+            >
+              <span>🥩 Bò né</span>
+              {activeRestId === 'beefsteak' ? (
+                <span className="text-[7.5px]">👑</span>
+              ) : gameState.unlockedRestaurants?.includes('beefsteak') ? (
+                <span className="text-[7.5px]">🟢</span>
+              ) : (
+                <span className="text-[7.5px] opacity-60">🏗️</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => scrollToElement('lot-com_tam')}
+              className={`px-2 py-0.5 rounded-full border text-[9.5px] font-black active:scale-95 transition-all flex items-center gap-0.5 ${
+                activeRestId === 'com_tam'
+                  ? 'bg-green-600 text-white border-green-700 shadow-2xs'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-950'
+              }`}
+            >
+              <span>🍛 Cơm tấm</span>
+              {activeRestId === 'com_tam' ? (
+                <span className="text-[7.5px]">👑</span>
+              ) : gameState.unlockedRestaurants?.includes('com_tam') ? (
+                <span className="text-[7.5px]">🟢</span>
+              ) : (
+                <span className="text-[7.5px] opacity-60">🏗️</span>
+              )}
+            </button>
+
+            <span className="text-amber-300">|</span>
+
+            {/* Các địa điểm hàng xóm */}
+            <button
+              onClick={() => scrollToElement('lot-sua_xe')}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              🔧 Sửa xe
+            </button>
+            <button
+              onClick={() => scrollToElement('lot-tap_hoa')}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              🛒 Tạp hóa
+            </button>
+            <button
+              onClick={() => scrollToElement('lot-cay_me')}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              🎟️ Vé số
+            </button>
+            <button
+              onClick={() => scrollToElement('lot-ca_phe')}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              ☕ Bác Ba
+            </button>
+          </div>
+        </div>
+
+        {gameState.currentEvent && (
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              openModal('streetEvents');
+            }}
+            className="px-2 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-[10px] font-black flex items-center gap-1 animate-bounce shadow-xs shrink-0"
+          >
+            <span>🚨 CÓ BIẾN!</span>
+          </button>
+        )}
+      </div>
+
+      {/* 2. KHÔNG GIAN PHỐ XÁ VỈA HÈ SÀI GÒN (CUỘN NGANG ẤM CÚNG ~2100PX) */}
+      <div
+        ref={scrollRef}
+        onScroll={updateScrollState}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        className="flex-1 overflow-x-auto overflow-y-hidden relative no-scrollbar cursor-grab active:cursor-grabbing select-none"
+        style={{ scrollBehavior: 'smooth' }}
+      >
+        <div style={{ width: '2150px' }} className="h-full flex flex-col justify-between relative min-h-[430px]">
+          {/* LỚP 1: BẦU TRỜI & DÃY NHÀ PHỐ XÁ XA XA */}
+          <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-[#7DD3FC]/40 via-[#FED7AA]/30 to-transparent pointer-events-none z-0">
+            {/* Đám mây trôi */}
+            <div className="absolute top-2 left-20 text-3xl opacity-40 animate-pulse">☁️</div>
+            <div className="absolute top-4 left-[600px] text-2xl opacity-40">☁️</div>
+            <div className="absolute top-1 left-[1200px] text-3xl opacity-40">☁️</div>
+            <div className="absolute top-3 left-[1800px] text-2xl opacity-40">☁️</div>
+
+            {/* Dãy nhà phố xa xa */}
+            <div className="absolute bottom-0 left-0 right-0 h-16 flex items-end opacity-25 gap-2 px-2 overflow-hidden">
+              {Array.from({ length: 24 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-20 rounded-t-sm shrink-0"
+                  style={{
+                    height: `${40 + (i % 4) * 12}px`,
+                    backgroundColor: ['#90CAF9', '#CE93D8', '#80DEEA', '#FFE082', '#A5D6A7'][i % 5],
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Dây điện chằng chịt đặc trưng đường phố Sài Gòn */}
+            <div className="absolute top-8 left-0 right-0 h-6 pointer-events-none z-10">
+              <svg viewBox="0 0 2150 30" className="w-full h-full opacity-60">
+                <path d="M 0 8 Q 400 22 800 10 Q 1400 24 2150 8" stroke="#37474F" strokeWidth="1.2" fill="none" />
+                <path d="M 0 14 Q 500 26 1100 12 Q 1700 26 2150 14" stroke="#455A64" strokeWidth="0.8" fill="none" />
+                {/* Chim sẻ đậu trên dây điện */}
+                <circle cx="280" cy="12" r="2" fill="#3E2723" />
+                <circle cx="750" cy="11" r="2" fill="#3E2723" />
+                <circle cx="1320" cy="14" r="2" fill="#3E2723" />
+                <circle cx="1890" cy="12" r="2" fill="#3E2723" />
+              </svg>
+            </div>
+          </div>
+
+          {/* LỚP 2: DÃY MẶT TIỀN 5 QUÁN & HÀNG XÓM THÂN THƯƠNG */}
+          <div className="flex-1 flex items-end pt-10 pb-1 px-3 relative z-10 gap-2.5">
+            {/* 1. TIỆM SỬA XE MÁY CHÚ NĂM (~180px) */}
+            <div
+              id="lot-sua_xe"
+              style={{ width: '180px' }}
+              className="h-56 bg-[#D7CCC8]/90 border-2 border-[#8D6E63] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0"
+            >
+              <div className="bg-[#FFA000] border border-[#FF8F00] text-amber-950 font-black text-center text-[10px] py-1 rounded-lg shadow-2xs">
+                🔧 SỬA XE CHÚ NĂM
+                <div className="text-[8px] font-bold text-amber-900">
+                  Bơm Vá · Nhớt · Rửa Xe
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between px-1 py-1">
+                <div className="flex flex-col gap-0.5 items-center">
+                  <span className="text-lg leading-none" title="Vỏ lốp xe">🛞</span>
+                  <div className="bg-[#FFF8E1] border border-amber-300 rounded px-1 text-[7.5px] font-black text-amber-900 text-center leading-tight">
+                    Xăng Lẻ<br />25k/chai
+                  </div>
+                </div>
+
+                <div
+                  onClick={safeClick(() => openModal('delivery'))}
+                  className="flex flex-col items-center cursor-pointer group active:scale-95 transition-all"
+                  title="Chạm để mở Đội Xe Giao Hàng & Nhận Cuốc"
+                >
+                  <div className="bg-sky-500 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full mb-0.5 animate-bounce shadow-2xs">
+                    Nổ Cuốc 🛵
+                  </div>
+                  <ChibiAvatar type="chu_nam" emotion="happy" size={40} />
+                  <span className="text-[8px] font-black text-sky-950 bg-sky-100 px-1 py-0.2 rounded border border-sky-200 mt-0.5">
+                    Chú Năm
+                  </span>
+                </div>
+              </div>
+
+              <div
+                onClick={safeClick(() => openModal('delivery'))}
+                className="bg-white/90 rounded-lg py-0.5 text-center text-[8px] font-black text-sky-900 border border-sky-200 cursor-pointer hover:bg-sky-50 transition-all"
+              >
+                👉 Chạm ship đơn mang về
+              </div>
+            </div>
+
+            {/* Cột điện bê tông */}
+            <div className="w-4 h-60 bg-[#B0BEC5] rounded-t-xs flex flex-col justify-between items-center py-2 shrink-0 border border-[#90A4AE] relative opacity-85">
+              <span className="text-[6.5px] font-black text-slate-700 writing-vertical-lr rotate-180 opacity-70">
+                KHOAN CẮT BÊ TÔNG
+              </span>
+              <div className="w-5 h-1.5 bg-[#78909C] rounded-xs" />
+            </div>
+
+            {/* 2. TẠP HÓA CÔ BA (~180px) */}
+            <div
+              id="lot-tap_hoa"
+              style={{ width: '180px' }}
+              className="h-56 bg-[#FFF9C4] border-2 border-[#FBC02D] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0"
+            >
+              <div className="bg-[#E53935] text-white font-black text-center text-[10px] py-1 rounded-lg shadow-2xs">
+                🍬 TẠP HÓA CÔ BA
+                <div className="text-[8px] font-medium text-amber-100">
+                  Bánh kẹo · Nước giải khát
+                </div>
+              </div>
+
+              <div
+                onClick={safeClick(() => openModal('market'))}
+                className="flex items-center justify-between px-1 py-1 bg-white/85 rounded-xl border border-amber-300 cursor-pointer hover:border-amber-500 transition-all group"
+                title="Chạm để vào Chợ Đầu Mối mua nguyên liệu"
+              >
+                <div className="space-y-0.5 text-[10px]">
+                  <div>🥫 🧃 🍼</div>
+                  <div className="text-[7.5px] font-extrabold text-rose-600 bg-rose-50 px-1 rounded inline-block">
+                    🧊 THÙNG ĐÁ
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <span className="text-base group-hover:scale-110 transition-transform">🪭</span>
+                  <ChibiAvatar type="chi_lan" emotion="happy" size={38} />
+                  <span className="text-[8px] font-black text-amber-950 bg-amber-100 px-1 py-0.2 rounded border border-amber-300 mt-0.5">
+                    Cô Ba
+                  </span>
+                </div>
+              </div>
+
+              <div
+                onClick={safeClick(() => openModal('market'))}
+                className="bg-amber-100/90 rounded-lg py-0.5 text-center text-[8px] font-black text-amber-900 border border-amber-200 cursor-pointer hover:bg-amber-200 transition-all"
+              >
+                🛒 Vào Chợ Sỉ nguyên liệu
+              </div>
+            </div>
+
+            {/* LOT 1: 🥖 TIỆM BÁNH MÌ SÀI GÒN & CÀ PHÊ (~280px) */}
+            {renderStorefrontLot('banh_mi', 280)}
+
+            {/* LOT 2: 🍜 QUÁN PHỞ BÒ GIA TRUYỀN (~280px) */}
+            {renderStorefrontLot('pho', 280)}
+
+            {/* 3. CÂY ME CỔ THỤ & QUẦY VÉ SỐ CÔ BẢY (~200px) */}
+            <div
+              id="lot-cay_me"
+              style={{ width: '200px' }}
+              className="h-56 relative flex flex-col justify-end items-center shrink-0"
+            >
+              {/* Vòm cây me râm mát */}
+              <div className="absolute top-0 left-2 w-32 h-32 rounded-full bg-emerald-600/90 border-3 border-emerald-700 shadow-md flex items-center justify-center text-3xl z-10">
+                🌳
+                <div
+                  onClick={safeClick(() => openModal('streetEvents'))}
+                  className={`absolute -top-1 -right-2 px-2 py-0.5 rounded-full text-[8px] font-black shadow-md cursor-pointer flex items-center gap-0.5 z-30 transition-all active:scale-95 ${
+                    gameState.currentEvent
+                      ? 'bg-rose-600 text-white animate-bounce ring-2 ring-yellow-300'
+                      : 'bg-white text-slate-800 border border-amber-300 hover:bg-amber-100'
+                  }`}
+                  title="Loa phường phố: Xem sự kiện phố xá"
+                >
+                  <span>📢</span>
+                  <span>{gameState.currentEvent ? 'CÓ BIẾN! 🚨' : 'Loa Phường'}</span>
+                </div>
+              </div>
+
+              {/* Dưới bóng cây: Quầy vé số Cô Bảy */}
+              <div className="w-full bg-[#E8F5E9] border-2 border-emerald-400 rounded-t-xl p-1.5 relative z-20 flex items-center justify-around shadow-sm">
+                <div className="text-center">
+                  <span className="text-xl">🪣</span>
+                  <div className="text-[7px] font-black text-sky-800 leading-tight">
+                    TRÀ ĐÁ<br />MIỄN PHÍ
+                  </div>
+                </div>
+
+                <div
+                  onClick={safeClick(() => openModal('lotteryDraw'))}
+                  className="bg-amber-50 border border-amber-400 rounded-xl p-1 flex flex-col items-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95 transition-all"
+                  title="Chạm để tra sổ mơ, mua vé số hoặc ghi đề x70"
+                >
+                  <span className="text-[7.5px] bg-red-600 text-white font-black px-1 py-0.2 rounded-full mb-0.5 animate-pulse">
+                    Đề x70 🎟️
+                  </span>
+                  <ChibiAvatar type="co_bay" emotion="happy" size={38} />
+                  <span className="text-[8px] font-black text-amber-950 mt-0.5">
+                    Cô Bảy Vé Số
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* LOT 3: 🍲 QUÁN BÚN BÒ HUẾ & BÚN RIÊU CUA (~280px) */}
+            {renderStorefrontLot('bun', 280)}
+
+            {/* 4. CÀ PHÊ CÓC & BÀN CỜ TƯỚNG BÁC BA (~200px) */}
+            <div
+              id="lot-ca_phe"
+              style={{ width: '200px' }}
+              className="h-56 bg-[#FFE0B2] border-2 border-[#FFA726] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0"
+            >
+              <div className="bg-[#E65100] text-white font-black text-center text-[10px] py-1 rounded-lg shadow-2xs">
+                ☕ CÀ PHÊ CÓC VỈA HÈ
+                <div className="text-[8px] font-medium text-amber-100">
+                  Cà phê phin · Bàn cờ tướng
+                </div>
+              </div>
+
+              <div
+                onClick={safeClick(() => openModal('neighbors'))}
+                className="flex items-center justify-around px-1 py-1 bg-white/85 rounded-xl border border-amber-300 cursor-pointer hover:border-amber-500 transition-all"
+                title="Bác Ba Tổ Trưởng & Bé Bông: Chạm để trò chuyện"
+              >
+                <div className="flex flex-col items-center">
+                  <ChibiAvatar type="bac_ba" emotion="happy" size={38} />
+                  <span className="text-[7.5px] font-black text-amber-950 bg-amber-100 px-1 rounded mt-0.5">
+                    Bác Ba
+                  </span>
+                </div>
+
+                <div className="text-center">
+                  <span className="text-base">♟️☕</span>
+                  <div className="text-[7px] font-bold text-slate-600">
+                    Chiếu Tướng!
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <ChibiAvatar type="be_bong" emotion="love" size={34} />
+                  <span className="text-[7.5px] font-black text-rose-800 bg-rose-100 px-1 rounded mt-0.5">
+                    Bé Bông
+                  </span>
+                </div>
+              </div>
+
+              <div
+                onClick={safeClick(() => openModal('neighbors'))}
+                className="bg-amber-100 rounded-lg py-0.5 text-center text-[8px] font-bold text-amber-900 border border-amber-200 cursor-pointer hover:bg-amber-200 transition-all"
+              >
+                💬 Tình làng nghĩa xóm
+              </div>
+            </div>
+
+            {/* LOT 4: 🥩 BÒ NÉ & BEEFSTEAK CHẢO GANG (~280px) */}
+            {renderStorefrontLot('beefsteak', 280)}
+
+            {/* LOT 5: 🍛 QUÁN CƠM TẤM SƯỜN BÌ CHẢ (~280px) */}
+            {renderStorefrontLot('com_tam', 280)}
+          </div>
+
+          {/* LỚP 3: VỈA HÈ LÁT GẠCH CHÂN THỰC & DÃY BÀN GHẾ NHỰA ĐỎ */}
+          <div className="relative z-20 bg-[#F4E4D0] border-t-3 border-[#D7CCC8] shadow-inner pt-1.5 pb-2 px-3">
+            {/* Header vỉa hè */}
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span
+                  style={{ backgroundColor: stageVisual.table.badgeBg }}
+                  className="text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"
+                >
+                  <span>{stageVisual.table.tableTypeIcon}</span>
+                  <span>
+                    {stageVisual.table.headerTitle} ({activeOrders.length}/{maxTables} bàn)
+                  </span>
+                </span>
+                <span className="text-[9px] text-[#7C5C55] font-extrabold hidden sm:inline">
+                  👉 Bàn của {currentRest.name} · Bấm nút "Bưng Món" để nhận tiền
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 text-[10px] text-amber-900 font-bold opacity-80">
+                <span>🚦 Đèn xanh</span>
+                <span>·</span>
+                <span>🚏 Trạm xe buýt</span>
+                <span>·</span>
+                <span>🚒 Trụ nước</span>
+              </div>
+            </div>
+
+            {/* Dãy bàn ghế phục vụ khách */}
+            <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar py-0.5">
+              {Array.from({ length: maxTables }).map((_, idx) => {
+                const tableNum = idx + 1;
+                const order = activeOrders.find((o) => o.tableIndex === tableNum);
+                const isSelected = selectedTable === tableNum;
+                const recipe = order ? RECIPES[order.recipeId] : null;
+                const cType = order ? CUSTOMER_TYPES[order.typeId] : null;
+                const patiencePercent = order
+                  ? Math.max(0, order.patienceRemaining / order.maxPatience)
+                  : 1;
+
+                return (
+                  <div
+                    key={tableNum}
+                    onClick={safeClick(() => {
+                      soundManager.playClick();
+                      setSelectedTable(tableNum);
+                    })}
+                    className={`relative shrink-0 w-28 sm:w-32 rounded-xl p-1.5 transition-all cursor-pointer border-2 shadow-2xs flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-amber-100/90 border-amber-500 ring-2 ring-amber-300'
+                        : order
+                        ? `${stageVisual.table.tableCardBg} ${stageVisual.table.tableCardBorder} hover:border-amber-400`
+                        : 'bg-white/70 border-dashed border-amber-300'
+                    }`}
+                  >
+                    {/* Header bàn: Số bàn & Trạng thái */}
+                    <div className="flex items-center justify-between text-[8px] font-black text-[#7C5C55] mb-0.5">
+                      <span className="bg-[#FFE082] px-1 py-0.2 rounded">
+                        Bàn {tableNum}
+                      </span>
+                      {order && (
+                        <span
+                          className={`text-[7.5px] font-bold px-1 py-0.2 rounded-full ${
+                            order.state === 'ready'
+                              ? 'bg-emerald-100 text-emerald-700 animate-pulse font-black'
+                              : order.state === 'eating'
+                              ? 'bg-amber-100 text-amber-700 font-bold'
+                              : order.state === 'cooking'
+                              ? 'bg-blue-100 text-blue-700 font-bold'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {order.state === 'ready'
+                            ? '✨ Có Món'
+                            : order.state === 'eating'
+                            ? '😋 Đang Ăn'
+                            : order.state === 'cooking'
+                            ? '♨️ Đang Nấu'
+                            : '⏳ Đang Đợi'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Khung cảnh bàn ăn: Ghế + Khách chibi + Bàn theo cấp */}
+                    <div className="h-14 bg-[#FFF9F2] rounded-lg border border-[#F7D7BA] flex items-center justify-around px-1 relative overflow-hidden">
+                      {order ? (
+                        <>
+                          <div className="flex flex-col items-center">
+                            <ChibiAvatar
+                              type={order.neighborId || order.typeId}
+                              emotion={
+                                order.state === 'eating'
+                                  ? 'eating'
+                                  : order.state === 'ready'
+                                  ? 'love'
+                                  : patiencePercent > 0.4
+                                  ? 'waiting'
+                                  : 'angry'
+                              }
+                              size={30}
+                            />
+                            <span className="text-[7px] font-black text-[#7C5C55] truncate max-w-[42px] leading-tight mt-0.5">
+                              {order.neighborId
+                                ? NEIGHBORS_DATA[order.neighborId].name
+                                : cType?.name.split(' ')[0]}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col items-center">
+                            <div className="text-sm animate-bounce-short leading-none" title={recipe?.name}>
+                              {recipe?.icon || currentRest.icon}
+                            </div>
+                            <div
+                              style={{
+                                background: stageVisual.table.topHighlight || stageVisual.table.topBg,
+                                borderColor: stageVisual.table.topBorder,
+                              }}
+                              className="w-8 h-2 rounded-2xs border shadow-2xs flex items-center justify-center my-0.5"
+                            >
+                              <span
+                                style={{ color: stageVisual.table.labelColor }}
+                                className="text-[4.5px] font-black leading-none tracking-tighter truncate max-w-[28px]"
+                              >
+                                {stageVisual.table.label}
+                              </span>
+                            </div>
+                            <div className="w-7 flex justify-between px-0.5">
+                              <div
+                                style={{ backgroundColor: stageVisual.table.legColor }}
+                                className="w-0.5 h-1.5"
+                              />
+                              <div
+                                style={{ backgroundColor: stageVisual.table.legColor }}
+                                className="w-0.5 h-1.5"
+                              />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400">
+                          <span className="text-base opacity-60">🪑</span>
+                          <span className="text-[7.5px] font-bold mt-0.5">Bàn trống</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nút bưng món nhanh ngay ngoài phố */}
+                    {order && order.state === 'ready' ? (
+                      <button
+                        onClick={safeClick(() => handleServeOnStreet(order.id))}
+                        className="mt-1 w-full py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-[8.5px] font-black flex items-center justify-center gap-0.5 animate-bounce-short shadow-2xs"
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>BƯNG MÓN 💰</span>
+                      </button>
+                    ) : order ? (
+                      <div className="mt-0.5 text-center text-[7.5px] text-slate-600 font-bold truncate">
+                        {recipe?.name}
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-center text-[7px] text-slate-400 italic">
+                        Đang đợi khách
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* LỚP 4: LÒNG ĐƯỜNG NHỰA & XE CỘ SÀI GÒN QUA LẠI */}
+          <div className="relative z-10 h-10 bg-[#37474F] border-t-2 border-[#263238] flex items-center overflow-hidden">
+            {/* Vạch kẻ đường đứt quãng */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 flex justify-between px-4 pointer-events-none opacity-60">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <div key={i} className="w-10 h-0.5 bg-yellow-300 shrink-0 mx-2" />
+              ))}
+            </div>
+
+            {/* Xe cộ chạy trên đường phố */}
+            <div
+              className="absolute flex items-center gap-1 transition-all duration-300 pointer-events-none"
+              style={{
+                left: `${(trafficTick * 22) % 2150}px`,
+              }}
+            >
+              <span className="text-xl -scale-x-100 filter drop-shadow">🛵</span>
+              <span className="text-[8px] bg-emerald-500 text-white px-1 rounded-full font-bold">
+                Shipper
+              </span>
+            </div>
+
+            <div
+              className="absolute flex items-center gap-1 transition-all duration-300 pointer-events-none"
+              style={{
+                left: `${((trafficTick * 18 + 700) % 2150)}px`,
+              }}
+            >
+              <span className="text-xl -scale-x-100 filter drop-shadow">🛵</span>
+              <span className="text-[8px] bg-sky-500 text-white px-1 rounded-full font-bold">
+                Cub 50
+              </span>
+            </div>
+
+            <div
+              className="absolute flex items-center gap-1 transition-all duration-300 pointer-events-none"
+              style={{
+                left: `${((trafficTick * 14 + 1400) % 2150)}px`,
+              }}
+            >
+              <span className="text-xl -scale-x-100 filter drop-shadow">🚲</span>
+              <span className="text-[8px] bg-amber-500 text-white px-1 rounded-full font-bold">
+                Xích lô
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. THANH ĐIỀU HƯỚNG CUỘN VÀ CHỈ BÁO VỊ TRÍ PHỐ */}
+      <div className="shrink-0 bg-white/95 backdrop-blur-xs border-t border-amber-200 px-3 py-1 flex items-center justify-between text-xs font-bold text-amber-950">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleScrollBy(-280)}
+            disabled={!canScrollLeft}
+            className="p-1 rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-30 border border-amber-200 transition-all active:scale-95"
+            title="Cuộn sang trái"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleScrollBy(280)}
+            disabled={!canScrollRight}
+            className="p-1 rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-30 border border-amber-200 transition-all active:scale-95"
+            title="Cuộn sang phải"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+          <span className="text-[9.5px] text-amber-900 hidden sm:inline">
+            Vuốt ngang hoặc chọn nút trên để tham quan 5 Quán & Hàng Xóm ➔
+          </span>
+        </div>
+
+        {/* Thanh tiến độ cuộn đường phố */}
+        <div className="flex items-center gap-2">
+          <div className="w-20 bg-amber-100 h-1.5 rounded-full overflow-hidden border border-amber-200">
+            <div
+              className="bg-amber-500 h-full transition-all duration-150"
+              style={{ width: `${scrollPercent}%` }}
+            />
+          </div>
+          <span className="text-[9.5px] text-amber-800 font-black">
+            {gameState.unlockedRestaurants?.length || 1}/5 Quán Mở
+          </span>
+        </div>
+      </div>
     </div>
   );
 };

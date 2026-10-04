@@ -10,11 +10,17 @@ interface ChibiAvatarProps {
     | 'emp_mai'
     | 'emp_linh'
     | 'emp_tuan'
+    | 'emp_hong'
+    | 'emp_tai'
+    | 'emp_ngoc'
+    | 'emp_quan'
+    | 'emp_dung'
     | 'bac_ba'
     | 'co_bay'
     | 'chu_nam'
     | 'be_bong'
-    | 'chi_lan';
+    | 'chi_lan'
+    | string;
   emotion?: 'happy' | 'waiting' | 'eating' | 'love' | 'angry';
   size?: number;
   className?: string;
@@ -91,6 +97,46 @@ export const ChibiAvatar: React.FC<ChibiAvatarProps> = ({
       outfit: '#FFE082',
       hat: 'chef',
       accessory: 'heart_apron',
+    },
+    emp_hong: {
+      skin: '#FFE0BD',
+      hair: '#8D6E63',
+      hairStyle: 'bun',
+      outfit: '#EF4444',
+      hat: 'chef',
+      accessory: 'heart_apron',
+    },
+    emp_tai: {
+      skin: '#FFE0BD',
+      hair: '#3E2723',
+      hairStyle: 'short',
+      outfit: '#D97706',
+      hat: 'chef_tall',
+      accessory: 'mustache',
+    },
+    emp_ngoc: {
+      skin: '#FFE0BD',
+      hair: '#1E293B',
+      hairStyle: 'pigtails',
+      outfit: '#06B6D4',
+      hat: 'none',
+      accessory: 'maid_ribbon',
+    },
+    emp_quan: {
+      skin: '#FFE0BD',
+      hair: '#475569',
+      hairStyle: 'neat',
+      outfit: '#10B981',
+      hat: 'none',
+      accessory: 'tie',
+    },
+    emp_dung: {
+      skin: '#FFE0BD',
+      hair: '#18181B',
+      hairStyle: 'short',
+      outfit: '#8B5CF6',
+      hat: 'helmet',
+      accessory: 'badge',
     },
     bac_ba: {
       skin: '#FFE0BD',
