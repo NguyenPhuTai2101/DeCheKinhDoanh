@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { RECIPES, INGREDIENTS } from '../../../../shared/gameData';
+import { RECIPES, INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { RecipeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import {
@@ -25,16 +25,24 @@ export const CookingModal: React.FC = () => {
     showToast,
   } = useGameStore();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'food' | 'drink'>('all');
-  const [selectedRecipeId, setSelectedRecipeId] = useState<RecipeId>('banh_mi_trung');
+  const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
+
+  const [activeTab, setActiveTab] = useState<'current' | 'all' | 'food' | 'drink'>('current');
+  const [selectedRecipeId, setSelectedRecipeId] = useState<RecipeId>(
+    currentRest.primaryRecipeIds[0] || 'banh_mi_trung'
+  );
 
   const allRecipes = Object.values(RECIPES);
   const filteredRecipes = allRecipes.filter((r) => {
+    if (activeTab === 'current') {
+      return currentRest.primaryRecipeIds.includes(r.id) || r.category === 'drink';
+    }
     if (activeTab === 'all') return true;
     return r.category === activeTab;
   });
 
-  const selectedRecipe = RECIPES[selectedRecipeId] || allRecipes[0];
+  const selectedRecipe = RECIPES[selectedRecipeId] || filteredRecipes[0] || allRecipes[0];
 
   // Tính chi phí nguyên liệu và kiểm tra tồn kho
   const calcIngredientCost = (recipe: typeof selectedRecipe) => {
@@ -93,9 +101,23 @@ export const CookingModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Thanh Tab Danh Mục (Tất cả, Bánh mì, Đồ uống) */}
-        <div className="px-4 py-2 bg-white/80 border-b border-[#F7D7BA]/60 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-1.5">
+        {/* Thanh Tab Danh Mục */}
+        <div className="px-4 py-2 bg-white/80 border-b border-[#F7D7BA]/60 flex items-center justify-between gap-2 shrink-0 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                setActiveTab('current');
+              }}
+              className={`px-3 py-1 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center gap-1 ${
+                activeTab === 'current'
+                  ? 'bg-rose-500 text-white shadow-xs'
+                  : 'bg-[#FFF7ED] text-[#7C5C55] hover:bg-rose-100'
+              }`}
+            >
+              <span>{currentRest.icon}</span>
+              <span>{currentRest.shortName}</span>
+            </button>
             <button
               onClick={() => {
                 soundManager.playClick();
@@ -120,7 +142,7 @@ export const CookingModal: React.FC = () => {
                   : 'bg-[#FFF7ED] text-[#7C5C55] hover:bg-rose-100'
               }`}
             >
-              🥖 Bánh Mì ({allRecipes.filter((r) => r.category === 'food').length})
+              🍲 Món Ăn ({allRecipes.filter((r) => r.category === 'food').length})
             </button>
             <button
               onClick={() => {

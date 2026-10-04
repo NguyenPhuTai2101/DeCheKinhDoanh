@@ -6,6 +6,7 @@ import {
   CUSTOMER_TYPES,
   NEIGHBORS_DATA,
   SHOP_THEMES,
+  RESTAURANT_TYPES,
 } from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
@@ -53,8 +54,10 @@ export const StreetMapView: React.FC = () => {
   const initialScrollLeft = useRef(0);
   const hasMoved = useRef(false);
 
-  // Cấu hình cấp bậc vỉa hè
+  // Cấu hình cấp bậc vỉa hè & quán ăn hiện tại
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
+  const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
   const upgrades = gameState.purchasedUpgrades;
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
@@ -268,9 +271,10 @@ export const StreetMapView: React.FC = () => {
             </button>
             <button
               onClick={() => scrollToLandmark(560)}
-              className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 rounded-full border border-rose-300 text-rose-950 font-black active:scale-95 transition-all"
+              className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 rounded-full border border-rose-300 text-rose-950 font-black active:scale-95 transition-all flex items-center gap-0.5"
             >
-              🥖 Quán mình
+              <span>{currentRest.icon}</span>
+              <span>{currentRest.shortName}</span>
             </button>
             <button
               onClick={() => scrollToLandmark(1050)}
@@ -489,7 +493,7 @@ export const StreetMapView: React.FC = () => {
                 )}
               </div>
 
-              {/* BIỂN HIỆU TIỆM BÁNH MÌ THEO CẤP */}
+              {/* BIỂN HIỆU TIỆM THEO CẤP & THƯƠNG HIỆU */}
               <div
                 className="rounded-2xl p-2 flex items-center justify-between border-2 shadow-xs transition-all"
                 style={{
@@ -498,14 +502,14 @@ export const StreetMapView: React.FC = () => {
                 }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-2xl animate-bounce-short shrink-0">{stageVisual.icon}</span>
+                  <span className="text-2xl animate-bounce-short shrink-0">{currentRest.icon}</span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3
                         className="font-black text-xs sm:text-sm leading-tight drop-shadow-2xs truncate"
                         style={{ color: stageVisual.storefront.signboardTextColor }}
                       >
-                        {gameState.shopName}
+                        {currentRest.name}
                       </h3>
                       <span
                         style={{
@@ -534,14 +538,14 @@ export const StreetMapView: React.FC = () => {
                 </button>
               </div>
 
-              {/* QUẦY CHẾ BIẾN & ĐẠO CỤ ĐẶC TRƯNG CỦA CẤP */}
+              {/* QUẦY CHẾ BIẾN & ĐẠO CỤ ĐẶC TRƯNG CỦA CẤP & QUÁN */}
               <div
                 onClick={safeClick(() => setCurrentView('shop'))}
                 className="bg-white/95 rounded-2xl border-2 p-1.5 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-sm group relative"
                 style={{ borderColor: stageVisual.storefront.signboardBorder }}
-                title="Chạm vào xe bánh mì để chuẩn bị món ăn"
+                title={`Chạm vào quầy ${currentRest.shortName} để chuẩn bị món ăn`}
               >
-                {/* Tủ kính/quầy theo cấp */}
+                {/* Tủ kính/quầy theo cấp và thiết bị quán */}
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div
                     className="w-14 h-16 rounded-xl border flex flex-col justify-around items-center p-1 shadow-inner shrink-0"
@@ -550,8 +554,8 @@ export const StreetMapView: React.FC = () => {
                       borderColor: stageVisual.storefront.signboardBorder,
                     }}
                   >
-                    <span className="text-sm animate-bounce-short">
-                      {stageVisual.storefront.cartDisplayIcon}
+                    <span className="text-xl animate-bounce-short">
+                      {currentRest.equipmentIcon}
                     </span>
                     <span
                       style={{
@@ -560,19 +564,19 @@ export const StreetMapView: React.FC = () => {
                       }}
                       className="text-[7px] font-black px-0.5 rounded truncate max-w-[50px]"
                     >
-                      {stageVisual.storefront.cartBadge}
+                      {currentRest.shortName}
                     </span>
                   </div>
 
                   <div className="min-w-0">
                     <div className="text-[11px] font-black text-slate-800 flex items-center gap-1 truncate">
-                      <span className="truncate">{stageVisual.storefront.cartDisplayTitle}</span>
+                      <span className="truncate">{currentRest.equipmentName}</span>
                       <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded-full font-bold shrink-0">
                         Đang Mở
                       </span>
                     </div>
                     <div className="text-[9.5px] text-slate-500 font-medium truncate max-w-[170px]">
-                      {stageVisual.storefront.cartDescription}
+                      {currentRest.tagline}
                     </div>
                     {/* Đạo cụ trang trí đặc trưng của cấp */}
                     <div className="flex items-center gap-1 mt-0.5 flex-wrap">

@@ -1,25 +1,18 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { INGREDIENTS } from '../../../../shared/gameData';
+import { INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { IngredientId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
-import { X, ShoppingBag, Plus, Minus, Package, CheckCircle2 } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Package, CheckCircle2, Filter } from 'lucide-react';
 
 export const MarketModal: React.FC = () => {
   const { closeModal, gameState, buyIngredients } = useGameStore();
 
-  const [cart, setCart] = useState<Record<IngredientId, number>>({
-    bread: 0,
-    egg: 0,
-    pork: 0,
-    pate: 0,
-    cucumber: 0,
-    herb: 0,
-    tea: 0,
-    milk: 0,
-    condensed_milk: 0,
-    coffee: 0,
-  });
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [filterTab, setFilterTab] = useState<'current' | 'all' | 'protein' | 'carb' | 'veggie' | 'drink'>('current');
+
+  const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
 
   const updateCartItem = (id: IngredientId, delta: number) => {
     soundManager.playClick();
@@ -53,6 +46,22 @@ export const MarketModal: React.FC = () => {
     }
   };
 
+  // Lọc nguyên liệu theo Tab
+  const displayedIngredients = Object.values(INGREDIENTS).filter((ing) => {
+    if (filterTab === 'current') {
+      return (
+        currentRest.allowedIngredientIds.includes(ing.id) ||
+        ing.category === 'beverage'
+      );
+    }
+    if (filterTab === 'all') return true;
+    if (filterTab === 'protein') return ing.category === 'meat';
+    if (filterTab === 'carb') return ing.category === 'bakery';
+    if (filterTab === 'veggie') return ing.category === 'veg';
+    if (filterTab === 'drink') return ing.category === 'beverage';
+    return true;
+  });
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFD6E5] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
@@ -63,7 +72,7 @@ export const MarketModal: React.FC = () => {
             <div>
               <h2 className="text-base sm:text-lg font-black text-[#7C5C55]">Chợ Đầu Mối Nông Sản</h2>
               <p className="text-[11px] text-[#9C7C75]">
-                Mua nguyên liệu bổ sung cho kho hàng
+                Mua nguyên liệu sỉ cho {currentRest.name} & chuỗi quán
               </p>
             </div>
           </div>
@@ -96,9 +105,74 @@ export const MarketModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Thanh lọc phân loại nguyên liệu */}
+        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 text-[11px] font-bold">
+          <button
+            onClick={() => setFilterTab('current')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 flex items-center gap-1 ${
+              filterTab === 'current'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            <span>{currentRest.icon}</span>
+            <span>{currentRest.shortName}</span>
+          </button>
+          <button
+            onClick={() => setFilterTab('all')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 ${
+              filterTab === 'all'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            Tất Cả ({Object.keys(INGREDIENTS).length})
+          </button>
+          <button
+            onClick={() => setFilterTab('protein')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 ${
+              filterTab === 'protein'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            🥩 Thịt & Topping
+          </button>
+          <button
+            onClick={() => setFilterTab('carb')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 ${
+              filterTab === 'carb'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            🍜 Bánh & Bún Phở
+          </button>
+          <button
+            onClick={() => setFilterTab('veggie')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 ${
+              filterTab === 'veggie'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            🥬 Rau & Sốt
+          </button>
+          <button
+            onClick={() => setFilterTab('drink')}
+            className={`px-2.5 py-1 rounded-xl transition-all shrink-0 ${
+              filterTab === 'drink'
+                ? 'bg-[#8D6E63] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+            }`}
+          >
+            🧋 Đồ Uống
+          </button>
+        </div>
+
         {/* Danh sách nguyên liệu */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 flex flex-col gap-2.5">
-          {Object.values(INGREDIENTS).map((ing) => {
+          {displayedIngredients.map((ing) => {
             const stock = gameState.inventory[ing.id] || 0;
             const inCart = cart[ing.id] || 0;
 

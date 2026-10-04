@@ -14,6 +14,7 @@ import {
   LotteryTicket,
   DeliveryOrder,
   ActiveOrder,
+  RestaurantTypeId,
 } from '../../../shared/types';
 import {
   INITIAL_GAME_STATE,
@@ -27,6 +28,7 @@ import {
   BUSINESS_STAGES,
   NEIGHBORS_DATA,
   STREET_EVENTS,
+  RESTAURANT_TYPES,
 } from '../../../shared/gameData';
 
 const LOCAL_STORAGE_KEY = 'cozy_empire_save_v4';
@@ -45,6 +47,8 @@ export type ModalType =
   | 'delivery'
   | 'lotteryDraw'
   | 'menuMore'
+  | 'franchise'
+  | 'starterSelection'
   | null;
 
 export interface FloatingFeedback {
@@ -161,6 +165,11 @@ export interface GameStoreState {
   fulfillDeliveryOrder: (orderId: string) => boolean;
   cancelDeliveryOrder: (orderId: string) => void;
   serveNeighborGuest: (neighborId: NeighborId) => void;
+
+  // V0.6: Chuỗi Đa Thương Hiệu Ẩm Thực (Franchise Chain)
+  chooseStarterRestaurant: (restaurantId: RestaurantTypeId) => void;
+  switchActiveRestaurant: (restaurantId: RestaurantTypeId) => void;
+  unlockRestaurantFranchise: (restaurantId: RestaurantTypeId) => boolean;
 
   // Day Cycle
   endDayAndSleep: () => void;
@@ -1280,6 +1289,78 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return true;
   },
 
+  chooseStarterRestaurant: (restaurantId: RestaurantTypeId) => {
+    const restaurant = RESTAURANT_TYPES[restaurantId];
+    if (!restaurant) return;
+
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        activeRestaurantId: restaurantId,
+        unlockedRestaurants: [restaurantId],
+        hasChosenStarter: true,
+        shopName: restaurant.name,
+      },
+      activeOrders: [],
+    }));
+    get().saveLocal();
+    get().showToast(`Chúc mừng bạn đã khai trương ${restaurant.name}! 🚀`);
+  },
+
+  switchActiveRestaurant: (restaurantId: RestaurantTypeId) => {
+    const restaurant = RESTAURANT_TYPES[restaurantId];
+    const { gameState } = get();
+    if (!restaurant || !gameState.unlockedRestaurants?.includes(restaurantId)) return;
+
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        activeRestaurantId: restaurantId,
+        shopName: restaurant.name,
+      },
+      activeOrders: [], // Xóa bàn chờ cũ để khách mới kéo vào gọi món của quán mới
+    }));
+    get().saveLocal();
+    get().showToast(`Đã chuyển tới quản lý: ${restaurant.name} ${restaurant.icon}`);
+  },
+
+  unlockRestaurantFranchise: (restaurantId: RestaurantTypeId) => {
+    const restaurant = RESTAURANT_TYPES[restaurantId];
+    const { gameState } = get();
+    if (!restaurant) return false;
+
+    if (gameState.unlockedRestaurants?.includes(restaurantId)) {
+      get().showToast('Bạn đã sở hữu thương hiệu này rồi!');
+      return false;
+    }
+
+    if (gameState.money < restaurant.unlockCost) {
+      get().showToast(`Cần thêm ${(restaurant.unlockCost - gameState.money).toLocaleString('vi-VN')} đ để mở chi nhánh!`);
+      return false;
+    }
+
+    if (gameState.reputation < restaurant.requiredReputation) {
+      get().showToast(`Cần ${restaurant.requiredReputation} điểm Uy tín để mở chi nhánh này!`);
+      return false;
+    }
+
+    const currentUnlocked = gameState.unlockedRestaurants || ['banh_mi'];
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money - restaurant.unlockCost,
+        unlockedRestaurants: [...currentUnlocked, restaurantId],
+        activeRestaurantId: restaurantId,
+        shopName: restaurant.name,
+      },
+      activeOrders: [],
+    }));
+
+    get().saveLocal();
+    get().showToast(`Tưng bừng khai trương chi nhánh mới: ${restaurant.name}! 🎊`);
+    return true;
+  },
+
   endDayAndSleep: () => {
     const { gameState, dailyRevenue, dailyCost, dailyCustomersServed, dailyCustomersLost } = get();
 
@@ -1397,6 +1478,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             },
             lotteryHistory: parsed.lotteryHistory || [],
             activeLotteryTicket: parsed.activeLotteryTicket || null,
+            activeRestaurantId: parsed.activeRestaurantId || 'banh_mi',
+            unlockedRestaurants: parsed.unlockedRestaurants || ['banh_mi'],
+            hasChosenStarter: parsed.hasChosenStarter ?? false,
           },
         });
       }
@@ -1427,6 +1511,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                 },
                 lotteryHistory: cloudState.lotteryHistory || [],
                 activeLotteryTicket: cloudState.activeLotteryTicket || null,
+                activeRestaurantId: cloudState.activeRestaurantId || 'banh_mi',
+                unlockedRestaurants: cloudState.unlockedRestaurants || ['banh_mi'],
+                hasChosenStarter: cloudState.hasChosenStarter ?? false,
               },
             });
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));

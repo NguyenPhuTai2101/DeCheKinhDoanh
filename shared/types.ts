@@ -10,7 +10,27 @@ export type IngredientId =
   | 'tea'
   | 'milk'
   | 'condensed_milk'
-  | 'coffee';
+  | 'coffee'
+  // Phở
+  | 'pho_noodle'
+  | 'beef'
+  | 'beef_broth'
+  | 'quay'
+  | 'spring_onion'
+  // Bún Bò & Bún Riêu
+  | 'bun_noodle'
+  | 'crab_paste'
+  | 'bun_broth'
+  | 'tofu'
+  | 'tomato'
+  // Bò Né / Beefsteak
+  | 'butter'
+  | 'potato'
+  | 'pepper_sauce'
+  // Cơm Tấm
+  | 'broken_rice'
+  | 'pork_rib'
+  | 'scallion_oil';
 
 export interface Ingredient {
   id: IngredientId;
@@ -28,7 +48,41 @@ export type RecipeId =
   | 'banh_mi_xiu_mai'
   | 'tra_sua'
   | 'cafe_sua'
-  | 'tra_dao';
+  | 'tra_dao'
+  // Phở
+  | 'pho_tai'
+  | 'pho_nam'
+  | 'pho_dac_biet'
+  // Bún
+  | 'bun_bo_hue'
+  | 'bun_rieu_cua'
+  // Beefsteak
+  | 'bo_ne_op_la'
+  | 'beefsteak_sot_tieu'
+  // Cơm Tấm
+  | 'com_tam_suon'
+  | 'com_tam_suon_bi_cha';
+
+export type RestaurantTypeId = 'banh_mi' | 'pho' | 'bun' | 'beefsteak' | 'com_tam';
+
+export interface RestaurantType {
+  id: RestaurantTypeId;
+  name: string;
+  shortName: string;
+  icon: string;
+  badge: string;
+  tagline: string;
+  starterDescription: string;
+  unlockCost: number;
+  requiredReputation: number;
+  themeColor: string;
+  accentColor: string;
+  equipmentName: string;
+  equipmentIcon: string;
+  equipmentType: 'board' | 'pho_pot' | 'bun_pot' | 'steak_pan' | 'grill';
+  primaryRecipeIds: RecipeId[];
+  allowedIngredientIds: IngredientId[];
+}
 
 export interface Recipe {
   id: RecipeId;
@@ -308,6 +362,11 @@ export interface GameSaveState {
   currentEvent?: StreetEvent | null;
   deliveryOrders?: DeliveryOrder[];
   totalDeliveriesCompleted?: number;
+
+  // V0.6: Hệ thống Chuỗi Chi Nhánh Đa Ẩm Thực
+  activeRestaurantId?: RestaurantTypeId;
+  unlockedRestaurants?: RestaurantTypeId[];
+  hasChosenStarter?: boolean;
 }
 
 

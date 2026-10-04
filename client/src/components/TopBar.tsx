@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { BUSINESS_STAGES } from '../../../shared/gameData';
+import { BUSINESS_STAGES, RESTAURANT_TYPES } from '../../../shared/gameData';
 import { Play, Pause, FastForward, Clock, Zap, Award, Store, Volume2, VolumeX } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 
@@ -30,27 +30,29 @@ export const TopBar: React.FC = () => {
 
   const energyPercent = Math.round((gameState.player.energy / gameState.player.maxEnergy) * 100);
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
+  const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
 
   return (
     <header className="w-full bg-[#FAF5EE] border-b-2 border-[#FFD6E5] px-3 py-2 flex flex-col gap-1.5 shadow-sm z-30 shrink-0">
       {/* Hàng 1: Tên quán, Tiền mặt, Nút Mở/Đóng cửa */}
       <div className="w-full flex items-center justify-between gap-2">
-        {/* Tên & Cấp độ */}
+        {/* Tên & Cấp độ & Nút Đổi Quán */}
         <div
           onClick={() => {
             soundManager.playClick();
-            openModal('ledger');
+            openModal('franchise');
           }}
           className="flex items-center gap-1.5 min-w-0 cursor-pointer group"
-          title="Bấm để xem Sổ Sách & Cơ Nghiệp Vỉa Hè"
+          title="Bấm để Quản lý Chuỗi Nhà Hàng & Đổi Quán Ăn"
         >
           <div className="w-8 h-8 rounded-full bg-[#FFF1F6] border-2 border-[#F7A8C4] flex items-center justify-center text-sm shadow-inner shrink-0 group-hover:scale-105 transition-all">
-            {currentStage.icon}
+            {currentRest.icon}
           </div>
           <div className="leading-tight truncate">
             <div className="flex items-center gap-1">
               <span className="font-extrabold text-[#7C5C55] text-xs truncate group-hover:text-pink-600 transition-colors">
-                {gameState.shopName}
+                {currentRest.name}
               </span>
               <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full font-bold shrink-0 border border-amber-200">
                 {currentStage.name}
@@ -64,6 +66,9 @@ export const TopBar: React.FC = () => {
               <span className="flex items-center gap-0.5">
                 <Award className="w-2.5 h-2.5 text-amber-500" />
                 {gameState.reputation}⭐
+              </span>
+              <span className="text-[8.5px] text-orange-600 bg-orange-100 px-1 rounded-sm font-bold border border-orange-200">
+                Chuỗi ▾
               </span>
             </div>
           </div>

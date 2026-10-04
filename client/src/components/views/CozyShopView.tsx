@@ -7,6 +7,7 @@ import {
   SHOP_THEMES,
   BUSINESS_STAGES,
   NEIGHBORS_DATA,
+  RESTAURANT_TYPES,
 } from '../../../../shared/gameData';
 import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
@@ -26,6 +27,7 @@ import {
   Flame,
   CheckCircle2,
   AlertCircle,
+  Building2,
 } from 'lucide-react';
 
 export const CozyShopView: React.FC = () => {
@@ -56,13 +58,15 @@ export const CozyShopView: React.FC = () => {
   // Khay nguyên liệu đang chọn trên thớt
   const [selectedIngredients, setSelectedIngredients] = useState<Record<string, boolean>>({});
 
-  // Cấu hình cấp bậc
+  // Cấu hình cấp bậc & thương hiệu quán hiện tại
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const upgrades = gameState.purchasedUpgrades;
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
+  const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
 
   // Đơn hàng đang được chọn chế biến
   const activeOrder = orders.find((o) => o.tableIndex === selectedOrderIndex) || orders[0] || null;
@@ -173,26 +177,25 @@ export const CozyShopView: React.FC = () => {
     }, 1800);
   };
 
-  // Danh mục nguyên liệu bánh mì (6 món chính, gọn gàng, to rõ)
-  const breadIngredients: Array<{ id: IngredientId; name: string; icon: string }> = [
-    { id: 'bread', name: 'Bánh Mì', icon: '🥖' },
-    { id: 'pate', name: 'Patê Gan', icon: '🧈' },
-    { id: 'pork', name: 'Thịt Nướng', icon: '🥩' },
-    { id: 'egg', name: 'Trứng Ốp La', icon: '🍳' },
-    { id: 'cucumber', name: 'Dưa Leo', icon: '🥒' },
-    { id: 'herb', name: 'Rau Thơm', icon: '🌿' },
-  ];
+  // Danh mục nguyên liệu món chính theo thương hiệu quán đang mở
+  const foodIngredients: Array<{ id: IngredientId; name: string; icon: string }> = currentRest.allowedIngredientIds
+    .filter((id) => INGREDIENTS[id]?.category !== 'beverage')
+    .map((id) => ({
+      id,
+      name: INGREDIENTS[id]?.name.split(' ')[0] || id,
+      icon: INGREDIENTS[id]?.icon || '✨',
+    }));
 
-  // Danh mục nguyên liệu đồ uống (4 món chính to rõ)
+  // Danh mục nguyên liệu đồ uống (4 món chính)
   const drinkIngredients: Array<{ id: IngredientId; name: string; icon: string }> = [
     { id: 'tea', name: 'Trà Lài', icon: '🍃' },
-    { id: 'coffee', name: 'Cà Phê Phin', icon: '☕' },
+    { id: 'coffee', name: 'Cà Phê', icon: '☕' },
     { id: 'milk', name: 'Sữa Tươi', icon: '🥛' },
     { id: 'condensed_milk', name: 'Sữa Đặc', icon: '🍯' },
   ];
 
   const currentIngredientsList =
-    activeIngredientTab === 'bread' ? breadIngredients : drinkIngredients;
+    activeIngredientTab === 'bread' ? foodIngredients : drinkIngredients;
 
   // Đếm số nguyên liệu cần đã chọn
   const requiredCount = currentRecipe?.requiredIngredients.length || 0;
@@ -320,10 +323,33 @@ export const CozyShopView: React.FC = () => {
               </button>
             )}
 
+            {/* Nút Chuỗi Quán / Đổi Quán */}
+            <div
+              onClick={() => {
+                soundManager.playClick();
+                openModal('franchise');
+              }}
+              className="flex items-center gap-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border border-amber-400 rounded-xl px-2 py-1 shrink-0 cursor-pointer transition-all active:scale-95 shadow-2xs ml-auto"
+              title="Quản lý Chuỗi Quán Ăn / Mở Chi Nhánh Mới"
+            >
+              <span className="text-sm">{currentRest.icon}</span>
+              <div className="text-left leading-tight">
+                <div className="text-[9.5px] font-black flex items-center gap-1">
+                  <span>{currentRest.shortName}</span>
+                  <span className="text-[7.5px] bg-white/30 text-white px-1 rounded-full font-black">
+                    {gameState.unlockedRestaurants?.length || 1} Quán
+                  </span>
+                </div>
+                <div className="text-[8px] font-medium text-amber-100 truncate">
+                  Đổi Quán 🔀
+                </div>
+              </div>
+            </div>
+
             {/* Huy hiệu Cấp độ hiện tại */}
             <div
               onClick={() => openModal('upgrades')}
-              className="flex items-center gap-1 bg-amber-50/90 border border-amber-300 rounded-xl px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-100 transition-all active:scale-95 shadow-2xs ml-auto"
+              className="flex items-center gap-1 bg-amber-50/90 border border-amber-300 rounded-xl px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-100 transition-all active:scale-95 shadow-2xs"
               title="Chạm để xem Lộ trình 5 Cấp Cơ Nghiệp"
             >
               <span className="text-sm">{stageVisual.icon}</span>
@@ -542,10 +568,10 @@ export const CozyShopView: React.FC = () => {
           <div className="flex-1 my-1.5 flex flex-col items-center justify-center relative">
             {activeOrder && currentRecipe ? (
               <div className="flex flex-col items-center justify-center gap-1.5 w-full">
-                {/* Ổ Bánh Mì hoặc Ly Nước to ở giữa */}
+                {/* Thiết bị nấu & Món ăn to ở giữa */}
                 <div className="relative flex items-center justify-center">
                   <div className="text-5xl drop-shadow-sm select-none animate-bounce-short">
-                    {currentRecipe.category === 'drink' ? '🥤' : '🥖'}
+                    {currentRecipe.category === 'drink' ? '🥤' : currentRecipe.icon}
                   </div>
 
                   {/* Topping bay vào quanh món */}
@@ -563,17 +589,23 @@ export const CozyShopView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Nhãn tiến độ topping */}
+                {/* Nhãn tiến độ topping & Thiết bị nấu chuyên dụng */}
                 <div className="text-[11px] font-black text-[#5D4037] flex items-center gap-1">
                   <span>{currentRecipe.name}</span>
                   <span className="text-pink-600 bg-pink-100 px-1.5 py-0.2 rounded-full text-[10px]">
                     {pickedRequiredCount}/{requiredCount} nguyên liệu
                   </span>
                 </div>
+                <div className="text-[9px] text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span>{currentRest.equipmentIcon}</span>
+                  <span>{currentRest.equipmentName}</span>
+                </div>
               </div>
             ) : (
-              <div className="text-center text-xs text-slate-400 font-medium py-3">
-                <span>Chạm các khay nguyên liệu bên dưới để cho lên thớt nha! 👆</span>
+              <div className="text-center text-xs text-slate-500 font-medium py-3 flex flex-col items-center gap-1">
+                <span className="text-3xl animate-bounce-short">{currentRest.equipmentIcon}</span>
+                <span className="font-bold text-[#5D4037]">{currentRest.equipmentName}</span>
+                <span className="text-[10.5px] text-slate-400">Chạm nguyên liệu để nấu {currentRest.shortName}! 👆</span>
               </div>
             )}
           </div>
@@ -622,7 +654,7 @@ export const CozyShopView: React.FC = () => {
 
       {/* 4. KHAY NGUYÊN LIỆU TO RÕ, ĐÃ TAY (MOBILE-FIRST TOPPING STATION) */}
       <div className="px-3 shrink-0 space-y-1.5">
-        {/* Header chuyển Tab: Bánh Mì vs Đồ Uống */}
+        {/* Header chuyển Tab: Món chính vs Đồ Uống */}
         <div className="flex items-center justify-between">
           <div className="flex gap-1.5">
             <button
@@ -636,8 +668,8 @@ export const CozyShopView: React.FC = () => {
                   : 'bg-white border border-[#D7CCC8] text-[#5D4037] hover:bg-amber-50'
               }`}
             >
-              <span>🥖</span>
-              <span>Nhân Bánh Mì</span>
+              <span>{currentRest.icon}</span>
+              <span>{currentRest.shortName}</span>
             </button>
             <button
               onClick={() => {

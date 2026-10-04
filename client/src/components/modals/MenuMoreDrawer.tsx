@@ -65,6 +65,31 @@ export const MenuMoreDrawer: React.FC = () => {
               <Store className="w-3 h-3 text-pink-500" />
               <span>Quản Lý & Phát Triển Quán</span>
             </div>
+
+            {/* Banner Mở Chuỗi Quán Ăn */}
+            <div
+              onClick={() => handleSelectModal('franchise')}
+              className="p-3 bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 rounded-2xl text-white shadow-sm flex items-center justify-between cursor-pointer hover:brightness-105 active:scale-98 transition-all group mb-2.5"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0 shadow-inner">
+                  🍜
+                </div>
+                <div>
+                  <div className="text-xs font-black flex items-center gap-1.5">
+                    <span>Mở Rộng Chuỗi Quán Ăn</span>
+                    <span className="text-[8.5px] bg-white text-orange-600 px-1.5 py-0.2 rounded-full font-black">
+                      {gameState.unlockedRestaurants?.length || 1}/5 Quán
+                    </span>
+                  </div>
+                  <div className="text-[10.5px] text-amber-100">
+                    Phở Bò, Bún Riêu, Bò Né Chảo Gang, Cơm Tấm...
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/80 group-hover:translate-x-1 transition-transform" />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {/* Nhân sự */}
               <button

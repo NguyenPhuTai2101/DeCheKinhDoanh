@@ -6,6 +6,7 @@ import {
   CUSTOMER_TYPES,
   NEIGHBORS_DATA,
   INGREDIENTS,
+  RESTAURANT_TYPES,
 } from '../../../shared/gameData';
 import { ActiveOrder, CustomerTypeId, NeighborId, RecipeId } from '../../../shared/types';
 import { soundManager } from '../utils/soundManager';
@@ -82,11 +83,16 @@ export const useGameSimulation = () => {
           }
         }
 
+        // Thực đơn của thương hiệu quán hiện tại
+        const activeRest =
+          RESTAURANT_TYPES[gameState.activeRestaurantId || 'banh_mi'] || RESTAURANT_TYPES.banh_mi;
+        const availableRecipes = activeRest.primaryRecipeIds;
+
         // Tỷ lệ xuất hiện hàng xóm quen thuộc
         const isNeighbor = Math.random() < 0.22;
         let chosenType: CustomerTypeId = 'student';
         let chosenNeighborId: NeighborId | undefined = undefined;
-        let chosenRecipe: RecipeId = 'banh_mi_trung';
+        let chosenRecipe: RecipeId = availableRecipes[0] || 'banh_mi_trung';
         let dialogue = '';
         let patienceSeconds = 40;
 
@@ -94,15 +100,23 @@ export const useGameSimulation = () => {
           const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
           chosenNeighborId = neighborKeys[Math.floor(Math.random() * neighborKeys.length)];
           const nData = NEIGHBORS_DATA[chosenNeighborId];
-          chosenRecipe = nData.favoriteDishId;
+          if (availableRecipes.includes(nData.favoriteDishId)) {
+            chosenRecipe = nData.favoriteDishId;
+          } else {
+            chosenRecipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
+          }
           dialogue = nData.dialogues[1] || 'Chào chủ quán!';
           patienceSeconds = 50;
         } else {
           const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
           chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
           const cType = CUSTOMER_TYPES[chosenType];
-          const favoriteList = cType.favoriteRecipeIds;
-          chosenRecipe = favoriteList[Math.floor(Math.random() * favoriteList.length)];
+          const matched = cType.favoriteRecipeIds.filter((r) => availableRecipes.includes(r));
+          if (matched.length > 0) {
+            chosenRecipe = matched[Math.floor(Math.random() * matched.length)];
+          } else {
+            chosenRecipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
+          }
           patienceSeconds = cType.patienceSeconds;
         }
 
