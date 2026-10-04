@@ -15,6 +15,7 @@ import { StreetEventsModal } from './components/modals/StreetEventsModal';
 import { LedgerModal } from './components/modals/LedgerModal';
 import { DeliveryModal } from './components/modals/DeliveryModal';
 import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
+import { MenuMoreDrawer } from './components/modals/MenuMoreDrawer';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
 
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
         {activeModal === 'ledger' && <LedgerModal />}
         {activeModal === 'delivery' && <DeliveryModal />}
         {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
+        {activeModal === 'menuMore' && <MenuMoreDrawer />}
 
         {/* 5. Thông báo nổi (Toast & Floating feedback) */}
         <ToastNotification />

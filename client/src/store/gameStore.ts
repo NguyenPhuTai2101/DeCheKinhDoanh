@@ -44,6 +44,7 @@ export type ModalType =
   | 'ledger'
   | 'delivery'
   | 'lotteryDraw'
+  | 'menuMore'
   | null;
 
 export interface FloatingFeedback {

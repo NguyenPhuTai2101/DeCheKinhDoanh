@@ -154,22 +154,7 @@ export const TopBar: React.FC = () => {
             </button>
           </div>
 
-          {/* Phím chuyển nhanh Quán ⇄ Ra Đường */}
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              setCurrentView(currentView === 'street' ? 'shop' : 'street');
-            }}
-            className={`px-2 py-0.5 rounded-full font-black text-[9px] flex items-center gap-1 border transition-all active:scale-95 ${
-              currentView === 'street'
-                ? 'bg-amber-400 text-amber-950 border-amber-500 shadow-xs'
-                : 'bg-rose-100 text-rose-800 border-rose-300'
-            }`}
-            title="Chuyển chế độ: Quán Bếp ⇄ Ra đường quan sát"
-          >
-            <span>{currentView === 'street' ? '🍳 Quầy Bếp' : '👀 Ra Phố'}</span>
-          </button>
-
+          {/* Âm thanh */}
           <button
             onClick={toggleSound}
             className="p-1 rounded-full bg-[#FFF1F6] border border-[#FFD6E5] text-[#7C5C55] hover:bg-white transition-all shadow-sm"

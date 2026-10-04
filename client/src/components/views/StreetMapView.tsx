@@ -234,93 +234,67 @@ export const StreetMapView: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden select-none bg-[#EBF4FA] relative">
-      {/* 1. THANH ĐIỀU HƯỚNG TINH GỌN (COMPACT STREET TOP BAR) */}
-      <div className="relative z-30 shrink-0 bg-white/95 backdrop-blur-xs border-b border-amber-200 shadow-xs">
-        {/* Hàng 1: Nút Vào Bếp + Tên Phố + Thống Kê Bàn Ngoài Trời */}
-        <div className="px-3 py-1.5 flex items-center justify-between gap-2">
-          {/* Nút Vào Bếp Bự Rõ Nhất Cho Mobile */}
-          <div className="flex items-center gap-2">
+      {/* 1. THANH TRẠNG THÁI PHỐ XÁ TINH GIẢN */}
+      <div className="relative z-30 shrink-0 bg-white/95 backdrop-blur-xs border-b border-amber-200/80 shadow-2xs px-2.5 py-1.5 flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 text-xs font-black text-amber-950 shrink-0">
+            <span>📍</span>
+            <span className="truncate">Phố Hoa Đào</span>
+          </div>
+
+          <div className="flex items-center gap-1 text-[11px] font-black text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+            <span>🪑 Bàn:</span>
+            <span className="text-rose-600 font-extrabold">
+              {activeOrders.length}/{maxTables}
+            </span>
+          </div>
+
+          {/* Quick jump chips tinh gọn */}
+          <div className="flex items-center gap-1 text-[10px] font-bold shrink-0">
             <button
-              onClick={() => {
-                soundManager.playClick();
-                setCurrentView('shop');
-              }}
-              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:brightness-105 active:scale-95 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all"
+              onClick={() => scrollToLandmark(0)}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
             >
-              <Utensils className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Vào Bếp Nấu</span>
+              🔧 Sửa xe
             </button>
-
-            {/* Tên Phố & Cấp Quán */}
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-950 font-black">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>Phố Hoa Đào</span>
-              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
-                {currentStage.name}
-              </span>
-            </div>
-          </div>
-
-          {/* Góc phải: Thống kê bàn ngoài trời & Báo động biến phố xá */}
-          <div className="flex items-center gap-2">
-            {gameState.currentEvent && (
-              <button
-                onClick={() => {
-                  soundManager.playClick();
-                  openModal('streetEvents');
-                }}
-                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-xs font-black flex items-center gap-1 animate-bounce shadow-xs"
-              >
-                <span>🚨</span>
-                <span>CÓ BIẾN!</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl text-xs font-black text-amber-900 shadow-2xs">
-              <span>🪑 Bàn:</span>
-              <span className="text-rose-600 font-extrabold">
-                {activeOrders.length}/{maxTables}
-              </span>
-            </div>
+            <button
+              onClick={() => scrollToLandmark(280)}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              🍬 Tạp hóa
+            </button>
+            <button
+              onClick={() => scrollToLandmark(560)}
+              className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 rounded-full border border-rose-300 text-rose-950 font-black active:scale-95 transition-all"
+            >
+              🥖 Quán mình
+            </button>
+            <button
+              onClick={() => scrollToLandmark(1050)}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              🌳 Cây me
+            </button>
+            <button
+              onClick={() => scrollToLandmark(1350)}
+              className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all"
+            >
+              ☕ Bác Ba
+            </button>
           </div>
         </div>
 
-        {/* Hàng 2: THANH CUỘN NHANH ĐỊA DANH PHỐ (QUICK JUMP CHIPS) */}
-        <div className="px-2 py-1 bg-amber-50/70 border-t border-amber-100/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold text-slate-700">
-          <span className="text-[10px] text-amber-800 font-black shrink-0 px-1">
-            📍 Địa Điểm:
-          </span>
+        {gameState.currentEvent && (
           <button
-            onClick={() => scrollToLandmark(0)}
-            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
+            onClick={() => {
+              soundManager.playClick();
+              openModal('streetEvents');
+            }}
+            className="px-2 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-[10px] font-black flex items-center gap-1 animate-bounce shadow-xs shrink-0"
           >
-            <span>🔧</span> Sửa Xe Chú Năm
+            <span>🚨 CÓ BIẾN!</span>
           </button>
-          <button
-            onClick={() => scrollToLandmark(280)}
-            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
-          >
-            <span>🍬</span> Tạp Hóa Cô Ba
-          </button>
-          <button
-            onClick={() => scrollToLandmark(560)}
-            className="shrink-0 px-2.5 py-0.5 bg-gradient-to-r from-amber-200 to-rose-200 text-rose-950 font-black rounded-full border border-rose-300 shadow-2xs active:scale-95 transition-all flex items-center gap-1"
-          >
-            <span>🥖</span> Quán Mình & Bàn Ăn
-          </button>
-          <button
-            onClick={() => scrollToLandmark(1050)}
-            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
-          >
-            <span>🌳</span> Cây Me & Vé Số
-          </button>
-          <button
-            onClick={() => scrollToLandmark(1350)}
-            className="shrink-0 px-2.5 py-0.5 bg-white hover:bg-amber-100 rounded-full border border-amber-200 text-amber-900 active:scale-95 transition-all flex items-center gap-1"
-          >
-            <span>☕</span> Cóc Bác Ba
-          </button>
-        </div>
+        )}
       </div>
 
       {/* 2. KHÔNG GIAN TOÀN CẢNH PHỐ XÁ CHÂN THỰC (PANORAMA CUỘN NGANG) */}

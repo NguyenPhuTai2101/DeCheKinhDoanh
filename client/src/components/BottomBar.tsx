@@ -1,216 +1,125 @@
-import React, { useState } from 'react';
-import { useGameStore, ModalType } from '../store/gameStore';
+import React from 'react';
+import { useGameStore } from '../store/gameStore';
+import { soundManager } from '../utils/soundManager';
 import {
   Utensils,
   ShoppingBag,
-  HeartHandshake,
-  BookOpen,
-  Megaphone,
   ArrowUpCircle,
-  Users,
-  Palette,
-  Moon,
-  Settings,
   LayoutGrid,
-  SlidersHorizontal,
+  Store,
   Bike,
-  Eye,
 } from 'lucide-react';
-import { soundManager } from '../utils/soundManager';
-import { HorizontalScrollBox } from './common/HorizontalScrollBox';
 
 export const BottomBar: React.FC = () => {
   const { openModal, gameState, deliveryOrders, currentView, setCurrentView } = useGameStore();
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const handleOpen = (modal: ModalType | 'street_view_toggle') => {
-    soundManager.playClick();
-    if (modal === 'street_view_toggle') {
-      setCurrentView(currentView === 'street' ? 'shop' : 'street');
-      return;
-    }
-    openModal(modal as ModalType);
-  };
 
   const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
-
-  const menuItems: Array<{
-    id: ModalType | 'street_view_toggle';
-    label: string;
-    icon: React.ReactNode;
-    colorClasses: string;
-    badge?: string | number | null;
-    hasAlert?: boolean;
-  }> = [
-    {
-      id: 'street_view_toggle',
-      label: currentView === 'street' ? 'Quầy Bếp' : 'Ra Phố',
-      icon: currentView === 'street' ? <Utensils className="w-4 h-4" /> : <Eye className="w-4 h-4" />,
-      colorClasses: currentView === 'street'
-        ? 'bg-rose-50 border-rose-300 text-rose-600 group-hover:bg-rose-400 group-hover:text-white'
-        : 'bg-amber-100 border-amber-400 text-amber-900 group-hover:bg-amber-400 group-hover:text-white',
-    },
-    {
-      id: 'cooking',
-      label: 'Nấu Ăn',
-      icon: <Utensils className="w-4 h-4" />,
-      colorClasses: 'bg-[#FFF1F6] border-[#F7A8C4] text-[#F7A8C4] group-hover:bg-[#F7A8C4] group-hover:text-white',
-    },
-    {
-      id: 'market',
-      label: `Chợ (${currentStock})`,
-      icon: <ShoppingBag className="w-4 h-4" />,
-      colorClasses: 'bg-[#FFF7ED] border-[#F7D7BA] text-amber-600 group-hover:bg-amber-400 group-hover:text-white',
-    },
-    {
-      id: 'neighbors',
-      label: 'Xóm Giềng',
-      icon: <HeartHandshake className="w-4 h-4" />,
-      colorClasses: 'bg-rose-50 border-rose-300 text-rose-500 group-hover:bg-rose-400 group-hover:text-white',
-      badge: '❤️',
-    },
-    {
-      id: 'ledger',
-      label: 'Sổ Sách',
-      icon: <BookOpen className="w-4 h-4" />,
-      colorClasses: 'bg-amber-50 border-amber-300 text-amber-700 group-hover:bg-amber-500 group-hover:text-white',
-    },
-    {
-      id: 'streetEvents',
-      label: 'Chuyện Xóm',
-      icon: <Megaphone className="w-4 h-4" />,
-      colorClasses: 'bg-sky-50 border-sky-300 text-sky-600 group-hover:bg-sky-400 group-hover:text-white',
-      hasAlert: !!gameState.currentEvent,
-    },
-    {
-      id: 'delivery',
-      label: deliveryOrders.length > 0 ? `Ship (${deliveryOrders.length})` : 'Giao Hàng',
-      icon: <Bike className="w-4 h-4" />,
-      colorClasses: 'bg-sky-50 border-sky-400 text-sky-600 group-hover:bg-sky-500 group-hover:text-white',
-      badge: deliveryOrders.length > 0 ? deliveryOrders.length : null,
-      hasAlert: deliveryOrders.length > 0,
-    },
-    {
-      id: 'upgrades',
-      label: 'Nâng Cấp',
-      icon: <ArrowUpCircle className="w-4 h-4" />,
-      colorClasses: 'bg-[#E8F5E9] border-[#A5D6A7] text-emerald-600 group-hover:bg-emerald-400 group-hover:text-white',
-    },
-    {
-      id: 'employees',
-      label: 'Nhân Sự',
-      icon: <Users className="w-4 h-4" />,
-      colorClasses: 'bg-[#EDE7F6] border-[#D1C4E9] text-purple-600 group-hover:bg-purple-400 group-hover:text-white',
-      badge: gameState.hiredEmployees.length > 0 ? gameState.hiredEmployees.length : null,
-    },
-    {
-      id: 'decor',
-      label: 'Trang Trí',
-      icon: <Palette className="w-4 h-4" />,
-      colorClasses: 'bg-[#FFF1F6] border-[#F7A8C4] text-[#F7A8C4] group-hover:bg-[#F7A8C4] group-hover:text-white',
-    },
-    {
-      id: 'dailySummary',
-      label: 'Đi Ngủ',
-      icon: <Moon className="w-4 h-4" />,
-      colorClasses: 'bg-[#E0F2FE] border-[#BAE6FD] text-sky-600 group-hover:bg-sky-400 group-hover:text-white',
-    },
-    {
-      id: 'settings',
-      label: 'Cài Đặt',
-      icon: <Settings className="w-3.5 h-3.5" />,
-      colorClasses: 'bg-[#FFF1F6] border-[#FFD6E5] text-[#7C5C55] group-hover:bg-[#7C5C55] group-hover:text-white',
-    },
-  ];
+  const pendingDeliveries = deliveryOrders.filter((d) => d.status !== 'delivering').length;
+  const hasEvent = !!gameState.currentEvent;
+  const hasMoreAlert = hasEvent || pendingDeliveries > 0;
 
   return (
-    <nav className="w-full bg-[#FAF5EE] border-t-2 border-[#FFD6E5] shadow-lg z-30 shrink-0 relative">
-      {/* Nút toggle chuyển đổi Chế độ Cuộn 1 hàng ↔ Lưới 2 hàng */}
-      <div className="flex items-center justify-between px-3 py-0.5 bg-[#FFF1F6]/80 border-b border-[#FFD6E5]/60 text-[9px] text-[#9C7C75]">
-        <span className="font-bold">
-          {isExpanded ? '📑 Danh Mục Tiện Ích (Tất cả)' : '👉 Vuốt sang ngang hoặc bấm mũi tên'}
-        </span>
+    <nav className="w-full bg-[#FAF5EE] border-t-2 border-[#FFD6E5] shadow-lg z-30 shrink-0 relative px-2 py-1.5 sm:py-2">
+      <div className="w-full grid grid-cols-5 items-center gap-1 sm:gap-2">
+        {/* NÚT 1: CHUYỂN CHẾ ĐỘ QUÁN BẾP ⇄ RA PHỐ */}
         <button
           onClick={() => {
             soundManager.playClick();
-            setIsExpanded(!isExpanded);
+            setCurrentView(currentView === 'street' ? 'shop' : 'street');
           }}
-          className="flex items-center gap-1 font-black text-pink-600 hover:text-pink-700 active:scale-95 transition-all"
+          className="flex flex-col items-center justify-center gap-0.5 py-1 rounded-2xl active:scale-95 transition-all group"
         >
-          {isExpanded ? (
-            <>
-              <SlidersHorizontal className="w-2.5 h-2.5" />
-              <span>Chế độ 1 Hàng</span>
-            </>
-          ) : (
-            <>
-              <LayoutGrid className="w-2.5 h-2.5" />
-              <span>Hiện Tất Cả (Lưới)</span>
-            </>
-          )}
+          <div
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shadow-xs border ${
+              currentView === 'street'
+                ? 'bg-gradient-to-br from-rose-100 to-pink-200 border-rose-300 text-rose-700'
+                : 'bg-gradient-to-br from-amber-100 to-yellow-200 border-amber-300 text-amber-900'
+            }`}
+          >
+            {currentView === 'street' ? (
+              <Utensils className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+            ) : (
+              <Store className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+            )}
+          </div>
+          <span className="text-[10px] sm:text-xs font-black text-[#7C5C55] leading-tight">
+            {currentView === 'street' ? 'Quầy Bếp' : 'Ra Phố'}
+          </span>
+        </button>
+
+        {/* NÚT 2: CHỢ NGUYÊN LIỆU */}
+        <button
+          onClick={() => {
+            soundManager.playClick();
+            openModal('market');
+          }}
+          className="flex flex-col items-center justify-center gap-0.5 py-1 rounded-2xl active:scale-95 transition-all group relative"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center transition-all shadow-xs group-hover:bg-amber-100">
+            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          </div>
+          <span className="text-[10px] sm:text-xs font-black text-[#7C5C55] leading-tight flex items-center gap-0.5">
+            <span>Chợ</span>
+            <span className="text-[8px] bg-amber-200 text-amber-900 px-1 rounded-full font-bold">
+              {currentStock}
+            </span>
+          </span>
+        </button>
+
+        {/* NÚT 3: NẤU ĂN (TRỌNG TÂM - TO VÀ NỔI BẬT NHẤT) */}
+        <button
+          onClick={() => {
+            soundManager.playClick();
+            openModal('cooking');
+          }}
+          className="flex flex-col items-center justify-center -mt-3 active:scale-90 transition-all group"
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-pink-300 group-hover:brightness-110 animate-bounce-short">
+            <Utensils className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
+          </div>
+          <span className="text-[10px] sm:text-xs font-black text-rose-600 mt-0.5 leading-tight">
+            Nấu Ăn
+          </span>
+        </button>
+
+        {/* NÚT 4: NÂNG CẤP QUÁN */}
+        <button
+          onClick={() => {
+            soundManager.playClick();
+            openModal('upgrades');
+          }}
+          className="flex flex-col items-center justify-center gap-0.5 py-1 rounded-2xl active:scale-95 transition-all group"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center transition-all shadow-xs group-hover:bg-emerald-100">
+            <ArrowUpCircle className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          </div>
+          <span className="text-[10px] sm:text-xs font-black text-[#7C5C55] leading-tight">
+            Nâng Cấp
+          </span>
+        </button>
+
+        {/* NÚT 5: MENU THÊM (GOM TIỆN ÍCH PHỤ: NHÂN SỰ, DECOR, GIAO HÀNG, SỰ KIỆN...) */}
+        <button
+          onClick={() => {
+            soundManager.playClick();
+            openModal('menuMore');
+          }}
+          className="flex flex-col items-center justify-center gap-0.5 py-1 rounded-2xl active:scale-95 transition-all group relative"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center transition-all shadow-xs group-hover:bg-purple-100 relative">
+            <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+            {hasMoreAlert && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-ping" />
+            )}
+            {hasMoreAlert && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+            )}
+          </div>
+          <span className="text-[10px] sm:text-xs font-black text-[#7C5C55] leading-tight">
+            Thêm ✨
+          </span>
         </button>
       </div>
-
-      {/* CHẾ ĐỘ 1: LƯỚI GỌN GÀNG (Hiển thị 100% không cần cuộn) */}
-      {isExpanded ? (
-        <div className="p-1.5 grid grid-cols-4 sm:grid-cols-6 gap-1 animate-slide-up">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleOpen(item.id)}
-              className="flex flex-col items-center gap-0.5 py-1 px-0.5 rounded-xl hover:bg-[#FFF1F6] text-[#7C5C55] transition-all group active:scale-90 relative"
-            >
-              <div
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${item.colorClasses}`}
-              >
-                {item.icon}
-              </div>
-              <span className="text-[9px] font-bold truncate max-w-full leading-tight">
-                {item.label}
-              </span>
-              {item.hasAlert && (
-                <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-              )}
-              {item.badge && (
-                <span className="absolute top-0 right-1 text-[8px] font-bold text-pink-600">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      ) : (
-        /* CHẾ ĐỘ 2: CUỘN NGANG VỚI MŨI TÊN & KÉO CHUỘT MƯỢT MÀ */
-        <HorizontalScrollBox
-          showArrows={true}
-          className="py-1 px-1 flex items-center gap-1 scrollbar-none"
-        >
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleOpen(item.id)}
-              className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl hover:bg-[#FFF1F6] text-[#7C5C55] transition-all group active:scale-90 shrink-0 relative"
-            >
-              <div
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${item.colorClasses}`}
-              >
-                {item.icon}
-              </div>
-              <span className="text-[10px] font-bold whitespace-nowrap">
-                {item.label}
-              </span>
-              {item.hasAlert && (
-                <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-              )}
-              {item.badge && (
-                <span className="absolute top-0.5 right-1.5 text-[9px] font-black text-pink-600">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </HorizontalScrollBox>
-      )}
     </nav>
   );
 };
