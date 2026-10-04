@@ -18,12 +18,20 @@ import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
 import { StarterSelectionModal } from './components/modals/StarterSelectionModal';
 import { FranchiseModal } from './components/modals/FranchiseModal';
 import { MenuMoreDrawer } from './components/modals/MenuMoreDrawer';
+import { FlashScreen } from './components/views/FlashScreen';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
 import { useGameSimulation } from './hooks/useGameSimulation';
 
 export const App: React.FC = () => {
-  const { activeModal, currentView, loadGame, saveLocal, gameState } = useGameStore();
+  const {
+    activeModal,
+    currentView,
+    loadGame,
+    saveLocal,
+    gameState,
+    showFlashScreen,
+  } = useGameStore();
 
   // Chạy vòng lặp mô phỏng & nhân viên tự động trên toàn bộ game
   useGameSimulation();
@@ -42,35 +50,39 @@ export const App: React.FC = () => {
     <div className="w-full h-[100dvh] bg-[#FFF1F6] flex justify-center items-center overflow-hidden">
       {/* Container chuẩn phong cách Mobile-First (Đế Chế Vỉa Hè & Tiệm Trà Nhỏ) */}
       <div className="w-full max-w-md sm:max-w-lg h-full bg-[#FAF5EE] sm:shadow-2xl sm:border-x-2 border-[#FFD6E5] flex flex-col justify-between overflow-hidden relative">
-        {/* 1. Thanh Header HUD Vỉa Hè */}
-        <TopBar />
+        {showFlashScreen ? (
+          <FlashScreen />
+        ) : (
+          <>
+            {/* 1. Thanh Header HUD Vỉa Hè */}
+            <TopBar />
 
-        {/* 2. Khu vực hiển thị trò chơi chính: Quầy Hàng (Bếp) ⇄ Ra Đường Quan Sát (Phố Vỉa Hè) */}
-        <main className="flex-1 w-full relative overflow-hidden flex flex-col min-h-0 bg-[#FAF5EE]">
-          {currentView === 'street' ? <StreetMapView /> : <CozyShopView />}
-        </main>
+            {/* 2. Khu vực hiển thị trò chơi chính: Quầy Hàng (Bếp) ⇄ Ra Đường Quan Sát (Phố Vỉa Hè) */}
+            <main className="flex-1 w-full relative overflow-hidden flex flex-col min-h-0 bg-[#FAF5EE]">
+              {currentView === 'street' ? <StreetMapView /> : <CozyShopView />}
+            </main>
 
-        {/* 3. Thanh điều hướng dưới cùng */}
-        <BottomBar />
+            {/* 3. Thanh điều hướng dưới cùng */}
+            <BottomBar />
 
-        {/* 4. Các Popup & Cửa sổ tương tác */}
-        {(!gameState.hasChosenStarter || activeModal === 'starterSelection') && (
-          <StarterSelectionModal />
+            {/* 4. Các Popup & Cửa sổ tương tác */}
+            {activeModal === 'franchise' && <FranchiseModal />}
+            {activeModal === 'starterSelection' && <StarterSelectionModal />}
+            {activeModal === 'cooking' && <CookingModal />}
+            {activeModal === 'market' && <MarketModal />}
+            {activeModal === 'upgrades' && <UpgradesModal />}
+            {activeModal === 'employees' && <EmployeesModal />}
+            {activeModal === 'decor' && <DecorModal />}
+            {activeModal === 'dailySummary' && <DailySummaryModal />}
+            {activeModal === 'settings' && <SettingsModal />}
+            {activeModal === 'neighbors' && <NeighborsModal />}
+            {activeModal === 'streetEvents' && <StreetEventsModal />}
+            {activeModal === 'ledger' && <LedgerModal />}
+            {activeModal === 'delivery' && <DeliveryModal />}
+            {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
+            {activeModal === 'menuMore' && <MenuMoreDrawer />}
+          </>
         )}
-        {activeModal === 'franchise' && <FranchiseModal />}
-        {activeModal === 'cooking' && <CookingModal />}
-        {activeModal === 'market' && <MarketModal />}
-        {activeModal === 'upgrades' && <UpgradesModal />}
-        {activeModal === 'employees' && <EmployeesModal />}
-        {activeModal === 'decor' && <DecorModal />}
-        {activeModal === 'dailySummary' && <DailySummaryModal />}
-        {activeModal === 'settings' && <SettingsModal />}
-        {activeModal === 'neighbors' && <NeighborsModal />}
-        {activeModal === 'streetEvents' && <StreetEventsModal />}
-        {activeModal === 'ledger' && <LedgerModal />}
-        {activeModal === 'delivery' && <DeliveryModal />}
-        {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
-        {activeModal === 'menuMore' && <MenuMoreDrawer />}
 
         {/* 5. Thông báo nổi (Toast & Floating feedback) */}
         <ToastNotification />

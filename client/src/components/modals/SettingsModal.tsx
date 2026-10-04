@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { X, Cloud, HardDrive, RefreshCw, AlertTriangle, CheckCircle2, Heart } from 'lucide-react';
 
 export const SettingsModal: React.FC = () => {
-  const { closeModal, saveLocal, syncCloud, resetGame, gameState, showToast } = useGameStore();
+  const { closeModal, saveLocal, syncCloud, resetGame, gameState, showToast, setShowFlashScreen } = useGameStore();
   const [isSyncing, setIsSyncing] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
@@ -80,6 +80,18 @@ export const SettingsModal: React.FC = () => {
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Đang đồng bộ Cloud...' : 'Lưu Game Ngay (Cloud + Local)'}</span>
+          </button>
+
+          {/* Nút Mở Lại FlashScreen Khởi Nghiệp */}
+          <button
+            onClick={() => {
+              closeModal();
+              setShowFlashScreen(true);
+            }}
+            className="w-full py-2.5 rounded-2xl font-bold text-xs text-amber-900 bg-amber-50 border border-amber-300 hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+          >
+            <span>🏮</span>
+            <span>Mở Lại Màn Hình FlashScreen (Chọn Quán Khởi Nghiệp)</span>
           </button>
 
           {/* Nút reset */}

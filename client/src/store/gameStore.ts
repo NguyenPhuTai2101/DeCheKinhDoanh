@@ -111,8 +111,10 @@ export interface GameStoreState {
     linh: string;
     tuan: string;
   };
+  showFlashScreen: boolean;
 
   // Actions cơ bản
+  setShowFlashScreen: (show: boolean) => void;
   setEmployeeActionStatus: (status: Partial<{ mai: string; linh: string; tuan: string }>) => void;
   setCurrentView: (view: 'shop' | 'street') => void;
   setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
@@ -212,6 +214,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     linh: 'idle',
     tuan: 'idle',
   },
+  showFlashScreen: true,
+
+  setShowFlashScreen: (show) => set({ showFlashScreen: show }),
 
   setEmployeeActionStatus: (status) =>
     set((state) => ({
@@ -1293,16 +1298,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const restaurant = RESTAURANT_TYPES[restaurantId];
     if (!restaurant) return;
 
-    set((state) => ({
-      gameState: {
-        ...state.gameState,
-        activeRestaurantId: restaurantId,
-        unlockedRestaurants: [restaurantId],
-        hasChosenStarter: true,
-        shopName: restaurant.name,
-      },
-      activeOrders: [],
-    }));
+    set((state) => {
+      const currentUnlocked = state.gameState.unlockedRestaurants || [];
+      const updatedUnlocked = currentUnlocked.includes(restaurantId)
+        ? currentUnlocked
+        : [...currentUnlocked, restaurantId];
+
+      return {
+        showFlashScreen: false,
+        gameState: {
+          ...state.gameState,
+          activeRestaurantId: restaurantId,
+          unlockedRestaurants: updatedUnlocked,
+          hasChosenStarter: true,
+          shopName: restaurant.name,
+        },
+        activeOrders: [],
+      };
+    });
     get().saveLocal();
     get().showToast(`Chúc mừng bạn đã khai trương ${restaurant.name}! 🚀`);
   },
