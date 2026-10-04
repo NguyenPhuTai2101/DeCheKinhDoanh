@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { SHOP_UPGRADES, BUSINESS_STAGES } from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
+import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
 import { X, Sparkles, Check, ArrowUpRight, Crown, Store, Award, ChevronRight, Lock } from 'lucide-react';
@@ -159,13 +160,19 @@ export const UpgradesModal: React.FC = () => {
 
                     {/* Lợi ích của cấp bậc */}
                     <div className="mt-2.5 pt-2 border-t border-amber-100 flex items-center justify-between text-xs flex-wrap gap-2">
-                      <div className="flex items-center gap-2 text-[11px] text-[#7C5C55]">
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-[#7C5C55] flex-wrap">
                         <span className="bg-white px-2 py-0.5 rounded-lg border border-amber-200 font-bold">
                           🪑 {stage.maxTables} Bàn Đón Khách
                         </span>
                         <span className="bg-white px-2 py-0.5 rounded-lg border border-amber-200 font-bold">
                           ⚡ Tốc Độ: {(stage.customerRateMs / 1000).toFixed(1)}s/khách
                         </span>
+                        {STAGE_VISUALS[stageKey] && (
+                          <span className="bg-amber-100/80 text-amber-900 px-2 py-0.5 rounded-lg border border-amber-300 font-extrabold flex items-center gap-1">
+                            <span>🎨</span>
+                            <span>{STAGE_VISUALS[stageKey].table.materialName}</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Hành động / Trạng thái nâng cấp */}

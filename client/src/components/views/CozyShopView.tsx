@@ -9,6 +9,7 @@ import {
   NEIGHBORS_DATA,
 } from '../../../../shared/gameData';
 import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder } from '../../../../shared/types';
+import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -61,6 +62,7 @@ export const CozyShopView: React.FC = () => {
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
+  const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
 
   // Đơn hàng đang được chọn chế biến
   const activeOrder = orders.find((o) => o.tableIndex === selectedOrderIndex) || orders[0] || null;
@@ -199,15 +201,18 @@ export const CozyShopView: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col justify-between overflow-y-auto select-none bg-[#FDF8F3] text-[#5D4037] pb-2">
-      {/* 1. MÁI HIÊN CUTE NHẸ NHÀNG TRÊN CÙNG */}
+      {/* 1. MÁI HIÊN THAY ĐỔI THEO CẤP BẬC CƠ NGHIỆP TRÊN CÙNG */}
       <div className="relative shrink-0">
-        <div className="h-4 w-full flex overflow-hidden shadow-2xs">
+        <div className="h-4.5 w-full flex overflow-hidden shadow-2xs">
           {Array.from({ length: 24 }).map((_, i) => (
             <div
               key={i}
               className="flex-1 h-full rounded-b-xs"
               style={{
-                backgroundColor: i % 2 === 0 ? '#F48FB1' : '#FFFFFF',
+                backgroundColor:
+                  i % 2 === 0
+                    ? stageVisual.kitchen.awningColors[0]
+                    : stageVisual.kitchen.awningColors[1],
               }}
             />
           ))}
@@ -314,6 +319,26 @@ export const CozyShopView: React.FC = () => {
                 <span>Tuyển Người</span>
               </button>
             )}
+
+            {/* Huy hiệu Cấp độ hiện tại */}
+            <div
+              onClick={() => openModal('upgrades')}
+              className="flex items-center gap-1 bg-amber-50/90 border border-amber-300 rounded-xl px-2 py-1 shrink-0 cursor-pointer hover:bg-amber-100 transition-all active:scale-95 shadow-2xs ml-auto"
+              title="Chạm để xem Lộ trình 5 Cấp Cơ Nghiệp"
+            >
+              <span className="text-sm">{stageVisual.icon}</span>
+              <div className="text-left leading-tight">
+                <div className="text-[9.5px] font-black text-amber-950 flex items-center gap-1">
+                  <span>{stageVisual.badge}</span>
+                  <span className="text-[7.5px] bg-amber-400 text-amber-950 px-1 rounded-full font-black">
+                    Lv.{stageVisual.levelNumber}
+                  </span>
+                </div>
+                <div className="text-[8px] font-bold text-amber-700 truncate max-w-[85px]">
+                  {stageVisual.name}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -463,15 +488,34 @@ export const CozyShopView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. THỚT CHẾ BIẾN TRUNG TÂM (RỘNG RÃI, TRỰC QUAN & DỄ THƯƠNG) */}
+      {/* 3. THỚT CHẾ BIẾN TRUNG TÂM (LỘT XÁC CHẤT LIỆU THEO CẤP ĐỘ) */}
       <div className="px-3 py-2 flex-1 min-h-[140px] flex flex-col justify-center">
-        <div className="bg-[#FAF3EA] rounded-3xl border-3 border-[#8D6E63] p-3 shadow-md relative flex flex-col justify-between h-full">
+        <div
+          style={{
+            backgroundColor: stageVisual.kitchen.workbenchBg,
+            borderColor: stageVisual.kitchen.workbenchBorder,
+          }}
+          className="rounded-3xl border-3 p-3 shadow-md relative flex flex-col justify-between h-full transition-all"
+        >
           {/* Header trên thớt */}
-          <div className="flex items-center justify-between text-[10px] font-black text-[#5D4037] pb-1 border-b border-[#EADCC9]">
-            <span className="flex items-center gap-1">
-              <span>🪵</span> THỚT CHẾ BIẾN TRUNG TÂM
-            </span>
-            <div className="flex items-center gap-1.5">
+          <div
+            style={{ borderColor: stageVisual.kitchen.workbenchBorder }}
+            className="flex items-center justify-between text-[10px] font-black pb-1 border-b border-opacity-30"
+          >
+            <div className="min-w-0 pr-1">
+              <span
+                style={{ color: stageVisual.kitchen.workbenchHeaderColor }}
+                className="flex items-center gap-1 font-black truncate"
+              >
+                <span>{stageVisual.kitchen.toolIcon}</span>
+                <span className="truncate">{stageVisual.kitchen.workbenchTitle}</span>
+              </span>
+              <div className="text-[8px] text-slate-500 font-medium italic mt-0.5 truncate">
+                {stageVisual.kitchen.workbenchTagline}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
               {currentRecipe && (
                 <button
                   onClick={handleQuickFill}

@@ -8,6 +8,7 @@ import {
   SHOP_THEMES,
 } from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
+import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -58,6 +59,7 @@ export const StreetMapView: React.FC = () => {
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
+  const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
 
   // Xác định gói nâng cấp bàn tiếp theo
   let nextTableType: 'extra_1' | 'extra_2' | 'stage_upgrade' | 'max' = 'max';
@@ -445,31 +447,77 @@ export const StreetMapView: React.FC = () => {
               </div>
             </div>
 
-            {/* ZONE 3: TIỆM BÁNH MÌ CỦA BẠN (TRỌNG TÂM CON PHỐ ~480px) */}
+            {/* ZONE 3: TIỆM BÁNH MÌ CỦA BẠN (TRỌNG TÂM CON PHỐ ~490px) */}
             <div
               style={{
-                width: '480px',
-                backgroundColor: activeTheme.bgColor,
-                borderColor: activeTheme.primaryColor,
+                width: '490px',
+                backgroundColor: stageVisual.storefront.facadeBg,
+                borderColor: stageVisual.storefront.facadeBorder,
               }}
-              className="h-64 border-4 rounded-t-3xl relative flex flex-col justify-between p-2.5 shadow-md shrink-0 transition-all"
+              className={`h-64 border-4 rounded-t-3xl relative flex flex-col justify-between p-2 shadow-md shrink-0 transition-all ${
+                stageVisual.storefront.hasNeonGlow ? 'ring-2 ring-amber-300 shadow-amber-200/50' : ''
+              }`}
             >
-              {/* Biển hiệu tiệm bánh mì neon rực rỡ */}
+              {/* MÁI HIÊN / MẶT TIỀN THAY ĐỔI THEO CẤP */}
+              <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
+                {/* Dải sọc mái che chuẩn màu của cấp */}
+                <div className={`h-4 w-full flex overflow-hidden shadow-2xs ${stageVisual.storefront.roofRounds}`}>
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 h-full"
+                      style={{
+                        backgroundColor:
+                          i % 2 === 0
+                            ? stageVisual.storefront.roofColors[0]
+                            : stageVisual.storefront.roofColors[1],
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Nếu cấp 4-5 có lầu/vòm đèn LED */}
+                {stageVisual.storefront.shophouseFloors && stageVisual.storefront.shophouseFloors >= 2 && (
+                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-white/95 border border-sky-300 rounded-t-lg px-2.5 py-0.2 shadow-xs flex items-center gap-1.5 text-[8.5px] font-black text-sky-900 z-20">
+                    <span>🪟 Tầng 2: Phòng Lạnh VIP</span>
+                    {stageVisual.storefront.shophouseFloors >= 3 && (
+                      <span className="bg-amber-400 text-amber-950 px-1 rounded-full text-[7.5px] animate-pulse">
+                        👑 TRỤ SỞ ĐẾ CHẾ
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* BIỂN HIỆU TIỆM BÁNH MÌ THEO CẤP */}
               <div
-                className="rounded-2xl p-2 flex items-center justify-between border-2 shadow-xs"
+                className="rounded-2xl p-2 flex items-center justify-between border-2 shadow-xs transition-all"
                 style={{
-                  backgroundColor: activeTheme.accentColor,
-                  borderColor: activeTheme.primaryColor,
+                  backgroundColor: stageVisual.storefront.signboardBg,
+                  borderColor: stageVisual.storefront.signboardBorder,
                 }}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-2xl animate-bounce-short">🥖</span>
-                  <div>
-                    <h3 className="font-black text-sm sm:text-base text-[#7C5C55] leading-tight drop-shadow-2xs">
-                      {gameState.shopName}
-                    </h3>
-                    <div className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
-                      <span>{currentStage.icon}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-2xl animate-bounce-short shrink-0">{stageVisual.icon}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3
+                        className="font-black text-xs sm:text-sm leading-tight drop-shadow-2xs truncate"
+                        style={{ color: stageVisual.storefront.signboardTextColor }}
+                      >
+                        {gameState.shopName}
+                      </h3>
+                      <span
+                        style={{
+                          backgroundColor: stageVisual.storefront.tagBg,
+                          color: stageVisual.storefront.tagColor,
+                        }}
+                        className="text-[8px] font-black px-1.5 py-0.2 rounded-full border border-black/10 shrink-0"
+                      >
+                        {stageVisual.storefront.tagText}
+                      </span>
+                    </div>
+                    <div className="text-[9.5px] font-bold text-rose-600 flex items-center gap-1 truncate">
                       <span>{currentStage.name}</span>
                       <span>·</span>
                       <span>⭐ Uy tín: {gameState.reputation}</span>
@@ -479,49 +527,72 @@ export const StreetMapView: React.FC = () => {
 
                 <button
                   onClick={safeClick(() => setCurrentView('shop'))}
-                  className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-300 rounded-xl text-xs font-black text-rose-700 shadow-2xs active:scale-95 transition-all flex items-center gap-1"
+                  className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-rose-300 rounded-xl text-xs font-black text-rose-700 shadow-2xs active:scale-95 transition-all flex items-center gap-1 shrink-0"
                 >
                   <Utensils className="w-3 h-3" />
                   <span>Vào Bếp 🍳</span>
                 </button>
               </div>
 
-              {/* Xe Inox Bánh Mì Đời Thực & Nhân Viên Nấu Nướng */}
+              {/* QUẦY CHẾ BIẾN & ĐẠO CỤ ĐẶC TRƯNG CỦA CẤP */}
               <div
                 onClick={safeClick(() => setCurrentView('shop'))}
-                className="bg-white/95 rounded-2xl border-2 p-2 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-sm group"
-                style={{ borderColor: activeTheme.primaryColor }}
+                className="bg-white/95 rounded-2xl border-2 p-1.5 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-sm group relative"
+                style={{ borderColor: stageVisual.storefront.signboardBorder }}
                 title="Chạm vào xe bánh mì để chuẩn bị món ăn"
               >
-                {/* Tủ kính bánh mì và khay pate bốc khói */}
-                <div className="flex items-center gap-2">
-                  <div className="w-16 h-18 bg-amber-50 rounded-xl border border-amber-300 flex flex-col justify-around items-center p-1 shadow-inner">
-                    <span className="text-base animate-bounce-short">♨️🥖</span>
-                    <span className="text-[8px] font-black text-amber-900 bg-amber-200 px-1 rounded">
-                      Pate Bơ Tỏi
+                {/* Tủ kính/quầy theo cấp */}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div
+                    className="w-14 h-16 rounded-xl border flex flex-col justify-around items-center p-1 shadow-inner shrink-0"
+                    style={{
+                      backgroundColor: stageVisual.storefront.tagBg,
+                      borderColor: stageVisual.storefront.signboardBorder,
+                    }}
+                  >
+                    <span className="text-sm animate-bounce-short">
+                      {stageVisual.storefront.cartDisplayIcon}
+                    </span>
+                    <span
+                      style={{
+                        backgroundColor: stageVisual.storefront.cartBadgeBg,
+                        color: stageVisual.storefront.tagColor,
+                      }}
+                      className="text-[7px] font-black px-0.5 rounded truncate max-w-[50px]"
+                    >
+                      {stageVisual.storefront.cartBadge}
                     </span>
                   </div>
 
-                  <div>
-                    <div className="text-xs font-black text-slate-800 flex items-center gap-1">
-                      <span>Xe Đẩy Bánh Mì Inox</span>
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded-full font-bold">
-                        Đang Nấu
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black text-slate-800 flex items-center gap-1 truncate">
+                      <span className="truncate">{stageVisual.storefront.cartDisplayTitle}</span>
+                      <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded-full font-bold shrink-0">
+                        Đang Mở
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-medium">
-                      Bánh mì giòn · Cà phê phin · Trà đào
+                    <div className="text-[9.5px] text-slate-500 font-medium truncate max-w-[170px]">
+                      {stageVisual.storefront.cartDescription}
                     </div>
-                    <div className="text-[9px] font-extrabold text-rose-600 mt-1">
-                      👉 Chạm để vào quầy nướng bánh 🍳
+                    {/* Đạo cụ trang trí đặc trưng của cấp */}
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                      {stageVisual.storefront.decorativeProps.map((prop, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[7.5px] bg-slate-100 border border-slate-200 text-slate-700 px-1 py-0.2 rounded-md font-bold"
+                          title={prop.name}
+                        >
+                          {prop.icon} {prop.name}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 {/* Đội ngũ đầu bếp Player & Nhân viên */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   <div className="relative">
-                    <ChibiAvatar type="player" emotion="happy" size={44} />
+                    <ChibiAvatar type="player" emotion="happy" size={40} />
                     <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[7px] font-black px-1 rounded-full">
                       Bếp
                     </span>
@@ -534,7 +605,7 @@ export const StreetMapView: React.FC = () => {
                         <ChibiAvatar
                           type="emp_linh"
                           emotion={employeeActionStatus.linh === 'cooking' ? 'love' : 'happy'}
-                          size={40}
+                          size={38}
                         />
                       </div>
                       <span className="absolute -bottom-1 -right-1 bg-amber-600 text-white text-[7px] font-black px-1 rounded-full">
@@ -552,7 +623,7 @@ export const StreetMapView: React.FC = () => {
                   {gameState.hiredEmployees.includes('emp_tuan') && (
                     <div className="relative">
                       <div className={employeeActionStatus.tuan === 'assisting' ? 'animate-bounce' : ''}>
-                        <ChibiAvatar type="emp_tuan" emotion="happy" size={38} />
+                        <ChibiAvatar type="emp_tuan" emotion="happy" size={36} />
                       </div>
                       <span className="absolute -bottom-1 -right-1 bg-purple-600 text-white text-[7px] font-black px-1 rounded-full">
                         Tuấn
@@ -567,7 +638,7 @@ export const StreetMapView: React.FC = () => {
                         <ChibiAvatar
                           type="emp_mai"
                           emotion={employeeActionStatus.mai === 'serving' ? 'love' : 'happy'}
-                          size={40}
+                          size={38}
                         />
                       </div>
                       <span className="absolute -bottom-1 -right-1 bg-pink-500 text-white text-[7px] font-black px-1 rounded-full">
@@ -582,6 +653,15 @@ export const StreetMapView: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* THẢM ĐỎ HOÀNG GIA (NẾU ĐẠT CẤP 5 ĐẾ CHẾ) */}
+              {stageVisual.storefront.hasRedCarpet && (
+                <div className="h-1.5 w-full bg-gradient-to-r from-red-700 via-rose-500 to-red-700 border-t border-yellow-300 rounded-b-lg shadow-xs flex items-center justify-center">
+                  <span className="text-[6px] text-yellow-200 font-black tracking-widest uppercase">
+                    ⭐ KHÁCH VIP - THẢM ĐỎ HOÀNG GIA ⭐
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* ZONE 4: GỐC CÂY ME & QUẦY VÉ SỐ CÔ BẢY (~260px) */}
@@ -691,8 +771,12 @@ export const StreetMapView: React.FC = () => {
             {/* Header vỉa hè: Biển hiệu vỉa hè & Hướng dẫn phục vụ */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <span className="bg-red-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-                  <span>🪑</span> BÀN GHẾ NHỰA VỈA HÈ ĐÓN KHÁCH ({activeOrders.length}/{maxTables})
+                <span
+                  style={{ backgroundColor: stageVisual.table.badgeBg }}
+                  className="text-white text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"
+                >
+                  <span>{stageVisual.table.tableTypeIcon}</span>
+                  <span>{stageVisual.table.headerTitle} ({activeOrders.length}/{maxTables})</span>
                 </span>
                 <span className="text-[10px] text-[#7C5C55] font-extrabold hidden sm:inline">
                   👉 Chạm vào bàn để bưng món hoặc xem khách đợi
@@ -707,7 +791,7 @@ export const StreetMapView: React.FC = () => {
               </div>
             </div>
 
-            {/* DÃY BÀN GHẾ NHỰA ĐỎ SONG LONG & Ô THÊM BÀN */}
+            {/* DÃY BÀN GHẾ THAY ĐỔI CHẤT LIỆU THEO CẤP & Ô THÊM BÀN */}
             <div className="flex items-stretch gap-2.5">
               {Array.from({ length: maxTables }).map((_, idx) => {
                 const tableNum = idx + 1;
@@ -730,7 +814,7 @@ export const StreetMapView: React.FC = () => {
                       isSelected
                         ? 'bg-amber-100/90 border-amber-500 ring-2 ring-amber-300'
                         : order
-                        ? 'bg-white border-[#F2E8E5] hover:border-amber-400'
+                        ? `${stageVisual.table.tableCardBg} ${stageVisual.table.tableCardBorder} hover:border-amber-400`
                         : 'bg-white/70 border-dashed border-amber-300'
                     }`}
                   >
@@ -758,11 +842,11 @@ export const StreetMapView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Khung cảnh bàn ăn: Ghế nhựa Song Long + Khách chibi + Món ăn */}
+                    {/* Khung cảnh bàn ăn: Ghế + Khách chibi + Bàn theo cấp */}
                     <div className="h-16 bg-[#FFF9F2] rounded-xl border border-[#F7D7BA] flex items-center justify-around px-1 relative overflow-hidden">
                       {order ? (
                         <>
-                          {/* Khách Chibi ngồi trên ghế đẩu nhựa */}
+                          {/* Khách Chibi */}
                           <div className="flex flex-col items-center">
                             <ChibiAvatar
                               type={order.neighborId || order.typeId}
@@ -784,28 +868,56 @@ export const StreetMapView: React.FC = () => {
                             </span>
                           </div>
 
-                          {/* Chiếc Bàn Nhựa Đỏ Song Long ở giữa */}
+                          {/* Chiếc Bàn Ăn theo chất liệu cấp độ */}
                           <div className="flex flex-col items-center">
                             <div className="text-base animate-bounce-short leading-none" title={recipe?.name}>
                               {recipe?.icon || '🥖'}
                             </div>
-                            <div className="w-8 h-2 bg-[#E53935] rounded-2xs border border-[#B71C1C] shadow-2xs flex items-center justify-center my-0.5">
-                              <span className="text-[5px] text-white font-black leading-none tracking-tighter">
-                                SLONG
+                            <div
+                              style={{
+                                background: stageVisual.table.topHighlight || stageVisual.table.topBg,
+                                borderColor: stageVisual.table.topBorder,
+                              }}
+                              className="w-9 h-2.5 rounded-2xs border shadow-2xs flex items-center justify-center my-0.5"
+                            >
+                              <span
+                                style={{ color: stageVisual.table.labelColor }}
+                                className="text-[5px] font-black leading-none tracking-tighter truncate max-w-[32px]"
+                              >
+                                {stageVisual.table.label}
                               </span>
                             </div>
-                            <div className="w-7 flex justify-between">
-                              <div className="w-0.5 h-2 bg-[#C62828]" />
-                              <div className="w-0.5 h-2 bg-[#C62828]" />
+                            <div className="w-8 flex justify-between px-0.5">
+                              <div
+                                style={{ backgroundColor: stageVisual.table.legColor }}
+                                className="w-0.5 h-2"
+                              />
+                              <div
+                                style={{ backgroundColor: stageVisual.table.legColor }}
+                                className="w-0.5 h-2"
+                              />
                             </div>
                           </div>
                         </>
                       ) : (
-                        /* Bàn trống */
+                        /* Bàn trống theo chất liệu cấp độ */
                         <div className="flex flex-col items-center justify-center text-center py-1 opacity-75">
-                          <div className="w-8 h-2 bg-[#E53935] rounded-2xs border border-[#B71C1C] shadow-2xs mb-1" />
-                          <span className="text-[8.5px] font-bold text-slate-500">
-                            Bàn Trống 🪑
+                          <div
+                            style={{
+                              background: stageVisual.table.topHighlight || stageVisual.table.topBg,
+                              borderColor: stageVisual.table.topBorder,
+                            }}
+                            className="w-9 h-2.5 rounded-2xs border shadow-2xs mb-1 flex items-center justify-center"
+                          >
+                            <span
+                              style={{ color: stageVisual.table.labelColor }}
+                              className="text-[4.5px] font-black leading-none tracking-tighter"
+                            >
+                              {stageVisual.table.label}
+                            </span>
+                          </div>
+                          <span className="text-[8px] font-bold text-slate-500">
+                            {stageVisual.table.emptyText}
                           </span>
                         </div>
                       )}
