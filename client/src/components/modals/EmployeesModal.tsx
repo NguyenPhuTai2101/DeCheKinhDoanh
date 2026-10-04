@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { EMPLOYEES } from '../../../../shared/gameData';
+import { EMPLOYEES, RESTAURANT_TYPES } from '../../../../shared/gameData';
+import { RestaurantTypeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import {
   X,
@@ -13,6 +14,7 @@ import {
   UserMinus,
   Sparkles,
   Zap,
+  Building2,
 } from 'lucide-react';
 
 export const EmployeesModal: React.FC = () => {
@@ -24,6 +26,7 @@ export const EmployeesModal: React.FC = () => {
     trainEmployee,
     promoteEmployee,
     giveBonusEmployee,
+    assignEmployeeToRestaurant,
   } = useGameStore();
 
   const [activeTab, setActiveTab] = useState<'hired' | 'recruit'>('hired');
@@ -172,6 +175,31 @@ export const EmployeesModal: React.FC = () => {
                         <UserMinus className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Nghỉ Việc</span>
                       </button>
+                    </div>
+
+                    {/* Phân công trực quán / Chi nhánh */}
+                    <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-xl text-xs">
+                      <span className="font-extrabold text-[#7C5C55] flex items-center gap-1.5 text-[11px]">
+                        <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Phân công quán:</span>
+                      </span>
+                      <select
+                        value={emp.assignedRestaurantId || 'banh_mi'}
+                        onChange={(e) => {
+                          soundManager.playClick();
+                          assignEmployeeToRestaurant(emp.id, e.target.value as RestaurantTypeId);
+                        }}
+                        className="bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-[11px] font-black text-amber-950 shadow-2xs outline-none cursor-pointer"
+                      >
+                        {(gameState.unlockedRestaurants || ['banh_mi']).map((rId) => {
+                          const r = RESTAURANT_TYPES[rId];
+                          return (
+                            <option key={rId} value={rId}>
+                              {r?.icon} {r?.name}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </div>
 
                     {/* Hàng 2: Thanh Tâm trạng (Mood) & Độ căng thẳng (Stress) */}

@@ -189,6 +189,7 @@ export interface Employee {
   experience: number;
   hired: boolean;
   description: string;
+  assignedRestaurantId?: RestaurantTypeId;
 }
 
 export type ShopThemeId = 'sakura_pink' | 'mint_cafe' | 'lavender_dream' | 'cream_bakery';
@@ -329,7 +330,13 @@ export interface ActiveOrder {
   recipeId: RecipeId;
   patienceRemaining: number;
   maxPatience: number;
-  state: 'waiting' | 'ready' | 'eating' | 'leaving';
+  state: 'waiting' | 'cooking' | 'ready' | 'eating' | 'leaving';
+  cookingProgress?: number;
+  chefId?: string;
+  chefName?: string;
+  serverId?: string;
+  serverName?: string;
+  eatingTimer?: number;
 }
 
 export interface GameSaveState {

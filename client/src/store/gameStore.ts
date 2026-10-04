@@ -106,16 +106,12 @@ export interface GameStoreState {
   currentView: 'shop' | 'street';
   activeOrders: ActiveOrder[];
   toastMessage: string | null;
-  employeeActionStatus: {
-    mai: string;
-    linh: string;
-    tuan: string;
-  };
+  employeeActionStatus: Record<string, string>;
   showFlashScreen: boolean;
 
   // Actions cơ bản
   setShowFlashScreen: (show: boolean) => void;
-  setEmployeeActionStatus: (status: Partial<{ mai: string; linh: string; tuan: string }>) => void;
+  setEmployeeActionStatus: (status: Record<string, string>) => void;
   setCurrentView: (view: 'shop' | 'street') => void;
   setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
   serveDishOrder: (orderId: string) => boolean;
@@ -142,6 +138,8 @@ export interface GameStoreState {
   trainEmployee: (employeeId: string) => boolean;
   promoteEmployee: (employeeId: string) => boolean;
   giveBonusEmployee: (employeeId: string, amount: number) => boolean;
+  assignEmployeeToRestaurant: (employeeId: string, restaurantId: RestaurantTypeId) => void;
+  addBranchRevenue: (restaurantId: RestaurantTypeId, amount: number, dishName: string) => void;
   
   // V0.3: Trang trí & Themes
   updateShopName: (name: string) => void;
@@ -209,11 +207,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   currentView: 'shop',
   activeOrders: [],
-  employeeActionStatus: {
-    mai: 'idle',
-    linh: 'idle',
-    tuan: 'idle',
-  },
+  employeeActionStatus: {},
   showFlashScreen: true,
 
   setShowFlashScreen: (show) => set({ showFlashScreen: show }),
@@ -523,6 +517,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       mood: 95,
       stress: 10,
       loyalty: 80,
+      assignedRestaurantId: gameState.activeRestaurantId || 'banh_mi',
     };
 
     set({
@@ -665,6 +660,46 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().showToast(`💖 Đã thưởng nóng ${amount.toLocaleString('vi-VN')} đ cho ${emp.name}! Nhân viên vô cùng hạnh phúc.`);
     get().saveLocal();
     return true;
+  },
+
+  assignEmployeeToRestaurant: (employeeId, restaurantId) => {
+    const { gameState } = get();
+    const currentEmp = gameState.employeeDetails[employeeId] || EMPLOYEES.find((e) => e.id === employeeId);
+    if (!currentEmp) return;
+
+    const restName = RESTAURANT_TYPES[restaurantId]?.name || restaurantId;
+    const updatedDetails = {
+      ...gameState.employeeDetails,
+      [employeeId]: {
+        ...currentEmp,
+        assignedRestaurantId: restaurantId,
+      },
+    };
+
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        employeeDetails: updatedDetails,
+      },
+    }));
+
+    get().showToast(`📍 Đã phân công ${currentEmp.name} sang ${restName}!`);
+    get().saveLocal();
+  },
+
+  addBranchRevenue: (restaurantId, amount, dishName) => {
+    const rest = RESTAURANT_TYPES[restaurantId];
+    set((state) => ({
+      dailyRevenue: state.dailyRevenue + amount,
+      dailyCustomersServed: state.dailyCustomersServed + 1,
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money + amount,
+        reputation: state.gameState.reputation + 1,
+      },
+    }));
+
+    get().addFloatingFeedback(`+${amount.toLocaleString('vi-VN')} đ (${rest?.shortName || 'Chi nhánh'})`, 'money', 50, 40);
   },
 
   // V0.3: Trang trí & Themes

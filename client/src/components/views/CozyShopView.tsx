@@ -8,8 +8,9 @@ import {
   BUSINESS_STAGES,
   NEIGHBORS_DATA,
   RESTAURANT_TYPES,
+  EMPLOYEES,
 } from '../../../../shared/gameData';
-import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder } from '../../../../shared/types';
+import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
@@ -67,6 +68,17 @@ export const CozyShopView: React.FC = () => {
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
+
+  // Danh sách nhân sự được phân công cho quán này
+  const hiredList = gameState.hiredEmployees.map(
+    (id) => gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id)
+  ).filter(Boolean) as Employee[];
+
+  const assignedStaff = hiredList.filter(
+    (e) => (e.assignedRestaurantId || 'banh_mi') === activeRestId
+  );
+  const activeCooks = assignedStaff.filter((e) => e.role === 'cook');
+  const activeServers = assignedStaff.filter((e) => e.role === 'server');
 
   // Đơn hàng đang được chọn chế biến
   const activeOrder = orders.find((o) => o.tableIndex === selectedOrderIndex) || orders[0] || null;
@@ -227,74 +239,68 @@ export const CozyShopView: React.FC = () => {
           </div>
         </button>
 
-        {/* Nhân sự trực bếp (Avatar nhỏ gọn) */}
+        {/* Nhân sự trực bếp (Avatar hiển thị tất cả nhân viên phân công tại quán) */}
         <div className="flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
           {/* Bạn (Bếp trưởng) */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0" title="Chủ Quán (Bếp Trưởng)">
             <ChibiAvatar type="player" emotion="happy" size={26} />
             <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[6.5px] font-black px-0.5 rounded-full">
-              Bếp
+              Chủ
             </span>
           </div>
 
-          {/* Em Mai (Phục vụ) */}
-          {gameState.hiredEmployees.includes('emp_mai') && (
-            <div
-              onClick={() => openModal('employees')}
-              className="relative shrink-0 cursor-pointer"
-              title="Mai: Chạy bàn"
-            >
-              <div className={employeeActionStatus.mai === 'serving' ? 'animate-bounce' : ''}>
-                <ChibiAvatar type="emp_mai" emotion={employeeActionStatus.mai === 'serving' ? 'love' : 'happy'} size={26} />
-              </div>
-              {employeeActionStatus.mai === 'serving' && (
-                <span className="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[6px] font-black px-1 rounded-full animate-pulse">
-                  Bưng
-                </span>
-              )}
-            </div>
-          )}
+          {/* Nhân viên trực tại quán này */}
+          {assignedStaff.map((emp) => {
+            const status = employeeActionStatus[emp.id] || 'idle';
+            const isCooking = status === 'cooking';
+            const isServing = status === 'serving';
+            const isWarning = status === 'warning';
 
-          {/* Bác Linh (Bếp chính) */}
-          {gameState.hiredEmployees.includes('emp_linh') && (
-            <div
-              onClick={() => openModal('employees')}
-              className="relative shrink-0 cursor-pointer"
-              title="Bác Linh: Bếp chính"
-            >
-              <div className={employeeActionStatus.linh === 'cooking' ? 'animate-bounce' : ''}>
-                <ChibiAvatar type="emp_linh" emotion={employeeActionStatus.linh === 'cooking' ? 'love' : 'happy'} size={26} />
+            return (
+              <div
+                key={emp.id}
+                onClick={() => openModal('employees')}
+                className="relative shrink-0 cursor-pointer"
+                title={`${emp.name}: ${emp.role === 'cook' ? 'Đầu bếp' : emp.role === 'server' ? 'Phục vụ' : 'Quản lý'}`}
+              >
+                <div className={isCooking || isServing ? 'animate-bounce' : ''}>
+                  <ChibiAvatar
+                    type={emp.id as any}
+                    emotion={isCooking || isServing ? 'love' : isWarning ? 'angry' : 'happy'}
+                    size={26}
+                  />
+                </div>
+                {isCooking && (
+                  <span className="absolute -top-1.5 -right-1 bg-amber-500 text-white text-[6px] font-black px-1 rounded-full animate-pulse">
+                    Nấu ♨️
+                  </span>
+                )}
+                {isServing && (
+                  <span className="absolute -top-1.5 -right-1 bg-rose-500 text-white text-[6px] font-black px-1 rounded-full animate-pulse">
+                    Bưng 🏃
+                  </span>
+                )}
+                {isWarning && (
+                  <span className="absolute -top-1.5 -right-1 bg-rose-600 text-white text-[6px] font-black px-1 rounded-full animate-bounce">
+                    Hết hàng ⚠️
+                  </span>
+                )}
+                {!isCooking && !isServing && !isWarning && (
+                  <span className="absolute -bottom-1 -right-1 bg-slate-600 text-white text-[6.5px] font-black px-0.5 rounded-full">
+                    {emp.role === 'cook' ? 'Bếp' : emp.role === 'server' ? 'Chạy' : 'QL'}
+                  </span>
+                )}
               </div>
-              {employeeActionStatus.linh === 'cooking' && (
-                <span className="absolute -top-1.5 -right-1 bg-amber-500 text-white text-[6px] font-black px-1 rounded-full animate-pulse">
-                  Nấu
-                </span>
-              )}
-            </div>
-          )}
+            );
+          })}
 
-          {/* Em Tuấn (Phụ bếp) */}
-          {gameState.hiredEmployees.includes('emp_tuan') && (
-            <div
-              onClick={() => openModal('employees')}
-              className="relative shrink-0 cursor-pointer"
-              title="Tuấn: Phụ bếp"
-            >
-              <div className={employeeActionStatus.tuan === 'assisting' ? 'animate-bounce' : ''}>
-                <ChibiAvatar type="emp_tuan" emotion="happy" size={26} />
-              </div>
-            </div>
-          )}
-
-          {gameState.hiredEmployees.length < 3 && (
-            <button
-              onClick={() => openModal('employees')}
-              className="w-6 h-6 rounded-full border border-dashed border-pink-400 bg-pink-50 flex items-center justify-center text-[10px] text-pink-600 font-black shrink-0 active:scale-95"
-              title="Tuyển thêm nhân viên"
-            >
-              +
-            </button>
-          )}
+          <button
+            onClick={() => openModal('employees')}
+            className="w-6 h-6 rounded-full border border-dashed border-pink-400 bg-pink-50 flex items-center justify-center text-[10px] text-pink-600 font-black shrink-0 active:scale-95"
+            title="Tuyển thêm / Phân công nhân viên"
+          >
+            +
+          </button>
         </div>
 
         {/* Cấp độ vỉa hè */}
@@ -433,6 +439,46 @@ export const CozyShopView: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Thanh tiến độ Nấu ăn / Bưng món nếu có nhân viên */}
+            {activeOrder.state === 'cooking' && (
+              <div className="mt-1 pt-1 border-t border-amber-100 bg-amber-50/80 rounded-lg p-1.5 flex flex-col gap-0.5 animate-pulse">
+                <div className="flex items-center justify-between text-[9px] font-black text-amber-900">
+                  <span className="flex items-center gap-1">
+                    <span className="animate-spin text-[10px]">🍳</span>
+                    <span>{activeOrder.chefName || 'Đầu bếp'} đang nấu món...</span>
+                  </span>
+                  <span>{Math.round(activeOrder.cookingProgress || 0)}%</span>
+                </div>
+                <div className="w-full bg-amber-200/60 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-amber-400 to-rose-500 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.round(activeOrder.cookingProgress || 0))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {activeOrder.state === 'ready' && (
+              <div className="mt-1 pt-1 border-t border-emerald-100 bg-emerald-50 rounded-lg p-1 flex items-center justify-between text-[9.5px] font-black text-emerald-800">
+                <span className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-600 animate-spin" />
+                  <span>Món đã nấu xong nóng hổi!</span>
+                </span>
+                <span className="bg-emerald-200/70 text-emerald-900 px-1.5 py-0.2 rounded-md text-[8.5px]">
+                  {activeServers.length > 0 ? 'Phục vụ đang bưng 🏃' : 'Bấm bưng ra bàn 👇'}
+                </span>
+              </div>
+            )}
+            {activeOrder.state === 'eating' && (
+              <div className="mt-1 pt-1 border-t border-pink-100 bg-pink-50 rounded-lg p-1 flex items-center justify-between text-[9.5px] font-black text-pink-800">
+                <span className="flex items-center gap-1">
+                  <span>😋 Khách đang thưởng thức món ngon</span>
+                </span>
+                <span className="text-[8.5px] text-pink-600 font-bold animate-pulse">
+                  Đang đợi tính tiền 💰
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="py-2 text-center text-xs text-slate-400 font-medium">
@@ -517,14 +563,30 @@ export const CozyShopView: React.FC = () => {
         {/* Nút hành động chính: HOÀN THÀNH HOẶC BƯNG RA BÀN */}
         <div className="pt-0.5">
           {activeOrder ? (
-            activeOrder.state === 'ready' ? (
+            activeOrder.state === 'cooking' ? (
+              <div className="w-full py-2.5 rounded-xl bg-amber-400 text-amber-950 font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 border border-amber-500 animate-pulse">
+                <span className="animate-spin text-sm">🍳</span>
+                <span>
+                  {activeOrder.chefName || 'Đầu bếp'} ĐANG NẤU ({Math.round(activeOrder.cookingProgress || 0)}%)
+                </span>
+              </div>
+            ) : activeOrder.state === 'ready' ? (
               <button
                 onClick={() => handleServeDish(activeOrder)}
                 className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-1.5 active:scale-95 animate-bounce-short transition-all"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>BƯNG RA BÀN {activeOrder.tableIndex} (THU TIỀN + TIP 💰)</span>
+                <span>
+                  {activeServers.length > 0
+                    ? `PHỤC VỤ ĐANG BƯNG (HOẶC BẤM BƯNG NGAY ⚡)`
+                    : `BƯNG RA BÀN ${activeOrder.tableIndex} (THU TIỀN + TIP 💰)`}
+                </span>
               </button>
+            ) : activeOrder.state === 'eating' ? (
+              <div className="w-full py-2.5 rounded-xl bg-pink-100 border border-pink-300 text-pink-800 font-black text-xs sm:text-sm flex items-center justify-center gap-2">
+                <span className="text-base animate-bounce-short">😋</span>
+                <span>Khách đang ăn tại Bàn {activeOrder.tableIndex}... sắp thanh toán!</span>
+              </div>
             ) : (
               <button
                 onClick={handleCookCurrent}

@@ -96,6 +96,9 @@ export const FranchiseModal: React.FC = () => {
             const canAffordMoney = gameState.money >= rest.unlockCost;
             const canAffordRep = gameState.reputation >= rest.requiredReputation;
             const canUnlock = !isUnlocked && canAffordMoney && canAffordRep;
+            const branchStaff = gameState.hiredEmployees.filter(
+              (id) => (gameState.employeeDetails[id]?.assignedRestaurantId || 'banh_mi') === rest.id
+            );
 
             return (
               <div
@@ -129,8 +132,17 @@ export const FranchiseModal: React.FC = () => {
                           </span>
                         )}
                         {isUnlocked && !isCurrent && (
-                          <span className="bg-emerald-100 text-emerald-800 text-[8.5px] font-bold px-2 py-0.2 rounded-full flex items-center gap-0.5">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> Đã Sở Hữu
+                          <span
+                            className={`text-[8.5px] font-bold px-2 py-0.2 rounded-full flex items-center gap-0.5 ${
+                              branchStaff.length > 0
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            {branchStaff.length > 0
+                              ? `Tự động bán (${branchStaff.length} NV)`
+                              : 'Chưa có NV trực ⚠️'}
                           </span>
                         )}
                       </div>

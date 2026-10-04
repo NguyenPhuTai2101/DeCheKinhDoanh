@@ -7,8 +7,9 @@ import {
   NEIGHBORS_DATA,
   SHOP_THEMES,
   RESTAURANT_TYPES,
+  EMPLOYEES,
 } from '../../../../shared/gameData';
-import { BusinessStageId, RestaurantTypeId } from '../../../../shared/types';
+import { BusinessStageId, RestaurantTypeId, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
@@ -27,6 +28,7 @@ import {
   AlertTriangle,
   Award,
   ArrowRight,
+  UserPlus,
 } from 'lucide-react';
 
 export const StreetMapView: React.FC = () => {
@@ -385,6 +387,11 @@ export const StreetMapView: React.FC = () => {
 
     // TRƯỜNG HỢP 2: CHI NHÁNH ĐÃ MỞ TRONG CHUỖI (UNLOCKED BRANCH)
     if (isUnlocked) {
+      const branchStaff = gameState.hiredEmployees.map(
+        (id) => gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id)
+      ).filter((e): e is Employee => Boolean(e) && (e.assignedRestaurantId || 'banh_mi') === restKey);
+      const isStaffed = branchStaff.length > 0;
+
       return (
         <div
           key={restKey}
@@ -409,10 +416,12 @@ export const StreetMapView: React.FC = () => {
               ))}
             </div>
 
-            {/* Huy hiệu Chi Nhánh Hoạt Động */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white font-black px-2.5 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-1 border border-emerald-400 whitespace-nowrap z-10">
-              <span className="animate-pulse">🟢</span>
-              <span>CHI NHÁNH HOẠT ĐỘNG</span>
+            {/* Huy hiệu Trạng thái Hoạt Động Của Chi Nhánh */}
+            <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-white font-black px-2.5 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-1 border whitespace-nowrap z-10 ${
+              isStaffed ? 'bg-emerald-600 border-emerald-400' : 'bg-amber-600 border-amber-400 animate-pulse'
+            }`}>
+              <span>{isStaffed ? '🟢 TỰ ĐỘNG BÁN HÀNG' : '⚠️ TẠM DỪNG'}</span>
+              <span>({branchStaff.length} NV)</span>
             </div>
           </div>
 
@@ -465,9 +474,15 @@ export const StreetMapView: React.FC = () => {
                 <div className="text-[11px] font-black text-slate-800 flex items-center gap-1 truncate">
                   <span className="truncate">{rest.equipmentName}</span>
                 </div>
-                <div className="text-[9px] text-slate-500 italic truncate max-w-[180px]">
-                  "{rest.tagline}"
-                </div>
+                {!isStaffed ? (
+                  <div className="text-[8.5px] text-rose-600 font-black truncate">
+                    ⚠️ Cần nhân viên để tự động bán hàng!
+                  </div>
+                ) : (
+                  <div className="text-[9px] text-slate-500 italic truncate max-w-[180px]">
+                    "{rest.tagline}"
+                  </div>
+                )}
 
                 {/* Thực đơn bán chạy */}
                 <div className="flex items-center gap-1 mt-1 overflow-x-auto no-scrollbar">
@@ -486,12 +501,33 @@ export const StreetMapView: React.FC = () => {
               </div>
             </div>
 
-            {/* Đầu bếp chi nhánh */}
+            {/* Nhân sự chi nhánh */}
             <div className="flex flex-col items-center shrink-0 pr-1">
-              <span className="text-2xl animate-bounce-short">🧑‍🍳</span>
-              <span className="text-[7.5px] font-bold text-emerald-800 bg-emerald-50 px-1 rounded mt-0.5 border border-emerald-200">
-                Chi Nhánh
-              </span>
+              {isStaffed ? (
+                <>
+                  <div className="flex items-center -space-x-2">
+                    {branchStaff.slice(0, 2).map((s) => (
+                      <span key={s.id} className="text-xl animate-bounce-short">
+                        {s.avatar || '🧑‍🍳'}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-[7.5px] font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded mt-0.5 border border-emerald-200">
+                    🟢 {branchStaff.length} Nhân Sự
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg">⚠️</span>
+                  <button
+                    onClick={safeClick(() => openModal('employees'))}
+                    className="mt-0.5 px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-[8px] font-black shadow-2xs active:scale-95"
+                    title="Phân công nhân viên"
+                  >
+                    + Giao Việc
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
