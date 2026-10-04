@@ -9,6 +9,7 @@ interface ChibiAvatarProps {
     | 'neighborhood'
     | 'emp_mai'
     | 'emp_linh'
+    | 'emp_tuan'
     | 'bac_ba'
     | 'co_bay'
     | 'chu_nam'
@@ -82,6 +83,14 @@ export const ChibiAvatar: React.FC<ChibiAvatarProps> = ({
       outfit: '#CFD8DC',
       hat: 'chef_tall',
       accessory: 'mustache',
+    },
+    emp_tuan: {
+      skin: '#FFE0BD',
+      hair: '#D84315',
+      hairStyle: 'curly',
+      outfit: '#FFE082',
+      hat: 'chef',
+      accessory: 'heart_apron',
     },
     bac_ba: {
       skin: '#FFE0BD',

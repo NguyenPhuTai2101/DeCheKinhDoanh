@@ -18,9 +18,13 @@ import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
 import { MenuMoreDrawer } from './components/modals/MenuMoreDrawer';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
+import { useGameSimulation } from './hooks/useGameSimulation';
 
 export const App: React.FC = () => {
   const { activeModal, currentView, loadGame, saveLocal } = useGameStore();
+
+  // Chạy vòng lặp mô phỏng & nhân viên tự động trên toàn bộ game
+  useGameSimulation();
 
   useEffect(() => {
     loadGame();

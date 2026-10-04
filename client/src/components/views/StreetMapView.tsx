@@ -34,6 +34,7 @@ export const StreetMapView: React.FC = () => {
     openModal,
     purchaseUpgrade,
     upgradeBusinessStage,
+    employeeActionStatus,
   } = useGameStore();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -520,18 +521,63 @@ export const StreetMapView: React.FC = () => {
                 {/* Đội ngũ đầu bếp Player & Nhân viên */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <div className="relative">
-                    <ChibiAvatar type="player" emotion="happy" size={48} />
+                    <ChibiAvatar type="player" emotion="happy" size={44} />
                     <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[7px] font-black px-1 rounded-full">
                       Bếp
                     </span>
                   </div>
 
+                  {/* Bác Linh (Bếp chính) */}
+                  {gameState.hiredEmployees.includes('emp_linh') && (
+                    <div className="relative">
+                      <div className={employeeActionStatus.linh === 'cooking' ? 'animate-bounce' : ''}>
+                        <ChibiAvatar
+                          type="emp_linh"
+                          emotion={employeeActionStatus.linh === 'cooking' ? 'love' : 'happy'}
+                          size={40}
+                        />
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 bg-amber-600 text-white text-[7px] font-black px-1 rounded-full">
+                        Linh
+                      </span>
+                      {employeeActionStatus.linh === 'cooking' && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[7px] font-black px-1 rounded-full animate-bounce whitespace-nowrap shadow-2xs">
+                          Nấu ♨️
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Em Tuấn (Phụ bếp) */}
+                  {gameState.hiredEmployees.includes('emp_tuan') && (
+                    <div className="relative">
+                      <div className={employeeActionStatus.tuan === 'assisting' ? 'animate-bounce' : ''}>
+                        <ChibiAvatar type="emp_tuan" emotion="happy" size={38} />
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 bg-purple-600 text-white text-[7px] font-black px-1 rounded-full">
+                        Tuấn
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Em Mai (Phục vụ) */}
                   {gameState.hiredEmployees.includes('emp_mai') && (
                     <div className="relative">
-                      <ChibiAvatar type="emp_mai" emotion="love" size={42} />
+                      <div className={employeeActionStatus.mai === 'serving' ? 'animate-bounce' : ''}>
+                        <ChibiAvatar
+                          type="emp_mai"
+                          emotion={employeeActionStatus.mai === 'serving' ? 'love' : 'happy'}
+                          size={40}
+                        />
+                      </div>
                       <span className="absolute -bottom-1 -right-1 bg-pink-500 text-white text-[7px] font-black px-1 rounded-full">
                         Mai
                       </span>
+                      {employeeActionStatus.mai === 'serving' && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[7px] font-black px-1 rounded-full animate-bounce whitespace-nowrap shadow-2xs">
+                          Bưng món 🏃‍♀️
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

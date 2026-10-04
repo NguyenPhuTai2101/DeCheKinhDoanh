@@ -42,6 +42,7 @@ export const CozyShopView: React.FC = () => {
     activeOrders,
     setActiveOrders,
     setCurrentView,
+    employeeActionStatus,
   } = useGameStore();
 
   const orders = activeOrders;
@@ -60,146 +61,6 @@ export const CozyShopView: React.FC = () => {
   const maxTables =
     currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
-
-  // 1. Vòng lặp thời gian & tính kiên nhẫn của khách
-  useEffect(() => {
-    if (!isShopOpen || timeSpeed === 0) return;
-
-    const interval = setInterval(() => {
-      tickTime(2.5 * timeSpeed);
-
-      setOrders((prev) => {
-        const next = prev.map((order) => {
-          if (order.state === 'waiting') {
-            const newPatience = order.patienceRemaining - 1 * timeSpeed;
-            if (newPatience <= 0) {
-              handleCustomerLeaveAngry(order.tableIndex);
-              return { ...order, state: 'leaving' as const };
-            }
-            return { ...order, patienceRemaining: newPatience };
-          }
-          return order;
-        });
-        return next.filter((o) => o.state !== 'leaving');
-      });
-    }, 1000 / timeSpeed);
-
-    return () => clearInterval(interval);
-  }, [isShopOpen, timeSpeed, tickTime, handleCustomerLeaveAngry, setOrders]);
-
-  // 2. Vòng lặp đón khách mới
-  useEffect(() => {
-    if (!isShopOpen || timeSpeed === 0) return;
-
-    const hasSignboard = (gameState.purchasedUpgrades['flower_signboard'] || 0) > 0;
-    const baseRate = currentStage.customerRateMs;
-    const spawnRate = hasSignboard ? Math.round(baseRate * 0.85) : baseRate;
-
-    const spawnInterval = setInterval(() => {
-      setOrders((prev) => {
-        if (prev.length >= maxTables) return prev;
-
-        const occupiedIndices = prev.map((o) => o.tableIndex);
-        let freeTable = 1;
-        for (let i = 1; i <= maxTables; i++) {
-          if (!occupiedIndices.includes(i)) {
-            freeTable = i;
-            break;
-          }
-        }
-
-        const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
-        const seatedNeighbors = prev.map((o) => o.neighborId).filter(Boolean);
-        const availableNeighbors = neighborKeys.filter((k) => !seatedNeighbors.includes(k));
-        const isNeighborRoll = Math.random() < 0.28 && availableNeighbors.length > 0;
-        const chosenNeighborId = isNeighborRoll
-          ? availableNeighbors[Math.floor(Math.random() * availableNeighbors.length)]
-          : undefined;
-
-        let chosenType: CustomerTypeId = 'student';
-        let chosenRecipe: RecipeId = 'banh_mi_trung';
-        let dialogue: string | undefined = undefined;
-        let patienceSeconds = 35;
-
-        if (chosenNeighborId) {
-          const nData = NEIGHBORS_DATA[chosenNeighborId];
-          const nRel = gameState.neighbors[chosenNeighborId] || { level: 1 };
-          chosenType = 'neighborhood';
-          chosenRecipe = nData.favoriteDishId;
-          dialogue = nData.dialogues[nRel.level] || nData.dialogues[1];
-          patienceSeconds = 50;
-        } else {
-          const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
-          chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-          const cType = CUSTOMER_TYPES[chosenType];
-          const favoriteList = cType.favoriteRecipeIds;
-          chosenRecipe = favoriteList[Math.floor(Math.random() * favoriteList.length)];
-          patienceSeconds = cType.patienceSeconds;
-        }
-
-        soundManager.playDoorBell();
-
-        const newOrder: ActiveOrder = {
-          id: Math.random().toString(36).substring(2, 9),
-          tableIndex: freeTable,
-          typeId: chosenType,
-          neighborId: chosenNeighborId,
-          dialogue,
-          recipeId: chosenRecipe,
-          patienceRemaining: patienceSeconds,
-          maxPatience: patienceSeconds,
-          state: 'waiting',
-        };
-
-        return [...prev, newOrder];
-      });
-    }, spawnRate / timeSpeed);
-
-    return () => clearInterval(spawnInterval);
-  }, [
-    isShopOpen,
-    timeSpeed,
-    maxTables,
-    currentStage.customerRateMs,
-    gameState.purchasedUpgrades,
-    gameState.neighbors,
-    setOrders,
-  ]);
-
-  // 3. Tự động phục vụ nếu có nhân viên
-  useEffect(() => {
-    if (!isShopOpen || timeSpeed === 0) return;
-
-    const hired = gameState.hiredEmployees;
-
-    if (hired.includes('emp_mai')) {
-      const readyOrder = orders.find((o) => o.state === 'ready');
-      if (readyOrder) {
-        handleServeDish(readyOrder);
-      }
-    }
-
-    if (hired.includes('emp_linh')) {
-      const waitingOrder = orders.find((o) => o.state === 'waiting');
-      if (waitingOrder) {
-        const recipe = RECIPES[waitingOrder.recipeId];
-        let canCook = true;
-        for (const ing of recipe.requiredIngredients) {
-          if ((gameState.inventory[ing] || 0) <= 0) {
-            canCook = false;
-            break;
-          }
-        }
-        if (canCook) {
-          completeCooking(waitingOrder.recipeId, waitingOrder.tableIndex);
-          setOrders((prev) =>
-            prev.map((o) => (o.id === waitingOrder.id ? { ...o, state: 'ready' } : o))
-          );
-          soundManager.playDishComplete();
-        }
-      }
-    }
-  }, [orders, isShopOpen, timeSpeed, gameState.hiredEmployees, gameState.inventory, setOrders]);
 
   // Đơn hàng đang được chọn chế biến
   const activeOrder = orders.find((o) => o.tableIndex === selectedOrderIndex) || orders[0] || null;
@@ -350,6 +211,110 @@ export const CozyShopView: React.FC = () => {
               }}
             />
           ))}
+        </div>
+      </div>
+
+      {/* 1.5. ĐỘI NGŨ NHÂN SỰ BẾP & PHỤC VỤ (HIỂN THỊ TRỰC QUAN NHÂN VIÊN ĐANG LÀM VIỆC) */}
+      <div className="px-3 pt-1.5 shrink-0">
+        <div className="bg-white/95 backdrop-blur-xs rounded-2xl border border-pink-200 p-1.5 shadow-2xs flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5">
+            {/* Chủ quán (Bạn) */}
+            <div className="flex items-center gap-1 bg-pink-50/90 border border-pink-200 rounded-xl px-2 py-1 shrink-0">
+              <ChibiAvatar type="player" emotion="happy" size={30} />
+              <div className="text-left leading-tight">
+                <div className="text-[10px] font-black text-[#5D4037]">Bạn</div>
+                <div className="text-[8px] font-bold text-pink-600">Bếp trưởng</div>
+              </div>
+            </div>
+
+            {/* Em Mai (Phục vụ) */}
+            {gameState.hiredEmployees.includes('emp_mai') && (
+              <div
+                onClick={() => openModal('employees')}
+                className={`flex items-center gap-1 rounded-xl px-2 py-1 shrink-0 border cursor-pointer transition-all active:scale-95 ${
+                  employeeActionStatus.mai === 'serving'
+                    ? 'bg-rose-100 border-rose-400 ring-2 ring-rose-200 animate-pulse'
+                    : 'bg-rose-50/90 border-rose-200'
+                }`}
+                title="Em Mai (Phục vụ): Tự động bưng món ra bàn"
+              >
+                <div className={employeeActionStatus.mai === 'serving' ? 'animate-bounce' : ''}>
+                  <ChibiAvatar type="emp_mai" emotion={employeeActionStatus.mai === 'serving' ? 'love' : 'happy'} size={30} />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="text-[10px] font-black text-rose-950 flex items-center gap-1">
+                    <span>Mai</span>
+                    {employeeActionStatus.mai === 'serving' && <span className="text-[7.5px] bg-rose-500 text-white px-1 rounded-full">Bưng món 🏃‍♀️</span>}
+                  </div>
+                  <div className="text-[8px] font-bold text-rose-600">
+                    {employeeActionStatus.mai === 'serving' ? 'Đang bưng món...' : 'Chạy bàn 🍱'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bác Linh (Bếp chính) */}
+            {gameState.hiredEmployees.includes('emp_linh') && (
+              <div
+                onClick={() => openModal('employees')}
+                className={`flex items-center gap-1 rounded-xl px-2 py-1 shrink-0 border cursor-pointer transition-all active:scale-95 ${
+                  employeeActionStatus.linh === 'cooking'
+                    ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-200 animate-pulse'
+                    : 'bg-amber-50/90 border-amber-200'
+                }`}
+                title="Bác Linh (Bếp chính): Tự động chế biến món"
+              >
+                <div className={employeeActionStatus.linh === 'cooking' ? 'animate-bounce' : ''}>
+                  <ChibiAvatar type="emp_linh" emotion={employeeActionStatus.linh === 'cooking' ? 'love' : 'happy'} size={30} />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="text-[10px] font-black text-amber-950 flex items-center gap-1">
+                    <span>Bác Linh</span>
+                    {employeeActionStatus.linh === 'cooking' && <span className="text-[7.5px] bg-amber-500 text-white px-1 rounded-full">Nấu ♨️</span>}
+                  </div>
+                  <div className="text-[8px] font-bold text-amber-700">
+                    {employeeActionStatus.linh === 'cooking' ? 'Đang nấu bánh...' : 'Bếp chính 👨‍🍳'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Em Tuấn (Phụ bếp) */}
+            {gameState.hiredEmployees.includes('emp_tuan') && (
+              <div
+                onClick={() => openModal('employees')}
+                className={`flex items-center gap-1 rounded-xl px-2 py-1 shrink-0 border cursor-pointer transition-all active:scale-95 ${
+                  employeeActionStatus.tuan === 'assisting'
+                    ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-200 animate-pulse'
+                    : 'bg-purple-50/90 border-purple-200'
+                }`}
+                title="Em Tuấn (Phụ bếp): Giảm 40% thời gian nấu & +15% tip"
+              >
+                <div className={employeeActionStatus.tuan === 'assisting' ? 'animate-bounce' : ''}>
+                  <ChibiAvatar type="emp_tuan" emotion="happy" size={30} />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="text-[10px] font-black text-purple-950 flex items-center gap-1">
+                    <span>Tuấn</span>
+                    <span className="text-[7.5px] bg-purple-200 text-purple-800 px-1 rounded-full">+15% tip</span>
+                  </div>
+                  <div className="text-[8px] font-bold text-purple-600">Phụ bếp 🧑‍🍳</div>
+                </div>
+              </div>
+            )}
+
+            {/* Ô tuyển thêm nhân viên nếu chưa đủ người */}
+            {gameState.hiredEmployees.length < 3 && (
+              <button
+                onClick={() => openModal('employees')}
+                className="px-2 py-1 border-2 border-dashed border-pink-300 hover:border-pink-500 bg-pink-50/50 hover:bg-pink-100/60 rounded-xl text-[9.5px] font-black text-pink-700 flex items-center gap-1 shrink-0 active:scale-95 transition-all"
+                title="Thuê thêm nhân viên phụ bếp hoặc chạy bàn"
+              >
+                <span>➕</span>
+                <span>Tuyển Người</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

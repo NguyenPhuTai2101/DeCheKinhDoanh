@@ -102,8 +102,14 @@ export interface GameStoreState {
   currentView: 'shop' | 'street';
   activeOrders: ActiveOrder[];
   toastMessage: string | null;
+  employeeActionStatus: {
+    mai: string;
+    linh: string;
+    tuan: string;
+  };
 
   // Actions cơ bản
+  setEmployeeActionStatus: (status: Partial<{ mai: string; linh: string; tuan: string }>) => void;
   setCurrentView: (view: 'shop' | 'street') => void;
   setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
   serveDishOrder: (orderId: string) => boolean;
@@ -192,6 +198,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   currentView: 'shop',
   activeOrders: [],
+  employeeActionStatus: {
+    mai: 'idle',
+    linh: 'idle',
+    tuan: 'idle',
+  },
+
+  setEmployeeActionStatus: (status) =>
+    set((state) => ({
+      employeeActionStatus: { ...state.employeeActionStatus, ...status },
+    })),
 
   setCurrentView: (view) => {
     set({ currentView: view });
