@@ -2,8 +2,9 @@ import React from 'react';
 import { useGameStore } from '../store/gameStore';
 import { soundManager } from '../utils/soundManager';
 import {
-  Utensils,
+  BookOpen,
   ShoppingBag,
+  Utensils,
   ArrowUpCircle,
   LayoutGrid,
   Store,
@@ -21,29 +22,19 @@ export const BottomBar: React.FC = () => {
   return (
     <nav className="w-full bg-[#FAF5EE] border-t-2 border-[#FFD6E5] shadow-lg z-30 shrink-0 relative px-2 py-1.5 sm:py-2">
       <div className="w-full grid grid-cols-5 items-center gap-1 sm:gap-2">
-        {/* NÚT 1: CHUYỂN CHẾ ĐỘ QUÁN BẾP ⇄ RA PHỐ */}
+        {/* NÚT 1: CÔNG THỨC NẤU ĂN (SỔ TAY MÓN ĂN & MENU) */}
         <button
           onClick={() => {
             soundManager.playClick();
-            setCurrentView(currentView === 'street' ? 'shop' : 'street');
+            openModal('cooking');
           }}
           className="flex flex-col items-center justify-center gap-0.5 py-1 rounded-2xl active:scale-95 transition-all group"
         >
-          <div
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center transition-all shadow-xs border ${
-              currentView === 'street'
-                ? 'bg-gradient-to-br from-rose-100 to-pink-200 border-rose-300 text-rose-700'
-                : 'bg-gradient-to-br from-amber-100 to-yellow-200 border-amber-300 text-amber-900'
-            }`}
-          >
-            {currentView === 'street' ? (
-              <Utensils className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
-            ) : (
-              <Store className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
-            )}
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center transition-all shadow-xs group-hover:bg-rose-100">
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
           </div>
           <span className="text-[10px] sm:text-xs font-black text-[#7C5C55] leading-tight">
-            {currentView === 'street' ? 'Quầy Bếp' : 'Ra Phố'}
+            Công Thức
           </span>
         </button>
 
@@ -66,19 +57,34 @@ export const BottomBar: React.FC = () => {
           </span>
         </button>
 
-        {/* NÚT 3: NẤU ĂN (TRỌNG TÂM - TO VÀ NỔI BẬT NHẤT) */}
+        {/* NÚT 3: VÀO BẾP / RA PHỐ (TRỌNG TÂM - TO VÀ NỔI BẬT NHẤT Ở GIỮA) */}
         <button
           onClick={() => {
             soundManager.playClick();
-            openModal('cooking');
+            setCurrentView(currentView === 'street' ? 'shop' : 'street');
           }}
           className="flex flex-col items-center justify-center -mt-3 active:scale-90 transition-all group"
+          title={currentView === 'street' ? 'Bấm để vào bếp chuẩn bị món' : 'Bấm để ra đường quan sát'}
         >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 ring-pink-300 group-hover:brightness-110 animate-bounce-short">
-            <Utensils className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
+          <div
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full text-white flex items-center justify-center shadow-lg border-2 border-white ring-2 group-hover:brightness-110 animate-bounce-short transition-all ${
+              currentView === 'street'
+                ? 'bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 ring-pink-300'
+                : 'bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-400 ring-amber-300'
+            }`}
+          >
+            {currentView === 'street' ? (
+              <Utensils className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
+            ) : (
+              <Store className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
+            )}
           </div>
-          <span className="text-[10px] sm:text-xs font-black text-rose-600 mt-0.5 leading-tight">
-            Nấu Ăn
+          <span
+            className={`text-[10px] sm:text-xs font-black mt-0.5 leading-tight ${
+              currentView === 'street' ? 'text-rose-600' : 'text-amber-700'
+            }`}
+          >
+            {currentView === 'street' ? 'Vào Bếp 🍳' : 'Ra Phố 🛵'}
           </span>
         </button>
 

@@ -25,8 +25,10 @@ export type RecipeId =
   | 'banh_mi_trung'
   | 'banh_mi_thit'
   | 'banh_mi_dac_biet'
+  | 'banh_mi_xiu_mai'
   | 'tra_sua'
-  | 'cafe_sua';
+  | 'cafe_sua'
+  | 'tra_dao';
 
 export interface Recipe {
   id: RecipeId;
