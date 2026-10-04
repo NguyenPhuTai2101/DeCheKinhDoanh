@@ -590,17 +590,33 @@ export const CozyShopView: React.FC = () => {
             </button>
           </div>
 
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              openModal('market');
-            }}
-            className="text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded-xl cursor-pointer flex items-center gap-1"
-            title="Mở chợ mua sỉ nguyên liệu"
-          >
-            <ShoppingBag className="w-3 h-3 text-amber-800" />
-            <span>Chợ Sỉ 🛒</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {deliveryOrders.length > 0 && (
+              <button
+                onClick={() => {
+                  soundManager.playClick();
+                  openModal('delivery');
+                }}
+                className="py-1 px-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-black text-[10px] flex items-center gap-1 shadow-2xs active:scale-95 transition-all animate-pulse"
+                title="Đơn giao hàng Chú Năm"
+              >
+                <Bike className="w-3 h-3" />
+                <span>Ship ({deliveryOrders.length})</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                openModal('market');
+              }}
+              className="text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded-xl cursor-pointer flex items-center gap-1"
+              title="Mở chợ mua sỉ nguyên liệu"
+            >
+              <ShoppingBag className="w-3 h-3 text-amber-800" />
+              <span>Chợ Sỉ 🛒</span>
+            </button>
+          </div>
         </div>
 
         {/* Khay topping dạng cuộn ngang (Horizontal scroll container - chuẩn Game nấu ăn Mobile) */}
@@ -661,34 +677,6 @@ export const CozyShopView: React.FC = () => {
             );
           })}
         </div>
-      </div>
-
-      {/* 5. PHÍM ĐIỀU HƯỚNG RA ĐƯỜNG VỈA HÈ (SLIM FOOTER BUTTON) */}
-      <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
-        <button
-          onClick={() => {
-            soundManager.playClick();
-            setCurrentView('street');
-          }}
-          className="flex-1 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-amber-950 font-black text-xs border border-amber-500 flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          <span>Ra Phố Quan Sát Phố Xá 🚶</span>
-        </button>
-
-        {deliveryOrders.length > 0 && (
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              openModal('delivery');
-            }}
-            className="py-2 px-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs flex items-center gap-1 shadow-2xs active:scale-95 transition-all animate-pulse shrink-0"
-            title="Đơn giao hàng Chú Năm"
-          >
-            <Bike className="w-3.5 h-3.5" />
-            <span>Ship ({deliveryOrders.length})</span>
-          </button>
-        )}
       </div>
     </div>
   );
