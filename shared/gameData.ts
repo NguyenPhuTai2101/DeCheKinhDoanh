@@ -11,6 +11,7 @@ import {
   DecorationItem,
   RestaurantType,
   RestaurantTypeId,
+  BranchTier,
 } from './types';
 
 export const INGREDIENTS: Record<IngredientId, Ingredient> = {
@@ -422,6 +423,59 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     starterDescription: 'Vốn khởi nghiệp nhẹ nhàng, khách đông từ sáng sớm đến chiều muộn, dễ quản lý.',
     unlockCost: 0,
     requiredReputation: 0,
+    requiredStaffCount: 0,
+    branchTiers: [
+      {
+        level: 1,
+        name: 'Kiosk Vỉa Hè Tinh Gọn',
+        tagline: 'Xe đẩy inox vỉa hè giản dị',
+        cost: 0,
+        requiredReputation: 0,
+        requiredStaff: 0,
+        bonusMultiplier: 1.0,
+        description: 'Doanh thu tự động cơ bản 100%.',
+      },
+      {
+        level: 2,
+        name: 'Quán Góc Phố Nhộn Nhịp',
+        tagline: 'Bàn ghế gỗ xếp, mái hiên di động che mưa nắng',
+        cost: 1500000,
+        requiredReputation: 80,
+        requiredStaff: 1,
+        bonusMultiplier: 1.4,
+        description: '+40% Doanh thu tự động & tăng 20% tốc độ bán.',
+      },
+      {
+        level: 3,
+        name: 'Cửa Hàng Mặt Tiền Máy Lạnh',
+        tagline: 'Biển LED nổi bật, khách ngồi điều hòa thưởng thức',
+        cost: 4500000,
+        requiredReputation: 200,
+        requiredStaff: 1,
+        bonusMultiplier: 1.9,
+        description: '+90% Doanh thu tự động & khách boa thêm 15%.',
+      },
+      {
+        level: 4,
+        name: 'Chuỗi Nhượng Quyền Quốc Dân',
+        tagline: 'Thương hiệu nức tiếng phủ sóng khắp các quận trung tâm',
+        cost: 12000000,
+        requiredReputation: 450,
+        requiredStaff: 2,
+        bonusMultiplier: 2.5,
+        description: '+150% Doanh thu tự động & nhận thêm ⭐ uy tín mỗi ngày.',
+      },
+      {
+        level: 5,
+        name: 'Đế Chế Bánh Mì Toàn Cầu',
+        tagline: 'Biểu tượng ẩm thực Việt Nam vươn tầm quốc tế',
+        cost: 30000000,
+        requiredReputation: 900,
+        requiredStaff: 3,
+        bonusMultiplier: 3.5,
+        description: '+250% Doanh thu tự động (Gấp 3.5 lần doanh thu cơ bản!).',
+      },
+    ],
     themeColor: '#D97706',
     accentColor: '#FEF3C7',
     equipmentName: 'Thớt Gỗ Chế Biến & Bếp Nướng',
@@ -438,8 +492,61 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     badge: 'Tinh Hoa Ẩm Thực',
     tagline: 'Nồi nước dùng hầm xương 24h, quế hồi ngào ngạt, thịt bò tái lăn mềm ngọt.',
     starterDescription: 'Món ăn danh tiếng toàn cầu. Giá trị mỗi tô cao, khách sẵn lòng chi trả hào phóng!',
-    unlockCost: 600000,
-    requiredReputation: 45,
+    unlockCost: 3500000,
+    requiredReputation: 120,
+    requiredStaffCount: 1,
+    branchTiers: [
+      {
+        level: 1,
+        name: 'Gánh Phở Bò Thúng Xưa',
+        tagline: 'Hương vị xưa thanh tao ấm lòng người lữ khách',
+        cost: 0,
+        requiredReputation: 120,
+        requiredStaff: 1,
+        bonusMultiplier: 1.0,
+        description: 'Doanh thu tự động cơ bản 100%.',
+      },
+      {
+        level: 2,
+        name: 'Quán Phở Gia Truyền Góc Phố',
+        tagline: 'Nồi ninh xương đồng sáng bóng, khói nghi ngút',
+        cost: 3000000,
+        requiredReputation: 220,
+        requiredStaff: 1,
+        bonusMultiplier: 1.45,
+        description: '+45% Doanh thu tự động & ninh nước lèo nhanh hơn.',
+      },
+      {
+        level: 3,
+        name: 'Nhà Hàng Phở Bò Thượng Hạng',
+        tagline: 'Không gian ấm cúng, bò Wagyu tái lăn sang trọng',
+        cost: 8500000,
+        requiredReputation: 450,
+        requiredStaff: 2,
+        bonusMultiplier: 2.0,
+        description: '+100% Doanh thu tự động (x2 doanh thu) & khách tip 20%.',
+      },
+      {
+        level: 4,
+        name: 'Chuỗi Phở Bò Di Sản Đô Thị',
+        tagline: 'Hàng ngàn lượt khách xếp hàng thưởng thức mỗi ngày',
+        cost: 22000000,
+        requiredReputation: 850,
+        requiredStaff: 2,
+        bonusMultiplier: 2.7,
+        description: '+170% Doanh thu tự động & danh tiếng vang xa khắp vùng.',
+      },
+      {
+        level: 5,
+        name: 'Kỳ Lân Phở Việt Vươn Tầm Thế Giới',
+        tagline: 'Thương hiệu Michelin được truyền thông quốc tế ca tụng',
+        cost: 55000000,
+        requiredReputation: 1600,
+        requiredStaff: 3,
+        bonusMultiplier: 3.8,
+        description: '+280% Doanh thu tự động siêu khổng lồ!',
+      },
+    ],
     themeColor: '#DC2626',
     accentColor: '#FEE2E2',
     equipmentName: 'Nồi Hầm Xương & Quầy Trụng Phở',
@@ -456,8 +563,61 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     badge: 'Đậm Vị Xứ Huế & Miền Tây',
     tagline: 'Riêu cua béo ngậy, bún bò sa tế cay nồng, chả cua giòn sần sật.',
     starterDescription: 'Món nước khoái khẩu của mọi lứa tuổi, lượng khách trung thành cực kỳ đông đảo.',
-    unlockCost: 1000000,
-    requiredReputation: 80,
+    unlockCost: 10000000,
+    requiredReputation: 300,
+    requiredStaffCount: 2,
+    branchTiers: [
+      {
+        level: 1,
+        name: 'Quầy Bún Nước Lèo Vỉa Hè',
+        tagline: 'Nồi sa tế đỏ cam bốc khói cay nồng hấp dẫn',
+        cost: 0,
+        requiredReputation: 300,
+        requiredStaff: 2,
+        bonusMultiplier: 1.0,
+        description: 'Doanh thu tự động cơ bản 100%.',
+      },
+      {
+        level: 2,
+        name: 'Tiệm Bún Sa Tế Khang Trang',
+        tagline: 'Bàn inox sáng bóng, quầy chả cua đầy ắp tươi ngon',
+        cost: 7000000,
+        requiredReputation: 480,
+        requiredStaff: 2,
+        bonusMultiplier: 1.45,
+        description: '+45% Doanh thu tự động & khách trung thành tăng vọt.',
+      },
+      {
+        level: 3,
+        name: 'Quán Ăn Bún Bò Cố Đô Chuẩn Vị',
+        tagline: 'Không gian cung đình Huế, hương sả quế nồng đượm',
+        cost: 18000000,
+        requiredReputation: 800,
+        requiredStaff: 3,
+        bonusMultiplier: 2.1,
+        description: '+110% Doanh thu tự động & nhận thưởng tip hậu hĩnh.',
+      },
+      {
+        level: 4,
+        name: 'Chuỗi Bún Riêu & Bún Bò Trứ Danh',
+        tagline: 'Thương hiệu ẩm thực miền Trung & Nam bộ phủ sóng',
+        cost: 45000000,
+        requiredReputation: 1400,
+        requiredStaff: 3,
+        bonusMultiplier: 2.8,
+        description: '+180% Doanh thu tự động & chuỗi cung ứng độc quyền.',
+      },
+      {
+        level: 5,
+        name: 'Đại Tiệc Ẩm Thực Bún Đẳng Cấp Quốc Gia',
+        tagline: 'Đỉnh cao phong vị bún nước lèo truyền đời',
+        cost: 95000000,
+        requiredReputation: 2500,
+        requiredStaff: 4,
+        bonusMultiplier: 4.0,
+        description: '+300% Doanh thu tự động (Gấp 4 lần doanh thu ban đầu!).',
+      },
+    ],
     themeColor: '#EA580C',
     accentColor: '#FFEDD5',
     equipmentName: 'Nồi Nước Lèo Sa Tế & Riêu Cua',
@@ -474,8 +634,61 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     badge: 'Chảo Gang Xèo Xèo Sang Chảnh',
     tagline: 'Thịt bò mềm mọng, bơ thơm ngào ngạt, trứng ốp la lòng đào sốt tiêu xèo xèo.',
     starterDescription: 'Phục vụ nóng hổi trên chảo gang con bò, giá bán cực cao, lợi nhuận tiền triệu.',
-    unlockCost: 1800000,
-    requiredReputation: 140,
+    unlockCost: 28000000,
+    requiredReputation: 650,
+    requiredStaffCount: 3,
+    branchTiers: [
+      {
+        level: 1,
+        name: 'Quán Bò Né Chảo Gang Vỉa Hè',
+        tagline: 'Chảo gang hình con bò bốc khói xèo xèo thơm bơ',
+        cost: 0,
+        requiredReputation: 650,
+        requiredStaff: 3,
+        bonusMultiplier: 1.0,
+        description: 'Doanh thu tự động cơ bản 100%.',
+      },
+      {
+        level: 2,
+        name: 'Tiệm Steak Xèo Xèo Phong Cách Mới',
+        tagline: 'Dàn bếp ga công suất lớn, nướng bơ xèo xèo không ngừng',
+        cost: 18000000,
+        requiredReputation: 950,
+        requiredStaff: 3,
+        bonusMultiplier: 1.5,
+        description: '+50% Doanh thu tự động & phục vụ nóng hổi tức thì.',
+      },
+      {
+        level: 3,
+        name: 'Nhà Hàng Bò Né Chảo Nóng Phố Tây',
+        tagline: 'Rượu vang đỏ và chảo bò hảo hạng thu hút du khách',
+        cost: 48000000,
+        requiredReputation: 1500,
+        requiredStaff: 4,
+        bonusMultiplier: 2.2,
+        description: '+120% Doanh thu tự động & khách VIP chi trả hào phóng.',
+      },
+      {
+        level: 4,
+        name: 'Chuỗi Steakhouse Đẳng Cấp Thượng Lưu',
+        tagline: 'Bò nhập khẩu sốt tiêu đen hảo hạng phủ khắp thành phố',
+        cost: 110000000,
+        requiredReputation: 2500,
+        requiredStaff: 4,
+        bonusMultiplier: 3.0,
+        description: '+200% Doanh thu tự động (x3 lần doanh thu!).',
+      },
+      {
+        level: 5,
+        name: 'Dinh Thự Ẩm Thực Bò Né Hoàng Gia',
+        tagline: 'Chuỗi nhà hàng beefsteak sang trọng bậc nhất Đông Nam Á',
+        cost: 220000000,
+        requiredReputation: 4000,
+        requiredStaff: 5,
+        bonusMultiplier: 4.5,
+        description: '+350% Doanh thu tự động cực đại!',
+      },
+    ],
     themeColor: '#9333EA',
     accentColor: '#F3E8FF',
     equipmentName: 'Bếp Ga Chảo Gang Xèo Xèo',
@@ -492,8 +705,61 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     badge: 'Món Ăn Quốc Dân Sài Gòn',
     tagline: 'Khói than nướng sườn thơm nức mũi, chả trứng béo ngậy, mỡ hành óng ánh.',
     starterDescription: 'Mùi khói than nướng sườn bay xa hàng trăm mét hút khách từ sáng tới khuya!',
-    unlockCost: 2500000,
-    requiredReputation: 200,
+    unlockCost: 70000000,
+    requiredReputation: 1200,
+    requiredStaffCount: 4,
+    branchTiers: [
+      {
+        level: 1,
+        name: 'Quầy Cơm Tấm Khói Than Lề Đường',
+        tagline: 'Mùi sườn nướng quạt than thơm nức cả góc phố',
+        cost: 0,
+        requiredReputation: 1200,
+        requiredStaff: 4,
+        bonusMultiplier: 1.0,
+        description: 'Doanh thu tự động cơ bản 100%.',
+      },
+      {
+        level: 2,
+        name: 'Quán Cơm Tấm Sườn Mỡ Hành Nức Tiếng',
+        tagline: 'Khách xếp hàng dài mua mang đi và ăn tại chỗ',
+        cost: 45000000,
+        requiredReputation: 1800,
+        requiredStaff: 4,
+        bonusMultiplier: 1.55,
+        description: '+55% Doanh thu tự động & khách đông nghẹt từ sáng đến đêm.',
+      },
+      {
+        level: 3,
+        name: 'Cửa Hàng Cơm Tấm Sài Gòn Không Ngủ',
+        tagline: 'Xửng hấp cơm tấm khổng lồ, sườn ướp mật ong vàng óng',
+        cost: 110000000,
+        requiredReputation: 2800,
+        requiredStaff: 5,
+        bonusMultiplier: 2.3,
+        description: '+130% Doanh thu tự động & phục vụ 24/7.',
+      },
+      {
+        level: 4,
+        name: 'Chuỗi Cơm Tấm Sườn Cọng Thượng Hạng',
+        tagline: 'Biểu tượng ẩm thực đường phố Sài Gòn hiện đại',
+        cost: 220000000,
+        requiredReputation: 4200,
+        requiredStaff: 5,
+        bonusMultiplier: 3.2,
+        description: '+220% Doanh thu tự động doanh số tiền tỷ.',
+      },
+      {
+        level: 5,
+        name: 'Kỳ Lân Cơm Tấm Quốc Bảo Việt Nam',
+        tagline: 'Đỉnh cao đế chế kinh doanh ẩm thực vỉa hè đạt quy mô huyền thoại',
+        cost: 450000000,
+        requiredReputation: 6500,
+        requiredStaff: 6,
+        bonusMultiplier: 5.0,
+        description: '+400% Doanh thu tự động (Gấp 5 lần doanh thu ban đầu!).',
+      },
+    ],
     themeColor: '#16A34A',
     accentColor: '#DCFCE7',
     equipmentName: 'Lò Nướng Than Hồng & Xửng Hấp Cơm',
@@ -544,11 +810,163 @@ export const CUSTOMER_TYPES: Record<string, CustomerType> = {
 };
 
 export const SHOP_UPGRADES: ShopUpgrade[] = [
+  // 1. BẾP NẤU SIÊU TỐC (Cook Speed - 5 Cấp)
+  {
+    id: 'modern_stove',
+    name: 'Bếp Nấu Siêu Tốc',
+    icon: '⚡',
+    description: 'Nâng cấp công suất bếp, giúp đầu bếp nấu chín món ăn nhanh chóng.',
+    cost: 180000,
+    level: 0,
+    maxLevel: 5,
+    category: 'kitchen',
+    effect: { type: 'cook_speed', value: 0.15 },
+    tiers: [
+      { level: 1, title: 'Bếp Gas Đôi Lửa Xanh', cost: 180000, effectValue: 0.15, description: 'Giảm 15% thời gian nấu nướng cho mọi món ăn.' },
+      { level: 2, title: 'Bếp Khè Gang Công Nghiệp', cost: 550000, effectValue: 0.25, description: 'Lửa cực mạnh, giảm 25% thời gian chế biến.' },
+      { level: 3, title: 'Bếp Từ Cao Tần Siêu Tốc', cost: 1600000, effectValue: 0.38, description: 'Kiểm soát nhiệt chuẩn xác, giảm 38% thời gian nấu.' },
+      { level: 4, title: 'Dàn Bếp Thông Minh AI Hẹn Giờ', cost: 4800000, effectValue: 0.50, description: 'Tự động canh lửa chuẩn xác, giảm 50% thời gian nấu.' },
+      { level: 5, title: 'Lò Nấu Luyện Kim Hoàng Gia', cost: 14000000, effectValue: 0.65, description: 'Nấu chín món ăn trong nháy mắt, giảm tới 65% thời gian nấu!' },
+    ],
+  },
+  // 2. KHO LẠNH & TỦ BẢO QUẢN (Storage Capacity - 5 Cấp)
+  {
+    id: 'cozy_storage',
+    name: 'Kho Lạnh & Tủ Bảo Quản',
+    icon: '📦',
+    description: 'Mở rộng sức chứa kho nguyên liệu, tha hồ tích trữ.',
+    cost: 150000,
+    level: 0,
+    maxLevel: 5,
+    category: 'storage',
+    effect: { type: 'storage_capacity', value: 30 },
+    tiers: [
+      { level: 1, title: 'Thùng Giữ Nhiệt Lớn', cost: 150000, effectValue: 30, description: 'Tăng thêm +30 ô sức chứa kho nguyên liệu.' },
+      { level: 2, title: 'Tủ Mát Kính Đứng Sài Gòn', cost: 450000, effectValue: 50, description: 'Tăng thêm +50 ô sức chứa kho, giữ rau củ tươi ngon.' },
+      { level: 3, title: 'Tủ Cấp Đông 2 Ngăn Sâu', cost: 1400000, effectValue: 80, description: 'Tăng thêm +80 ô sức chứa kho, trữ thịt cá thoải mái.' },
+      { level: 4, title: 'Phòng Kho Lạnh Mini Tiệt Trùng', cost: 4200000, effectValue: 120, description: 'Tăng thêm +120 ô sức chứa kho đạt chuẩn an toàn thực phẩm.' },
+      { level: 5, title: 'Kho Tổng Logistics Công Nghiệp', cost: 12000000, effectValue: 200, description: 'Tăng thêm +200 ô sức chứa kho, tích trữ số lượng lớn không lo hết hàng!' },
+    ],
+  },
+  // 3. BIỂN HIỆU & ĐÈN NEON HÚT KHÁCH (Attract Customers - 5 Cấp)
+  {
+    id: 'flower_signboard',
+    name: 'Biển Hiệu & Đèn Neon Hút Khách',
+    icon: '🌸',
+    description: 'Trang trí biển hiệu bắt mắt, kéo khách nườm nượp đến quán.',
+    cost: 220000,
+    level: 0,
+    maxLevel: 5,
+    category: 'marketing',
+    effect: { type: 'attract_customers', value: 0.15 },
+    tiers: [
+      { level: 1, title: 'Bạt Biển Hiệu Hoa Tươi Tắn', cost: 220000, effectValue: 0.15, description: 'Khách ghé thăm quán nhanh hơn 15%.' },
+      { level: 2, title: 'Biển Gỗ Vintage Khắc Chữ Nổi', cost: 680000, effectValue: 0.25, description: 'Khách ghé thăm quán nhanh hơn 25%.' },
+      { level: 3, title: 'Hộp Đèn LED Nhấp Nháy Sắc Màu', cost: 2000000, effectValue: 0.38, description: 'Nổi bật trong đêm, khách ghé nhanh hơn 38%.' },
+      { level: 4, title: 'Dàn Đèn Neon Sài Gòn Không Ngủ', cost: 5800000, effectValue: 0.50, description: 'Góc phố rực rỡ, khách ghé nhanh hơn 50%.' },
+      { level: 5, title: 'Màn Hình LED 3D Hologram Tráng Lệ', cost: 16500000, effectValue: 0.65, description: 'Đỉnh cao thị giác, khách nườm nượp kéo đến nhanh hơn 65%!' },
+    ],
+  },
+  // 4. BÀN GHẾ & TRẢI NGHIỆM KHÁCH NGỒI (Customer Patience - 5 Cấp)
+  {
+    id: 'seating_comfort',
+    name: 'Bàn Ghế & Trải Nghiệm Khách',
+    icon: '🪑',
+    description: 'Chỗ ngồi thoải mái giúp khách vui vẻ kiên nhẫn chờ món ăn.',
+    cost: 140000,
+    level: 0,
+    maxLevel: 5,
+    category: 'comfort',
+    effect: { type: 'customer_patience', value: 15 },
+    tiers: [
+      { level: 1, title: 'Ghế Nhựa Đỏ Dày & Đệm Lót', cost: 140000, effectValue: 15, description: 'Tăng thêm +15s độ kiên nhẫn của khách hàng.' },
+      { level: 2, title: 'Bàn Ghế Xếp Gỗ Cafe Vỉa Hè', cost: 420000, effectValue: 25, description: 'Tăng thêm +25s độ kiên nhẫn, ngồi chill thoải mái.' },
+      { level: 3, title: 'Quạt Phun Sương Mát Mùa Hè', cost: 1300000, effectValue: 40, description: 'Tăng thêm +40s độ kiên nhẫn, khách không lo oi bức.' },
+      { level: 4, title: 'Phòng Đệm Ghế Sofa Êm Ái', cost: 3800000, effectValue: 60, description: 'Tăng thêm +60s độ kiên nhẫn của mọi thực khách.' },
+      { level: 5, title: 'Không Gian VIP Lounge Máy Lạnh', cost: 11000000, effectValue: 90, description: 'Tăng thêm +90s độ kiên nhẫn, khách thư thả không bao giờ giận dỗi!' },
+    ],
+  },
+  // 5. BỘ DỤNG CỤ BÁT ĐĨA & TRÌNH BÀY (Tip Rate - 5 Cấp)
+  {
+    id: 'dishware_premium',
+    name: 'Bộ Dụng Cụ Bát Đĩa & Trình Bày',
+    icon: '🍽️',
+    description: 'Trình bày món ăn đẹp mắt, khách hài lòng boa tiền hào phóng.',
+    cost: 160000,
+    level: 0,
+    maxLevel: 5,
+    category: 'service',
+    effect: { type: 'tip_rate', value: 0.10 },
+    tiers: [
+      { level: 1, title: 'Tô Chén Sứ Trắng Sạch Bong', cost: 160000, effectValue: 0.10, description: 'Khách thưởng thêm +10% tiền tip khi dùng bữa.' },
+      { level: 2, title: 'Khay Gỗ Mộc & Giấy Thấm Dầu', cost: 480000, effectValue: 0.20, description: 'Khách thưởng thêm +20% tiền tip hài lòng.' },
+      { level: 3, title: 'Bộ Muỗng Nĩa Inox 304 Cao Cấp', cost: 1500000, effectValue: 0.35, description: 'Khách thưởng thêm +35% tiền tip hào phóng.' },
+      { level: 4, title: 'Gốm Sứ Bát Tràng Tráng Men Ngọc', cost: 4500000, effectValue: 0.50, description: 'Khách thưởng thêm +50% tiền tip ấn tượng.' },
+      { level: 5, title: 'Bộ Đĩa Thìa Hoàng Gia Mạ Vàng', cost: 13000000, effectValue: 0.75, description: 'Khách thưởng thêm tới +75% tiền tip cực lớn!' },
+    ],
+  },
+  // 6. THÙNG GIỮ NHIỆT & ĐỘI GIAO HÀNG (Delivery Bonus - 5 Cấp)
+  {
+    id: 'delivery_fleet',
+    name: 'Thùng Giữ Nhiệt & Đội Xe Siêu Tốc',
+    icon: '🛵',
+    description: 'Trang bị cho đội giao hàng mang đi, tăng tiền thưởng mỗi chuyến ship.',
+    cost: 180000,
+    level: 0,
+    maxLevel: 5,
+    category: 'logistics',
+    effect: { type: 'delivery_bonus', value: 0.15 },
+    tiers: [
+      { level: 1, title: 'Túi Giữ Nhiệt 3 Lớp Chuyên Dụng', cost: 180000, effectValue: 0.15, description: 'Tăng 15% tiền thưởng cho các đơn giao hàng mang đi.' },
+      { level: 2, title: 'Thùng Nhựa Composite Sau Xe', cost: 520000, effectValue: 0.30, description: 'Tăng 30% tiền thưởng giao hàng giữ trọn độ nóng giòn.' },
+      { level: 3, title: 'Xe Tay Ga Phun Xăng Chạy Tỉnh', cost: 1600000, effectValue: 0.50, description: 'Tăng 50% tiền thưởng giao hàng tốc độ cao.' },
+      { level: 4, title: 'Đội Xe Điện Thông Minh Xanh 5 Sao', cost: 4900000, effectValue: 0.75, description: 'Tăng 75% tiền thưởng giao hàng chuyên nghiệp.' },
+      { level: 5, title: 'Trung Tâm Hỏa Tốc Drone Tận Bàn', cost: 15000000, effectValue: 1.10, description: 'Tăng 110% tiền thưởng giao hàng (nhận đơn siêu lợi nhuận)!' },
+    ],
+  },
+  // 7. DÀN ÂM THANH & BẦU KHÔNG KHÍ QUÁN (Reputation Boost - 5 Cấp)
+  {
+    id: 'sound_ambience',
+    name: 'Dàn Âm Thanh & Bầu Không Khí',
+    icon: '🎵',
+    description: 'Âm nhạc du dương lan tỏa niềm vui, tăng nhanh điểm uy tín quán.',
+    cost: 150000,
+    level: 0,
+    maxLevel: 5,
+    category: 'comfort',
+    effect: { type: 'reputation_boost', value: 0.15 },
+    tiers: [
+      { level: 1, title: 'Đài Radio Sài Gòn Cũ Hoài Niệm', cost: 150000, effectValue: 0.15, description: 'Khách vui vẻ, +15% tỷ lệ nhận thêm sao uy tín ⭐.' },
+      { level: 2, title: 'Loa Bluetooth Nhạc Trịnh & Lofi', cost: 450000, effectValue: 0.30, description: 'Không gian ấm áp, +30% tỷ lệ nhận sao uy tín ⭐.' },
+      { level: 3, title: 'Dàn Âm Thanh Vòm Hát Cho Nhau', cost: 1400000, effectValue: 0.50, description: 'Khách say mê quán, +50% tỷ lệ nhận sao uy tín ⭐.' },
+      { level: 4, title: 'Ban Nhạc Sống Acoustic Cuối Tuần', cost: 4200000, effectValue: 0.75, description: 'Tiếng vang xa xôi, +75% tỷ lệ nhận sao uy tín ⭐.' },
+      { level: 5, title: 'Sân Khấu Nghệ Thuật Ẩm Thực Phố', cost: 12500000, effectValue: 1.10, description: 'Đỉnh cao văn hóa, gấp đôi (+110%) điểm uy tín nhận được!' },
+    ],
+  },
+  // 8. KÊ THÊM BÀN ĐÓN KHÁCH (Add Tables - 4 Cấp)
+  {
+    id: 'extra_tables',
+    name: 'Kê Thêm Bàn Đón Khách',
+    icon: '🪑',
+    description: 'Mở rộng thêm nhiều bàn phục vụ khách cùng lúc giờ cao điểm.',
+    cost: 250000,
+    level: 0,
+    maxLevel: 4,
+    category: 'kitchen',
+    effect: { type: 'add_table', value: 1 },
+    tiers: [
+      { level: 1, title: 'Kê Thêm Bàn Số 3 (Bàn Gỗ Sồi)', cost: 250000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 3).' },
+      { level: 2, title: 'Kê Thêm Bàn Số 4 (Bàn Inox Cao Cấp)', cost: 750000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 4).' },
+      { level: 3, title: 'Kê Thêm Bàn Số 5 (Bàn Đá Hoa Cương)', cost: 2500000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 5).' },
+      { level: 4, title: 'Kê Thêm Bàn Số 6 (Bàn VIP Hoàng Gia)', cost: 7000000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 6).' },
+    ],
+  },
+  // Tương thích ngược với save game cũ
   {
     id: 'extra_table_1',
-    name: 'Bàn Gỗ Sồi Cozy (Bàn 3)',
+    name: 'Bàn Gỗ Sồi Cozy (Bàn 3 cũ)',
     icon: '🪑',
-    description: 'Thêm 1 bàn phục vụ khách, giúp đón tiếp thêm nhiều khách cùng lúc.',
+    description: 'Thêm 1 bàn phục vụ khách.',
     cost: 150000,
     level: 0,
     maxLevel: 1,
@@ -556,45 +974,82 @@ export const SHOP_UPGRADES: ShopUpgrade[] = [
   },
   {
     id: 'extra_table_2',
-    name: 'Bàn Gỗ Sồi Cozy (Bàn 4)',
+    name: 'Bàn Gỗ Sồi Cozy (Bàn 4 cũ)',
     icon: '🪑',
-    description: 'Thêm bàn thứ 4 cho quán, tăng doanh thu giờ cao điểm.',
+    description: 'Thêm bàn thứ 4 cho quán.',
     cost: 350000,
     level: 0,
     maxLevel: 1,
     effect: { type: 'add_table', value: 1 },
   },
-  {
-    id: 'modern_stove',
-    name: 'Bếp Nướng Điện Cao Cấp',
-    icon: '⚡',
-    description: 'Nhiệt độ ổn định, giảm 30% thời gian nấu món.',
-    cost: 200000,
-    level: 0,
-    maxLevel: 1,
-    effect: { type: 'cook_speed', value: 0.3 },
-  },
-  {
-    id: 'cozy_storage',
-    name: 'Tủ Kho Bảo Quản Lớn',
-    icon: '📦',
-    description: 'Tăng sức chứa kho thêm 30 đơn vị nguyên liệu.',
-    cost: 120000,
-    level: 0,
-    maxLevel: 2,
-    effect: { type: 'storage_capacity', value: 30 },
-  },
-  {
-    id: 'flower_signboard',
-    name: 'Biển Hiệu Hoa Hồng Pastel',
-    icon: '🌸',
-    description: 'Biển hiệu lung linh dễ thương, tăng 25% tần suất khách ghé thăm.',
-    cost: 250000,
-    level: 0,
-    maxLevel: 1,
-    effect: { type: 'attract_customers', value: 0.25 },
-  },
 ];
+
+// Helper tính toán thông tin tầng nâng cấp của trang thiết bị
+export const getUpgradeTierInfo = (
+  upgrade: ShopUpgrade,
+  currentLevel: number
+): {
+  level: number;
+  title: string;
+  cost: number;
+  description: string;
+  effectValue: number;
+  isMax: boolean;
+} => {
+  const isMax = currentLevel >= upgrade.maxLevel;
+  if (upgrade.tiers && upgrade.tiers.length > 0) {
+    const targetIdx = Math.min(upgrade.tiers.length - 1, currentLevel);
+    const tier = upgrade.tiers[targetIdx];
+    return {
+      level: currentLevel + 1,
+      title: tier.title,
+      cost: tier.cost,
+      description: tier.description,
+      effectValue: tier.effectValue,
+      isMax,
+    };
+  }
+
+  const nextCost = Math.round(upgrade.cost * Math.pow(2.2, currentLevel));
+  return {
+    level: currentLevel + 1,
+    title: `${upgrade.name} (Cấp ${currentLevel + 1})`,
+    cost: nextCost,
+    description: upgrade.description,
+    effectValue: upgrade.effect.value * (currentLevel + 1),
+    isMax,
+  };
+};
+
+// Helper tính toán quy mô chi nhánh thương hiệu
+export const getBranchTierInfo = (
+  restaurantId: RestaurantTypeId,
+  currentLevel = 1
+): {
+  currentTier: BranchTier;
+  nextTier: BranchTier | null;
+  isMax: boolean;
+} => {
+  const rest = RESTAURANT_TYPES[restaurantId];
+  const tiers = rest?.branchTiers || [];
+  const safeLvl = Math.max(1, Math.min(tiers.length, currentLevel));
+  const currentTier = tiers[safeLvl - 1] || {
+    level: 1,
+    name: 'Kiosk Tiêu Chuẩn',
+    tagline: 'Chi nhánh bán hàng cơ bản',
+    cost: 0,
+    requiredReputation: 0,
+    requiredStaff: 0,
+    bonusMultiplier: 1.0,
+    description: 'Hiệu suất bán 100%',
+  };
+  const nextTier = safeLvl < tiers.length ? tiers[safeLvl] : null;
+  return {
+    currentTier,
+    nextTier,
+    isMax: safeLvl >= tiers.length,
+  };
+};
 
 export const EMPLOYEES: Employee[] = [
   {
@@ -1554,6 +2009,13 @@ export const INITIAL_GAME_STATE: GameSaveState = {
   // V0.6: Hệ thống Chuỗi Chi Nhánh Đa Ẩm Thực
   activeRestaurantId: 'banh_mi',
   unlockedRestaurants: ['banh_mi'],
+  branchLevels: {
+    banh_mi: 1,
+    pho: 1,
+    bun: 1,
+    beefsteak: 1,
+    com_tam: 1,
+  },
   hasChosenStarter: false,
 };
 

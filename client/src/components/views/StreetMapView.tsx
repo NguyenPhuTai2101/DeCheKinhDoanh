@@ -7,6 +7,7 @@ import {
   NEIGHBORS_DATA,
   RESTAURANT_TYPES,
   EMPLOYEES,
+  getBranchTierInfo,
 } from '../../../../shared/gameData';
 import { BusinessStageId, RestaurantTypeId, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
@@ -67,8 +68,11 @@ export const StreetMapView: React.FC = () => {
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
   const upgrades = gameState.purchasedUpgrades;
-  const maxTables =
-    currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+  const extraTableCount =
+    (upgrades['extra_tables'] || 0) +
+    (upgrades['extra_table_1'] ? 1 : 0) +
+    (upgrades['extra_table_2'] ? 1 : 0);
+  const maxTables = currentStage.maxTables + extraTableCount;
 
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
 
@@ -335,6 +339,10 @@ export const StreetMapView: React.FC = () => {
 
     // TRƯỜNG HỢP 2: CHI NHÁNH ĐÃ MỞ (UNLOCKED BRANCH)
     if (isUnlocked) {
+      const branchLevels: Record<string, number> = gameState.branchLevels || {};
+      const branchLvl = branchLevels[restKey] || 1;
+      const branchTier = getBranchTierInfo(restKey, branchLvl);
+
       return (
         <div
           id={`lot-${restKey}`}
@@ -369,7 +377,9 @@ export const StreetMapView: React.FC = () => {
             >
               <span>{isAutomated ? '🟢' : '⚠️'}</span>
               <span>
-                {isAutomated ? `TỰ ĐỘNG BÁN (${assignedStaff.length} NV)` : 'CẦN NHÂN VIÊN'}
+                {isAutomated
+                  ? `TỰ ĐỘNG BÁN (${assignedStaff.length} NV · Cấp ${branchLvl})`
+                  : 'CẦN NHÂN VIÊN'}
               </span>
             </div>
           </div>
@@ -382,12 +392,17 @@ export const StreetMapView: React.FC = () => {
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xl animate-bounce-short shrink-0">{rest.icon}</span>
               <div className="min-w-0">
-                <h3 className="font-black text-xs text-slate-900 leading-tight truncate">
-                  {rest.name}
-                </h3>
-                <div className="text-[8.5px] font-bold text-emerald-800 flex items-center gap-1 truncate">
+                <div className="flex items-center gap-1">
+                  <h3 className="font-black text-xs text-slate-900 leading-tight truncate">
+                    {rest.name}
+                  </h3>
+                  <span className="text-[7.5px] bg-amber-100 text-amber-900 border border-amber-300 px-1 rounded font-black shrink-0">
+                    Cấp {branchLvl}
+                  </span>
+                </div>
+                <div className="text-[8px] font-bold text-emerald-800 flex items-center gap-1 truncate">
                   <Award className="w-2.5 h-2.5 text-emerald-600" />
-                  <span>{rest.badge}</span>
+                  <span>{branchTier.currentTier.name}</span>
                 </div>
               </div>
             </div>
@@ -515,12 +530,26 @@ export const StreetMapView: React.FC = () => {
               <h3 className="font-black text-xs text-slate-800 leading-tight truncate">
                 Dự Án: {rest.name}
               </h3>
-              <div className="text-[8.5px] font-bold text-amber-800 flex items-center gap-1 truncate">
+              <div className="text-[8px] font-bold text-amber-800 flex items-center gap-1 truncate">
                 <span className="text-rose-600 font-extrabold">
                   {rest.unlockCost.toLocaleString('vi-VN')} đ
                 </span>
                 <span>·</span>
                 <span className="text-amber-700">{rest.requiredReputation}⭐</span>
+                {(rest.requiredStaffCount || 0) > 0 && (
+                  <>
+                    <span>·</span>
+                    <span
+                      className={
+                        gameState.hiredEmployees.length >= (rest.requiredStaffCount || 0)
+                          ? 'text-emerald-700 font-extrabold'
+                          : 'text-rose-600 font-extrabold'
+                      }
+                    >
+                      {rest.requiredStaffCount} NV
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -528,7 +557,9 @@ export const StreetMapView: React.FC = () => {
           <button
             onClick={safeClick(() => openModal('franchise'))}
             className={`px-2 py-1 text-white rounded-lg text-[9.5px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0 ${
-              gameState.money >= rest.unlockCost && gameState.reputation >= rest.requiredReputation
+              gameState.money >= rest.unlockCost &&
+              gameState.reputation >= rest.requiredReputation &&
+              gameState.hiredEmployees.length >= (rest.requiredStaffCount || 0)
                 ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
                 : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600'
             }`}

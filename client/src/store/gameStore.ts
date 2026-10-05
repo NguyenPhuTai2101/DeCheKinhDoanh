@@ -29,6 +29,8 @@ import {
   NEIGHBORS_DATA,
   STREET_EVENTS,
   RESTAURANT_TYPES,
+  getUpgradeTierInfo,
+  getBranchTierInfo,
 } from '../../../shared/gameData';
 
 const LOCAL_STORAGE_KEY = 'cozy_empire_save_v4';
@@ -170,6 +172,7 @@ export interface GameStoreState {
   chooseStarterRestaurant: (restaurantId: RestaurantTypeId) => void;
   switchActiveRestaurant: (restaurantId: RestaurantTypeId) => void;
   unlockRestaurantFranchise: (restaurantId: RestaurantTypeId) => boolean;
+  upgradeBranch: (restaurantId: RestaurantTypeId) => boolean;
 
   // Day Cycle
   endDayAndSleep: () => void;
@@ -468,25 +471,27 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (!upgrade) return false;
 
     const currentLvl = gameState.purchasedUpgrades[upgradeId] || 0;
-    if (currentLvl >= upgrade.maxLevel) {
-      get().showToast('ℹ️ Nâng cấp này đã đạt cấp tối đa!');
+    const tierInfo = getUpgradeTierInfo(upgrade, currentLvl);
+
+    if (tierInfo.isMax) {
+      get().showToast('ℹ️ Trang bị này đã đạt cấp tối đa!');
       return false;
     }
 
-    if (gameState.money < upgrade.cost) {
-      get().showToast('❌ Không đủ tiền để mua nâng cấp này!');
+    if (gameState.money < tierInfo.cost) {
+      get().showToast(`❌ Cần ${(tierInfo.cost - gameState.money).toLocaleString('vi-VN')} đ để nâng cấp lên ${tierInfo.title}!`);
       return false;
     }
 
     let extraCapacity = 0;
     if (upgrade.effect.type === 'storage_capacity') {
-      extraCapacity = upgrade.effect.value;
+      extraCapacity = tierInfo.effectValue;
     }
 
     set({
       gameState: {
         ...gameState,
-        money: gameState.money - upgrade.cost,
+        money: gameState.money - tierInfo.cost,
         storageCapacity: gameState.storageCapacity + extraCapacity,
         purchasedUpgrades: {
           ...gameState.purchasedUpgrades,
@@ -495,7 +500,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       },
     });
 
-    get().showToast(`🎉 Đã nâng cấp thành công: ${upgrade.name}!`);
+    get().showToast(`🎉 Đã nâng cấp thành công [${tierInfo.title}]!`);
     get().saveLocal();
     return true;
   },
@@ -1388,16 +1393,33 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     if (gameState.reputation < restaurant.requiredReputation) {
-      get().showToast(`Cần ${restaurant.requiredReputation} điểm Uy tín để mở chi nhánh này!`);
+      get().showToast(`Cần ${restaurant.requiredReputation}⭐ Uy tín để mở chi nhánh này!`);
+      return false;
+    }
+
+    if (restaurant.requiredStaffCount && gameState.hiredEmployees.length < restaurant.requiredStaffCount) {
+      get().showToast(`⚠️ Cần tuyển ít nhất ${restaurant.requiredStaffCount} nhân viên để quản lý chi nhánh ${restaurant.name}! (Hiện có ${gameState.hiredEmployees.length} NV)`);
       return false;
     }
 
     const currentUnlocked = gameState.unlockedRestaurants || ['banh_mi'];
+    const currentBranchLevels = gameState.branchLevels || {
+      banh_mi: 1,
+      pho: 1,
+      bun: 1,
+      beefsteak: 1,
+      com_tam: 1,
+    };
+
     set((state) => ({
       gameState: {
         ...state.gameState,
         money: state.gameState.money - restaurant.unlockCost,
         unlockedRestaurants: [...currentUnlocked, restaurantId],
+        branchLevels: {
+          ...currentBranchLevels,
+          [restaurantId]: 1,
+        },
         activeRestaurantId: restaurantId,
         shopName: restaurant.name,
       },
@@ -1406,6 +1428,70 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     get().saveLocal();
     get().showToast(`Tưng bừng khai trương chi nhánh mới: ${restaurant.name}! 🎊`);
+    return true;
+  },
+
+  upgradeBranch: (restaurantId: RestaurantTypeId) => {
+    const { gameState } = get();
+    const rest = RESTAURANT_TYPES[restaurantId];
+    if (!rest) return false;
+
+    const unlockedList = gameState.unlockedRestaurants || ['banh_mi'];
+    if (!unlockedList.includes(restaurantId)) {
+      get().showToast('❌ Quán ăn này chưa được mở khóa!');
+      return false;
+    }
+
+    const currentBranchLevels = gameState.branchLevels || {
+      banh_mi: 1,
+      pho: 1,
+      bun: 1,
+      beefsteak: 1,
+      com_tam: 1,
+    };
+    const currentLevel = currentBranchLevels[restaurantId] || 1;
+    const tierInfo = getBranchTierInfo(restaurantId, currentLevel);
+
+    if (tierInfo.isMax || !tierInfo.nextTier) {
+      get().showToast(`👑 ${rest.name} đã đạt cấp độ Flagship tối đa!`);
+      return false;
+    }
+
+    const nextTier = tierInfo.nextTier;
+
+    if (gameState.money < nextTier.cost) {
+      get().showToast(`❌ Cần thêm ${(nextTier.cost - gameState.money).toLocaleString('vi-VN')} đ để nâng cấp chi nhánh!`);
+      return false;
+    }
+
+    if (gameState.reputation < nextTier.requiredReputation) {
+      get().showToast(`❌ Cần ${nextTier.requiredReputation}⭐ Uy tín để nâng cấp lên [${nextTier.name}]!`);
+      return false;
+    }
+
+    // Kiểm tra nhân sự phân công trực tiếp tại chi nhánh
+    const branchStaff = gameState.hiredEmployees.filter(
+      (id) => (gameState.employeeDetails[id]?.assignedRestaurantId || 'banh_mi') === restaurantId
+    );
+    if (branchStaff.length < nextTier.requiredStaff) {
+      get().showToast(`⚠️ Cần ít nhất ${nextTier.requiredStaff} nhân viên phụ trách trực tiếp chi nhánh này để nâng cấp! (Hiện có: ${branchStaff.length} NV)`);
+      return false;
+    }
+
+    set((state) => ({
+      gameState: {
+        ...state.gameState,
+        money: state.gameState.money - nextTier.cost,
+        reputation: state.gameState.reputation + 20,
+        branchLevels: {
+          ...currentBranchLevels,
+          [restaurantId]: currentLevel + 1,
+        },
+      },
+    }));
+
+    get().showToast(`🎊 Nâng cấp thành công ${rest.name} lên [${nextTier.name}]! (+20⭐)`);
+    get().saveLocal();
     return true;
   },
 

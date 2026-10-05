@@ -30,8 +30,11 @@ export const useGameSimulation = () => {
 
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const upgrades = gameState.purchasedUpgrades;
-  const maxTables =
-    currentStage.maxTables + (upgrades['extra_table_1'] ? 1 : 0) + (upgrades['extra_table_2'] ? 1 : 0);
+  const extraTableCount =
+    (upgrades['extra_tables'] || 0) +
+    (upgrades['extra_table_1'] ? 1 : 0) +
+    (upgrades['extra_table_2'] ? 1 : 0);
+  const maxTables = currentStage.maxTables + extraTableCount;
 
   // Timers tracked in refs so component re-renders do NOT reset them
   const spawnTimerRef = useRef(0);
@@ -145,9 +148,11 @@ export const useGameSimulation = () => {
         else if (order.state === 'cooking') {
           const cook = hiredList.find((e) => e.id === order.chefId);
           const cookSpeed = (cook?.speed || 1.0) * managerBoost;
+          const stoveLvl = currentGameState.purchasedUpgrades['modern_stove'] || 0;
+          const stoveBoost = Math.max(0.35, 1 - stoveLvl * 0.13); // Giảm đến 65% thời gian nấu
           const cookingDurationMs = Math.max(
-            800,
-            (recipe.cookingTimeMs * (hasTuan ? 0.75 : 1.0)) / cookSpeed / timeSpeed
+            500,
+            (recipe.cookingTimeMs * (hasTuan ? 0.75 : 1.0) * stoveBoost) / cookSpeed / timeSpeed
           );
 
           const progressDelta = (tickMs / cookingDurationMs) * 100;
@@ -204,7 +209,9 @@ export const useGameSimulation = () => {
             // Ăn xong, thu tiền thanh toán + tip
             const cType = CUSTOMER_TYPES[order.typeId];
             const patiencePercent = Math.max(0, order.patienceRemaining / order.maxPatience);
-            let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent);
+            const dishwareLvl = currentGameState.purchasedUpgrades['dishware_premium'] || 0;
+            const dishwareTipBoost = 1 + dishwareLvl * 0.15; // +15% tip mỗi cấp
+            let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent * dishwareTipBoost);
             if (hasTuan) tip = Math.round(tip * 1.15);
             if (order.neighborId) {
               tip += Math.round(recipe.basePrice * 0.2);
@@ -253,9 +260,9 @@ export const useGameSimulation = () => {
       setActiveOrders(nextOrders);
 
       // 1.4 Sinh khách hàng mới vào bàn ăn
-      const hasSignboard = (currentGameState.purchasedUpgrades['flower_signboard'] || 0) > 0;
+      const signboardLvl = currentGameState.purchasedUpgrades['flower_signboard'] || 0;
       const baseRate = currentStage.customerRateMs;
-      const spawnRate = hasSignboard ? Math.round(baseRate * 0.85) : baseRate;
+      const spawnRate = Math.round(baseRate * Math.max(0.35, 1 - signboardLvl * 0.13));
 
       spawnTimerRef.current += tickMs * timeSpeed;
       if (spawnTimerRef.current >= spawnRate) {
@@ -274,12 +281,16 @@ export const useGameSimulation = () => {
           const activeRest = RESTAURANT_TYPES[currentRestId] || RESTAURANT_TYPES.banh_mi;
           const availableRecipes = activeRest.primaryRecipeIds;
 
+          // Tiện ích ghế ngồi tăng thêm độ kiên nhẫn
+          const comfortLvl = currentGameState.purchasedUpgrades['seating_comfort'] || 0;
+          const extraPatience = comfortLvl * 15;
+
           const isNeighbor = Math.random() < 0.22;
           let chosenType: CustomerTypeId = 'student';
           let chosenNeighborId: NeighborId | undefined = undefined;
           let chosenRecipe: RecipeId = availableRecipes[0] || 'banh_mi_trung';
           let dialogue = '';
-          let patienceSeconds = 45;
+          let patienceSeconds = 45 + extraPatience;
 
           if (isNeighbor) {
             const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
@@ -291,7 +302,7 @@ export const useGameSimulation = () => {
               chosenRecipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
             }
             dialogue = nData.dialogues[1] || 'Chào chủ quán!';
-            patienceSeconds = 55;
+            patienceSeconds = 55 + extraPatience;
           } else {
             const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
             chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
@@ -302,7 +313,7 @@ export const useGameSimulation = () => {
             } else {
               chosenRecipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
             }
-            patienceSeconds = cType.patienceSeconds;
+            patienceSeconds = cType.patienceSeconds + extraPatience;
           }
 
           soundManager.playDoorBell();
@@ -347,8 +358,13 @@ export const useGameSimulation = () => {
                 ];
               const recipe = RECIPES[randomRecipeId];
               if (recipe) {
-                const staffBonus = 1 + 0.1 * branchStaff.length;
-                const earned = Math.round(recipe.basePrice * staffBonus * managerBoost);
+                const staffBonus = 1 + 0.15 * branchStaff.length;
+                const branchLevels: Record<string, number> = currentGameState.branchLevels || {};
+                const branchLvl = branchLevels[branchId] || 1;
+                const tier = branchRest.branchTiers?.[branchLvl - 1];
+                const tierMultiplier = tier?.bonusMultiplier || (1 + (branchLvl - 1) * 0.5);
+
+                const earned = Math.round(recipe.basePrice * staffBonus * managerBoost * tierMultiplier);
                 addBranchRevenue(branchId, earned, recipe.name);
               }
             }

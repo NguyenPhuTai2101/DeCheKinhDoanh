@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { RESTAURANT_TYPES, RECIPES } from '../../../../shared/gameData';
+import { RESTAURANT_TYPES, RECIPES, getBranchTierInfo } from '../../../../shared/gameData';
 import { RestaurantTypeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -13,15 +13,25 @@ import {
   ArrowRight,
   TrendingUp,
   Award,
+  Users,
+  Crown,
+  ChevronRight,
+  Coins,
 } from 'lucide-react';
 
 export const FranchiseModal: React.FC = () => {
-  const { closeModal, gameState, switchActiveRestaurant, unlockRestaurantFranchise } =
-    useGameStore();
+  const {
+    closeModal,
+    gameState,
+    switchActiveRestaurant,
+    unlockRestaurantFranchise,
+    upgradeBranch,
+  } = useGameStore();
 
   const currentRestId = gameState.activeRestaurantId || 'banh_mi';
   const unlockedList = gameState.unlockedRestaurants || ['banh_mi'];
   const restaurants = Object.values(RESTAURANT_TYPES);
+  const branchLevels: Record<string, number> = gameState.branchLevels || {};
 
   const handleSwitch = (id: RestaurantTypeId) => {
     soundManager.playClick();
@@ -43,6 +53,19 @@ export const FranchiseModal: React.FC = () => {
     }
   };
 
+  const handleUpgradeBranch = (id: RestaurantTypeId) => {
+    soundManager.playCoin();
+    const success = upgradeBranch(id);
+    if (success) {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#F59E0B', '#10B981', '#6366F1', '#EC4899'],
+      });
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in select-none">
       <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-300 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh]">
@@ -55,7 +78,7 @@ export const FranchiseModal: React.FC = () => {
                 Chuỗi Đế Chế Ẩm Thực Đa Ngành
               </h2>
               <p className="text-[11px] text-amber-100 font-medium">
-                Sở hữu chuỗi thương hiệu Phở, Bún Bò, Bò Né, Cơm Tấm, Bánh Mì
+                Mở rộng & Nâng cấp 5 thương hiệu: Phở, Bún Bò, Bò Né, Cơm Tấm, Bánh Mì
               </p>
             </div>
           </div>
@@ -71,7 +94,7 @@ export const FranchiseModal: React.FC = () => {
         </div>
 
         {/* Thống kê chuỗi chi nhánh */}
-        <div className="bg-amber-100/60 px-4 py-2 border-b border-amber-200 flex items-center justify-between text-xs shrink-0">
+        <div className="bg-amber-100/60 px-4 py-2 border-b border-amber-200 flex items-center justify-between text-xs shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <span className="font-extrabold text-amber-950 flex items-center gap-1">
               <span>🏪 Đã mở:</span>
@@ -79,26 +102,43 @@ export const FranchiseModal: React.FC = () => {
                 {unlockedList.length}/{restaurants.length} Thương hiệu
               </span>
             </span>
+            <span className="text-amber-800 font-bold flex items-center gap-1">
+              <span>👥 Nhân sự:</span>
+              <span className="text-emerald-700 font-black">{gameState.hiredEmployees.length} NV</span>
+            </span>
           </div>
 
           <div className="flex items-center gap-2 text-[11px] font-bold text-amber-900">
-            <span>Ví: {gameState.money.toLocaleString('vi-VN')} đ</span>
+            <span>Ví: <strong className="text-rose-600">{gameState.money.toLocaleString('vi-VN')} đ</strong></span>
             <span>·</span>
-            <span>⭐ Uy tín: {gameState.reputation}</span>
+            <span>⭐ Uy tín: <strong>{gameState.reputation}</strong></span>
           </div>
         </div>
 
         {/* Danh sách 5 thương hiệu ẩm thực */}
-        <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-3">
+        <div className="p-3 sm:p-4 overflow-y-auto flex-1 space-y-3.5">
           {restaurants.map((rest) => {
             const isCurrent = rest.id === currentRestId;
             const isUnlocked = unlockedList.includes(rest.id);
+            const staffReq = rest.requiredStaffCount || 0;
+            const hasStaffReq = gameState.hiredEmployees.length >= staffReq;
             const canAffordMoney = gameState.money >= rest.unlockCost;
             const canAffordRep = gameState.reputation >= rest.requiredReputation;
-            const canUnlock = !isUnlocked && canAffordMoney && canAffordRep;
+            const canUnlock = !isUnlocked && canAffordMoney && canAffordRep && hasStaffReq;
+
             const branchStaff = gameState.hiredEmployees.filter(
               (id) => (gameState.employeeDetails[id]?.assignedRestaurantId || 'banh_mi') === rest.id
             );
+
+            const branchLvl = branchLevels[rest.id] || 1;
+            const tierInfo = getBranchTierInfo(rest.id, branchLvl);
+            const nextTier = tierInfo.nextTier;
+            const canUpgradeBranch =
+              isUnlocked &&
+              nextTier &&
+              gameState.money >= nextTier.cost &&
+              gameState.reputation >= nextTier.requiredReputation &&
+              branchStaff.length >= nextTier.requiredStaff;
 
             return (
               <div
@@ -107,8 +147,8 @@ export const FranchiseModal: React.FC = () => {
                   isCurrent
                     ? 'bg-white border-amber-500 ring-2 ring-amber-200 shadow-md'
                     : isUnlocked
-                    ? 'bg-white/90 border-emerald-200 shadow-2xs hover:border-emerald-300'
-                    : 'bg-slate-50 border-slate-200 opacity-80'
+                    ? 'bg-white/95 border-emerald-300 shadow-xs hover:border-emerald-400'
+                    : 'bg-slate-50 border-slate-300 opacity-85'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -116,24 +156,29 @@ export const FranchiseModal: React.FC = () => {
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <div
                       style={{ backgroundColor: rest.accentColor }}
-                      className="w-13 h-13 rounded-2xl flex items-center justify-center text-3xl shadow-xs shrink-0 border border-black/5"
+                      className="w-13 h-13 rounded-2xl flex items-center justify-center text-3xl shadow-xs shrink-0 border border-black/5 mt-0.5"
                     >
                       {rest.icon}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <h4 className="font-black text-sm text-slate-800 leading-tight">
                           {rest.name}
                         </h4>
                         {isCurrent && (
-                          <span className="bg-amber-500 text-white text-[8.5px] font-black px-2 py-0.2 rounded-full">
-                            Đang Quản Lý ⭐
+                          <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-0.2 rounded-full">
+                            Đang Đứng Bếp 👑
+                          </span>
+                        )}
+                        {isUnlocked && (
+                          <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-md">
+                            Cấp {branchLvl}/5
                           </span>
                         )}
                         {isUnlocked && !isCurrent && (
                           <span
-                            className={`text-[8.5px] font-bold px-2 py-0.2 rounded-full flex items-center gap-0.5 ${
+                            className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 ${
                               branchStaff.length > 0
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
@@ -149,18 +194,18 @@ export const FranchiseModal: React.FC = () => {
 
                       <div
                         style={{ color: rest.themeColor }}
-                        className="text-[10px] font-extrabold mt-0.5 flex items-center gap-1"
+                        className="text-[9.5px] font-extrabold mt-0.5 flex items-center gap-1"
                       >
                         <Award className="w-2.5 h-2.5" />
                         <span>{rest.badge}</span>
                       </div>
 
-                      <p className="text-[10.5px] text-slate-600 italic mt-0.5 font-medium line-clamp-1">
+                      <p className="text-[10px] text-slate-600 italic mt-0.5 font-medium line-clamp-1">
                         "{rest.tagline}"
                       </p>
 
                       {/* Dụng cụ nấu & Thực đơn */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap text-[9.5px]">
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[9px]">
                         <span className="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded-md font-bold flex items-center gap-1">
                           <span>{rest.equipmentIcon}</span>
                           <span>{rest.equipmentName}</span>
@@ -173,72 +218,144 @@ export const FranchiseModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Footer nút hành động / mở khóa */}
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
-                  {/* Thực đơn tiêu biểu */}
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {rest.primaryRecipeIds.slice(0, 3).map((rId) => {
-                      const recipe = RECIPES[rId];
-                      if (!recipe) return null;
-                      return (
-                        <span
-                          key={rId}
-                          className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold"
-                        >
-                          {recipe.icon} {recipe.name.split(' ')[0]}
-                        </span>
-                      );
-                    })}
-                  </div>
+                {/* KHU VỰC NÂNG CẤP CHI NHÁNH (NẾU ĐÃ MỞ QUÁN) */}
+                {isUnlocked ? (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 bg-[#FFFDF8] rounded-xl p-2.5 border border-amber-200/60">
+                    <div className="flex items-center justify-between text-xs mb-1.5 flex-wrap gap-1">
+                      <div className="flex items-center gap-1.5 font-black text-amber-950">
+                        <Crown className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Quy mô: {tierInfo.currentTier.name}</span>
+                      </div>
+                      <div className="text-[10.5px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ⚡ Hiệu suất: {Math.round(tierInfo.currentTier.bonusMultiplier * 100)}% ({tierInfo.currentTier.bonusMultiplier}x Doanh thu)
+                      </div>
+                    </div>
 
-                  {/* Nút Chuyển Quán hoặc Mở Chi Nhánh */}
-                  <div>
-                    {isCurrent ? (
-                      <span className="text-[10.5px] font-extrabold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
-                        Quán đang hoạt động
-                      </span>
-                    ) : isUnlocked ? (
-                      <button
-                        onClick={() => handleSwitch(rest.id)}
-                        className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black shadow-xs active:scale-95 transition-all flex items-center gap-1"
-                      >
-                        <span>Chuyển Quản Lý 🔀</span>
-                      </button>
+                    {/* Thanh tiến độ 5 cấp chi nhánh */}
+                    <div className="flex items-center gap-1 my-1.5">
+                      {Array.from({ length: 5 }).map((_, stepIdx) => (
+                        <div
+                          key={stepIdx}
+                          className={`h-1.5 flex-1 rounded-full transition-all ${
+                            stepIdx < branchLvl ? 'bg-emerald-500 shadow-2xs' : 'bg-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Nâng cấp quy mô tiếp theo */}
+                    {tierInfo.isMax || !nextTier ? (
+                      <div className="text-[10.5px] font-extrabold text-amber-800 bg-amber-50 p-1.5 rounded-lg border border-amber-200 text-center">
+                        👑 Chi nhánh đã đạt quy mô FLAGSHIP tối đa (+250% Doanh thu)!
+                      </div>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="text-right text-[10px] leading-tight">
-                          <div
-                            className={`font-black ${
-                              canAffordMoney ? 'text-slate-800' : 'text-rose-600'
-                            }`}
-                          >
-                            {rest.unlockCost.toLocaleString('vi-VN')} đ
+                      <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                        <div className="text-[10.5px] min-w-0">
+                          <div className="font-black text-slate-800">
+                            Nâng lên Cấp {nextTier.level}: <span className="text-rose-600">{nextTier.name}</span>
                           </div>
-                          <div
-                            className={`font-bold ${
-                              canAffordRep ? 'text-emerald-700' : 'text-rose-600'
-                            }`}
-                          >
-                            Cần: {rest.requiredReputation} ⭐
+                          <div className="text-[9.5px] text-slate-600 mt-0.5">
+                            {nextTier.description}
+                          </div>
+                          <div className="text-[9px] text-amber-800 font-bold flex items-center gap-1.5 mt-0.5">
+                            <span>Giá: <strong className="text-rose-600 font-black">{nextTier.cost.toLocaleString('vi-VN')} đ</strong></span>
+                            <span>·</span>
+                            <span>Cần: <strong>{nextTier.requiredReputation}⭐</strong></span>
+                            <span>·</span>
+                            <span>Cần: <strong className={branchStaff.length >= nextTier.requiredStaff ? 'text-emerald-700' : 'text-rose-600'}>{nextTier.requiredStaff} NV trực</strong></span>
                           </div>
                         </div>
 
                         <button
-                          onClick={() => handleUnlock(rest.id)}
-                          disabled={!canUnlock}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-all ${
-                            canUnlock
-                              ? 'bg-amber-500 hover:bg-amber-600 text-white animate-bounce-short active:scale-95'
+                          onClick={() => handleUpgradeBranch(rest.id)}
+                          disabled={!canUpgradeBranch}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-all shrink-0 ${
+                            canUpgradeBranch
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white animate-bounce-short active:scale-95'
                               : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           }`}
                         >
                           <Sparkles className="w-3 h-3" />
-                          <span>{canUnlock ? 'Mở Chi Nhánh 🚀' : 'Chưa Đủ Tiền/Uy Tín'}</span>
+                          <span>{canUpgradeBranch ? 'Nâng Cấp Chi Nhánh ⭐' : 'Chưa Đạt Điều Kiện'}</span>
                         </button>
                       </div>
                     )}
                   </div>
-                </div>
+                ) : (
+                  /* ĐIỀU KIỆN MỞ KHÓA MỚI (CHƯA MỞ) */
+                  <div className="mt-2.5 pt-2 border-t border-slate-200 bg-amber-50/50 rounded-xl p-2.5 border border-dashed border-amber-300">
+                    <div className="text-xs font-black text-slate-800 mb-1 flex items-center gap-1">
+                      <span>🏗️ Điều kiện mở thương hiệu:</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] mb-2">
+                      <div className={`p-1 rounded-lg border ${canAffordMoney ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-white border-rose-200 text-rose-700 font-bold'}`}>
+                        <div>Vốn đầu tư</div>
+                        <div className="font-black text-[11px]">{rest.unlockCost.toLocaleString('vi-VN')} đ</div>
+                      </div>
+                      <div className={`p-1 rounded-lg border ${canAffordRep ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-white border-rose-200 text-rose-700 font-bold'}`}>
+                        <div>Điểm Uy tín</div>
+                        <div className="font-black text-[11px]">{rest.requiredReputation} ⭐</div>
+                      </div>
+                      <div className={`p-1 rounded-lg border ${hasStaffReq ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold' : 'bg-white border-rose-200 text-rose-700 font-bold'}`}>
+                        <div>Nhân sự quán</div>
+                        <div className="font-black text-[11px]">{staffReq} NV</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9.5px] text-slate-500 italic">
+                        {canUnlock ? '✨ Bạn đã đủ điều kiện khai trương!' : '⏳ Cần tích lũy thêm vốn, uy tín và tuyển nhân sự'}
+                      </span>
+                      <button
+                        onClick={() => handleUnlock(rest.id)}
+                        disabled={!canUnlock}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-all ${
+                          canUnlock
+                            ? 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white animate-bounce-short active:scale-95'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>{canUnlock ? 'Mở Chi Nhánh 🚀' : 'Chưa Đủ Điều Kiện'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer chuyển sang đứng bếp */}
+                {isUnlocked && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {rest.primaryRecipeIds.slice(0, 3).map((rId) => {
+                        const recipe = RECIPES[rId];
+                        if (!recipe) return null;
+                        return (
+                          <span
+                            key={rId}
+                            className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[8.5px] font-bold"
+                          >
+                            {recipe.icon} {recipe.name.split(' ')[0]}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      {isCurrent ? (
+                        <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                          Đang Đứng Bếp Quán Này 🍳
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSwitch(rest.id)}
+                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[11px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-1"
+                        >
+                          <span>Chuyển Sang Đứng Bếp 🔀</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

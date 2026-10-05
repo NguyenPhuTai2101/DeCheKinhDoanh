@@ -65,6 +65,17 @@ export type RecipeId =
 
 export type RestaurantTypeId = 'banh_mi' | 'pho' | 'bun' | 'beefsteak' | 'com_tam';
 
+export interface BranchTier {
+  level: number;
+  name: string;
+  tagline: string;
+  cost: number;
+  requiredReputation: number;
+  requiredStaff: number;
+  bonusMultiplier: number;
+  description: string;
+}
+
 export interface RestaurantType {
   id: RestaurantTypeId;
   name: string;
@@ -75,6 +86,8 @@ export interface RestaurantType {
   starterDescription: string;
   unlockCost: number;
   requiredReputation: number;
+  requiredStaffCount?: number;
+  branchTiers?: BranchTier[];
   themeColor: string;
   accentColor: string;
   equipmentName: string;
@@ -146,6 +159,14 @@ export interface TableSpot {
   customerId?: string;
 }
 
+export interface ShopUpgradeTier {
+  level: number;
+  title: string;
+  cost: number;
+  description: string;
+  effectValue: number;
+}
+
 export interface ShopUpgrade {
   id: string;
   name: string;
@@ -154,8 +175,18 @@ export interface ShopUpgrade {
   cost: number;
   level: number;
   maxLevel: number;
+  category?: 'kitchen' | 'storage' | 'marketing' | 'comfort' | 'service' | 'logistics';
+  tiers?: ShopUpgradeTier[];
   effect: {
-    type: 'add_table' | 'cook_speed' | 'storage_capacity' | 'attract_customers';
+    type:
+      | 'add_table'
+      | 'cook_speed'
+      | 'storage_capacity'
+      | 'attract_customers'
+      | 'customer_patience'
+      | 'tip_rate'
+      | 'delivery_bonus'
+      | 'reputation_boost';
     value: number;
   };
 }
@@ -373,6 +404,7 @@ export interface GameSaveState {
   // V0.6: Hệ thống Chuỗi Chi Nhánh Đa Ẩm Thực
   activeRestaurantId?: RestaurantTypeId;
   unlockedRestaurants?: RestaurantTypeId[];
+  branchLevels?: Record<RestaurantTypeId, number>;
   hasChosenStarter?: boolean;
 }
 

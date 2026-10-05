@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { SHOP_UPGRADES, BUSINESS_STAGES } from '../../../../shared/gameData';
+import { SHOP_UPGRADES, BUSINESS_STAGES, getUpgradeTierInfo } from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { soundManager } from '../../utils/soundManager';
@@ -228,57 +228,99 @@ export const UpgradesModal: React.FC = () => {
               })}
             </div>
           ) : (
-            /* TAB 2: TRANG THIẾT BỊ VÀ TIỆN ÍCH */
+            /* TAB 2: TRANG THIẾT BỊ VÀ TIỆN ÍCH (MULTI-TIER PROGRESSION) */
             <div className="space-y-3">
-              {SHOP_UPGRADES.map((upgrade) => {
+              <div className="bg-amber-100/70 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span>💡</span>
+                  <span>Mỗi trang bị có 5 cấp độ chuyên sâu, cấp càng cao giá trị càng lớn!</span>
+                </div>
+                <span className="font-black text-rose-600 bg-white px-2 py-0.5 rounded-full border border-amber-300">
+                  Ví: {gameState.money.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
+
+              {SHOP_UPGRADES.filter((u) => !['extra_table_1', 'extra_table_2'].includes(u.id)).map((upgrade) => {
                 const currentLevel = gameState.purchasedUpgrades[upgrade.id] || 0;
-                const isMax = currentLevel >= upgrade.maxLevel;
-                const canAfford = gameState.money >= upgrade.cost;
+                const tierInfo = getUpgradeTierInfo(upgrade, currentLevel);
+                const isMax = tierInfo.isMax;
+                const canAfford = !isMax && gameState.money >= tierInfo.cost;
 
                 return (
                   <div
                     key={upgrade.id}
-                    className="bg-white border-2 border-[#F2E8E5] rounded-2xl p-3.5 flex items-center justify-between gap-3 hover:border-[#FFD6E5] transition-all shadow-sm"
+                    className="bg-white border-2 border-[#F2E8E5] rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-amber-300 transition-all shadow-sm"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-2xl bg-[#FFF1F6] border border-[#FFD6E5] flex items-center justify-center text-2xl shadow-sm shrink-0">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 flex items-center justify-center text-2xl shadow-2xs shrink-0 mt-0.5">
                         {upgrade.icon}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-black text-xs sm:text-sm text-[#7C5C55]">
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-black text-sm text-[#7C5C55]">
                             {upgrade.name}
                           </h4>
-                          <span className="text-[10px] bg-[#FFF7ED] text-[#7C5C55] border border-[#F7D7BA] px-2 py-0.2 rounded-full font-bold">
+                          <span className="text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.2 rounded-full font-black">
                             Cấp {currentLevel} / {upgrade.maxLevel}
                           </span>
                         </div>
-                        <p className="text-xs text-[#9C7C75] mt-0.5">{upgrade.description}</p>
-                        <div className="text-xs font-black text-[#F7A8C4] mt-1">
-                          {upgrade.cost.toLocaleString('vi-VN')} đ
+
+                        {/* Thanh chỉ báo cấp độ 5 nấc */}
+                        <div className="flex items-center gap-1 my-1.5">
+                          {Array.from({ length: upgrade.maxLevel }).map((_, stepIdx) => (
+                            <div
+                              key={stepIdx}
+                              className={`h-1.5 flex-1 rounded-full transition-all ${
+                                stepIdx < currentLevel
+                                  ? 'bg-amber-500 shadow-2xs'
+                                  : 'bg-slate-200'
+                              }`}
+                            />
+                          ))}
                         </div>
+
+                        {/* Chi tiết tầng tiếp theo */}
+                        {isMax ? (
+                          <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 inline-block mt-0.5">
+                            ✨ Đã đạt cấp độ tối đa của trang bị này!
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5 mt-0.5">
+                            <div className="text-xs font-black text-amber-950 flex items-center gap-1">
+                              <span>Tiếp theo:</span>
+                              <span className="text-rose-600 font-extrabold">{tierInfo.title}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 font-medium">
+                              {tierInfo.description}
+                            </p>
+                            <div className="text-xs font-black text-amber-700 pt-0.5">
+                              Giá nâng cấp: <span className="text-rose-600 font-black">{tierInfo.cost.toLocaleString('vi-VN')} đ</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Nút nâng cấp */}
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center justify-end sm:justify-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       {isMax ? (
-                        <div className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-200">
+                        <div className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-black border border-emerald-300">
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Đã Tối Đa</span>
+                          <span>TỐI ĐA</span>
                         </div>
                       ) : (
                         <button
                           onClick={() => handleBuyUpgrade(upgrade.id)}
                           disabled={!canAfford}
-                          className={`px-4 py-2 rounded-xl font-black text-xs flex items-center gap-1 shadow-sm transition-all ${
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl font-black text-xs flex items-center justify-center gap-1 shadow-xs transition-all ${
                             canAfford
-                              ? 'bg-[#F7A8C4] hover:bg-[#f28bb1] text-white active:scale-95 shadow-pink-200'
+                              ? 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white active:scale-95 shadow-amber-200'
                               : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                           }`}
                         >
                           <Sparkles className="w-3 h-3" />
-                          <span>{canAfford ? 'Nâng Cấp' : 'Thiếu Tiền'}</span>
+                          <span>{canAfford ? 'Nâng Cấp 🚀' : 'Thiếu Tiền ⏳'}</span>
                         </button>
                       )}
                     </div>
