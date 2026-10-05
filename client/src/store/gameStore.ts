@@ -38,6 +38,7 @@ import {
   getStageUpgradeTierInfo,
   calculateStorageCapacity,
   calculateMaxTables,
+  calculateDeliveryBonus,
   getStarterInventoryForRestaurant,
   getStarterRecipesForRestaurant,
 } from '../../../shared/gameData';
@@ -1296,8 +1297,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   spawnDeliveryOrder: () => {
-    const { deliveryOrders } = get();
-    if (deliveryOrders.length >= 3) return;
+    const { deliveryOrders, gameState } = get();
+    const activeRestId = gameState.activeRestaurantId || 'banh_mi';
+    const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
+
+    // Lọc bỏ bất kỳ đơn nào không thuộc thực đơn của quán hiện tại
+    const validExistingOrders = deliveryOrders.filter((o) =>
+      currentRest.primaryRecipeIds.includes(o.recipeId)
+    );
+
+    if (validExistingOrders.length >= 3) {
+      if (validExistingOrders.length !== deliveryOrders.length) {
+        set({ deliveryOrders: validExistingOrders });
+      }
+      return;
+    }
 
     const customers = [
       'Phòng Marketing Tầng 3',
@@ -1305,15 +1319,32 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       'Nhóm Học Sinh Trường Làng',
       'Chị Ngọc Kế Toán',
       'Đội Bảo Vệ Khu Phố',
+      'Công Ty Bất Động Sản',
+      'Ngân Hàng Đối Diện',
+      'Bệnh Viện Quận',
+      'Ủy Ban Phường',
+      'Xưởng May Gia Công',
     ];
 
-    const recipesKeys: RecipeId[] = ['banh_mi_thit', 'banh_mi_trung', 'banh_mi_dac_biet', 'tra_sua', 'cafe_sua'];
-    const chosenRecipeId = recipesKeys[Math.floor(Math.random() * recipesKeys.length)];
+    // Chỉ sinh món thuộc thực đơn của quán đang kinh doanh
+    const availableRecipes = (currentRest.primaryRecipeIds || []).filter((rId) =>
+      gameState.unlockedRecipes.includes(rId)
+    );
+    const candidateRecipes: RecipeId[] =
+      availableRecipes.length > 0 ? availableRecipes : currentRest.primaryRecipeIds;
+
+    const chosenRecipeId = candidateRecipes[Math.floor(Math.random() * candidateRecipes.length)];
     const recipe = RECIPES[chosenRecipeId];
+    if (!recipe) return;
+
     const qty = Math.floor(Math.random() * 2) + 2; // 2 - 3 suất
 
+    const stageId = gameState.businessStage || 'cart';
+    const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
+    const deliveryBonus = calculateDeliveryBonus(stageId, stageUpgrades);
+
     const baseRev = recipe.basePrice * qty;
-    const tip = Math.round(baseRev * 0.25);
+    const tip = Math.round(baseRev * (0.2 + deliveryBonus));
 
     const newOrder: DeliveryOrder = {
       id: Math.random().toString(36).substring(2, 9),
@@ -1327,10 +1358,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       status: 'pending',
     };
 
-    set((state) => ({
-      deliveryOrders: [...state.deliveryOrders, newOrder],
-    }));
-    get().showToast(`🛵 Có đơn giao hàng mang đi mới từ ${newOrder.customerName}!`);
+    set({
+      deliveryOrders: [...validExistingOrders, newOrder],
+    });
+    get().showToast(`🛵 Có đơn ship [${recipe.name} x${qty}] mới từ ${newOrder.customerName}!`);
   },
 
   fulfillDeliveryOrder: (orderId) => {
@@ -1356,6 +1387,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     const totalEarned = order.rewardMoney + order.rewardTip;
+    const activeRestId = gameState.activeRestaurantId || 'banh_mi';
 
     // Tăng thiện cảm Chú Năm
     const chuNam = gameState.neighbors.chu_nam || {
@@ -1371,6 +1403,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...state.gameState,
         inventory: newInventory,
+        restaurantInventories: {
+          ...(state.gameState.restaurantInventories || {}),
+          [activeRestId]: newInventory,
+        },
         money: state.gameState.money + totalEarned,
         totalDeliveriesCompleted: (state.gameState.totalDeliveriesCompleted || 0) + 1,
         reputation: state.gameState.reputation + 2,
@@ -1584,6 +1620,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
       return {
         showFlashScreen: false,
+        deliveryOrders: [], // Xóa sạch đơn giao hàng cũ khi bắt đầu chọn thương hiệu
         gameState: {
           ...state.gameState,
           activeRestaurantId: restaurantId,
@@ -1593,6 +1630,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           inventory: starterInventory,
           restaurantInventories: updatedRestaurantInventories,
           unlockedRecipes: starterRecipes,
+          deliveryOrders: [],
         },
         activeOrders: [],
       };
@@ -1627,6 +1665,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         new Set([...state.gameState.unlockedRecipes, ...starterRecipes])
       );
 
+      // 4. Lọc đơn ship: chỉ giữ các đơn thuộc thực đơn quán mới
+      const filteredDeliveries = state.deliveryOrders.filter((o) =>
+        restaurant.primaryRecipeIds.includes(o.recipeId)
+      );
+
       return {
         gameState: {
           ...state.gameState,
@@ -1635,8 +1678,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           inventory: targetInventory,
           restaurantInventories: updatedRestaurantInventories,
           unlockedRecipes: updatedUnlockedRecipes,
+          deliveryOrders: filteredDeliveries,
         },
         activeOrders: [], // Xóa bàn chờ cũ để khách mới kéo vào gọi món của quán mới
+        deliveryOrders: filteredDeliveries,
       };
     });
     get().saveLocal();
@@ -1899,6 +1944,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     try {
       const stateToSave = {
         ...get().gameState,
+        deliveryOrders: get().deliveryOrders,
         lastSavedAt: new Date().toISOString(),
       };
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
@@ -1965,7 +2011,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           ? Array.from(new Set([...parsed.unlockedRecipes, ...starterRecipes]))
           : starterRecipes;
 
+        const migratedEmployeeDetails = { ...(parsed.employeeDetails || {}) };
+        for (const [id, emp] of Object.entries(migratedEmployeeDetails)) {
+          const defaultEmp = EMPLOYEES.find((e) => e.id === id);
+          if (defaultEmp && (!emp.salaryPerDay || emp.salaryPerDay < defaultEmp.salaryPerDay)) {
+            migratedEmployeeDetails[id] = {
+              ...emp,
+              salaryPerDay: defaultEmp.salaryPerDay,
+            };
+          }
+        }
+
+        // Lọc đơn giao hàng: chỉ giữ các đơn thuộc thực đơn quán đang kích hoạt
+        const validDeliveries = (parsed.deliveryOrders || []).filter((o) =>
+          currentRest.primaryRecipeIds.includes(o.recipeId)
+        );
+
         set({
+          deliveryOrders: validDeliveries,
           gameState: {
             ...INITIAL_GAME_STATE,
             ...parsed,
@@ -1975,10 +2038,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             inventory: currentInv,
             restaurantInventories: restInvs,
             unlockedRecipes: unlockedRecipes,
+            deliveryOrders: validDeliveries,
             ownedThemes: parsed.ownedThemes || ['sakura_pink'],
             ownedDecorations: parsed.ownedDecorations || [],
             equippedDecorations: parsed.equippedDecorations || [],
-            employeeDetails: parsed.employeeDetails || {},
+            employeeDetails: migratedEmployeeDetails,
             shopName: parsed.shopName || currentRest.name,
             neighbors: {
               ...INITIAL_GAME_STATE.neighbors,
@@ -2056,7 +2120,23 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                   ? Array.from(new Set([...cloudState.unlockedRecipes, ...cloudStarterRecipes]))
                   : cloudStarterRecipes;
 
+                const cloudMigratedEmployeeDetails = { ...(cloudState.employeeDetails || {}) };
+                for (const [id, emp] of Object.entries(cloudMigratedEmployeeDetails)) {
+                  const defaultEmp = EMPLOYEES.find((e) => e.id === id);
+                  if (defaultEmp && (!emp.salaryPerDay || emp.salaryPerDay < defaultEmp.salaryPerDay)) {
+                    cloudMigratedEmployeeDetails[id] = {
+                      ...emp,
+                      salaryPerDay: defaultEmp.salaryPerDay,
+                    };
+                  }
+                }
+
+                const cloudValidDeliveries = (cloudState.deliveryOrders || []).filter((o) =>
+                  cloudCurrentRest.primaryRecipeIds.includes(o.recipeId)
+                );
+
                 set({
+                  deliveryOrders: cloudValidDeliveries,
                   gameState: {
                     ...INITIAL_GAME_STATE,
                     ...cloudState,
@@ -2066,10 +2146,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                     inventory: cloudCurrentInv,
                     restaurantInventories: cloudRestInvs,
                     unlockedRecipes: cloudUnlockedRecipes,
+                    deliveryOrders: cloudValidDeliveries,
                     ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
                     ownedDecorations: cloudState.ownedDecorations || [],
                     equippedDecorations: cloudState.equippedDecorations || [],
-                    employeeDetails: cloudState.employeeDetails || {},
+                    employeeDetails: cloudMigratedEmployeeDetails,
                     shopName: cloudState.shopName || cloudCurrentRest.name,
                     neighbors: {
                       ...INITIAL_GAME_STATE.neighbors,

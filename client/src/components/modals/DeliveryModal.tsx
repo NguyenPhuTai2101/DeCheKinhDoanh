@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { RECIPES, INGREDIENTS } from '../../../../shared/gameData';
+import { RECIPES, INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
 import { X, Bike, Check, Clock, DollarSign, Plus, PhoneCall } from 'lucide-react';
@@ -14,6 +14,23 @@ export const DeliveryModal: React.FC = () => {
     spawnDeliveryOrder,
     cancelDeliveryOrder,
   } = useGameStore();
+
+  const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+  const currentRest = RESTAURANT_TYPES[currentRestId] || RESTAURANT_TYPES.banh_mi;
+
+  // Lọc chỉ giữ đơn thuộc quán hiện tại
+  const matchingOrders = deliveryOrders.filter((order) =>
+    currentRest.primaryRecipeIds.includes(order.recipeId)
+  );
+
+  // Tự động dọn dẹp đơn cũ của quán khác nếu còn sót lại trong store
+  React.useEffect(() => {
+    if (deliveryOrders.some((o) => !currentRest.primaryRecipeIds.includes(o.recipeId))) {
+      useGameStore.setState({
+        deliveryOrders: matchingOrders,
+      });
+    }
+  }, [currentRest, deliveryOrders, matchingOrders]);
 
   const handleDeliver = (orderId: string) => {
     const success = fulfillDeliveryOrder(orderId);
@@ -41,7 +58,12 @@ export const DeliveryModal: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">🛵</span>
             <div>
-              <h2 className="text-lg font-black text-sky-950">Đội Xe Giao Hàng Chú Năm</h2>
+              <h2 className="text-lg font-black text-sky-950 flex items-center gap-2">
+                <span>Đội Xe Giao Hàng Chú Năm</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-sky-200 text-sky-900 font-extrabold">
+                  {currentRest.icon} {currentRest.name}
+                </span>
+              </h2>
               <p className="text-xs text-sky-700">
                 Nhận đơn mang đi & Ship tận nơi cho công ty, trường học trong xóm
               </p>
@@ -52,7 +74,7 @@ export const DeliveryModal: React.FC = () => {
               soundManager.playClick();
               closeModal();
             }}
-            className="w-8 h-8 rounded-full bg-white hover:bg-sky-100 flex items-center justify-center text-sky-900 shadow-sm transition-all"
+            className="w-8 h-8 rounded-full bg-white hover:bg-sky-100 flex items-center justify-center text-sky-900 shadow-sm transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -74,7 +96,7 @@ export const DeliveryModal: React.FC = () => {
 
           <button
             onClick={handleCallOrder}
-            className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+            className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
           >
             <PhoneCall className="w-3.5 h-3.5" />
             <span>Gọi Thêm Đơn</span>
@@ -83,18 +105,18 @@ export const DeliveryModal: React.FC = () => {
 
         {/* Danh sách đơn giao hàng */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {deliveryOrders.length === 0 ? (
+          {matchingOrders.length === 0 ? (
             <div className="py-12 bg-white rounded-2xl border-2 border-dashed border-sky-200 text-center space-y-2">
               <span className="text-3xl">📭</span>
               <p className="text-xs font-bold text-sky-950">
-                Hiện chưa có đơn đặt mang về nào!
+                Hiện chưa có đơn đặt mang về nào cho {currentRest.name}!
               </p>
               <p className="text-[11px] text-sky-700 max-w-xs mx-auto">
                 Bấm nút [Gọi Thêm Đơn] phía trên hoặc chờ các công ty xung quanh gọi điện thoại đặt hàng nhé!
               </p>
             </div>
           ) : (
-            deliveryOrders.map((order) => {
+            matchingOrders.map((order) => {
               const recipe = RECIPES[order.recipeId];
               if (!recipe) return null;
 

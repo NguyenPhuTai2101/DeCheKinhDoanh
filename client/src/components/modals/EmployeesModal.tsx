@@ -71,7 +71,7 @@ export const EmployeesModal: React.FC = () => {
 
   const handleBonus = (empId: string) => {
     soundManager.playCoin();
-    giveBonusEmployee(empId, 20000);
+    giveBonusEmployee(empId, 50000);
   };
 
   const handleFire = (empId: string) => {
@@ -354,7 +354,7 @@ export const EmployeesModal: React.FC = () => {
                         className="flex-1 min-w-[90px] py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-black border border-emerald-300 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                       >
                         <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500" />
-                        <span>Thưởng (20k)</span>
+                        <span>Thưởng (50k)</span>
                       </button>
                     </div>
                   </div>
