@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { EMPLOYEES, RESTAURANT_TYPES, BUSINESS_STAGES } from '../../../../shared/gameData';
 import { RestaurantTypeId, EmployeeRole } from '../../../../shared/types';
+import {
+  calculateEmployeeTrainingCost,
+  checkTrainingCap,
+  checkPromotionEligibility,
+  PROMOTION_REQUIREMENTS,
+} from '../../../../shared/simulation/employees';
 import { soundManager } from '../../utils/soundManager';
 import {
   X,
@@ -14,6 +20,10 @@ import {
   Building2,
   ShoppingBag,
   Sparkles,
+  Zap,
+  Star,
+  Shield,
+  Info,
 } from 'lucide-react';
 
 export const EmployeesModal: React.FC = () => {
@@ -191,6 +201,17 @@ export const EmployeesModal: React.FC = () => {
                 const mood = emp.mood ?? 90;
                 const stress = emp.stress ?? 15;
                 const isShopper = emp.role === 'shopper';
+                const isCook = emp.role === 'cook';
+                const isServer = emp.role === 'server';
+                const isManager = emp.role === 'manager';
+
+                const trainCost = calculateEmployeeTrainingCost(emp.trainingCount || 0);
+                const trainCap = checkTrainingCap(emp);
+                const canAffordTrain = gameState.money >= trainCost;
+                const canTrain = trainCap.canTrain && canAffordTrain;
+
+                const promoCheck = checkPromotionEligibility(emp);
+                const primarySkill = isCook ? (emp.cookingSkill || 50) : (emp.serviceSkill || 50);
 
                 return (
                   <div
@@ -214,32 +235,32 @@ export const EmployeesModal: React.FC = () => {
                               className={`text-[9.5px] font-black px-2 py-0.2 rounded-full border ${
                                 isShopper
                                   ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                  : emp.role === 'cook'
+                                  : isCook
                                   ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                  : emp.role === 'server'
+                                  : isServer
                                   ? 'bg-pink-100 text-pink-800 border-pink-300'
                                   : 'bg-indigo-100 text-indigo-800 border-indigo-300'
                               }`}
                             >
                               {isShopper
                                 ? '🛵 Đi Chợ Sỉ'
-                                : emp.role === 'cook'
+                                : isCook
                                 ? '👨‍🍳 Đầu Bếp'
-                                : emp.role === 'server'
+                                : isServer
                                 ? '🏃 Phục Vụ'
                                 : '👩‍💼 Quản Lý'}
                             </span>
-                            <span className="text-[9px] bg-slate-100 text-slate-600 font-extrabold px-1.5 py-0.2 rounded-full uppercase">
-                              {emp.careerTier}
+                            <span className="text-[9px] bg-slate-100 text-slate-700 font-extrabold px-1.5 py-0.2 rounded-full uppercase">
+                              {promoCheck.req?.name || emp.careerTier}
                             </span>
                           </div>
                           <p className="text-[10.5px] text-[#8C6258] mt-0.5 line-clamp-1">
                             {emp.personalityDesc}
                           </p>
-                          <div className="text-[10.5px] font-black text-[#E91E63] mt-0.5 flex items-center gap-2">
+                          <div className="text-[10.5px] font-black text-[#E91E63] mt-0.5 flex items-center gap-2 flex-wrap">
                             <span>Lương: {emp.salaryPerDay.toLocaleString('vi-VN')} đ/ngày</span>
                             <span>·</span>
-                            <span>Tốc độ: {emp.speed}x</span>
+                            <span>Tốc độ: {emp.speed.toFixed(2)}x</span>
                             {isShopper && (
                               <span className="text-emerald-700 font-black">
                                 · Giảm {emp.marketSkill || 75}% giá sỉ
@@ -284,7 +305,40 @@ export const EmployeesModal: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Hàng 2: Thanh Tâm trạng (Mood) & Độ căng thẳng (Stress) */}
+                    {/* Hàng 2: Chi tiết Kỹ năng & Điểm kinh nghiệm V2 */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-[#FFF9FA] p-2 rounded-xl border border-[#FFCCD9] text-[9.5px] font-bold text-[#5C3A33]">
+                      <div className="bg-white p-1.5 rounded-lg border border-[#FFEBF0]">
+                        <div className="text-[9px] text-[#8C6258]">
+                          {isCook ? '🍳 Nấu nướng' : isServer ? '🏃 Phục vụ' : '💼 Nghiệp vụ'}
+                        </div>
+                        <div className="font-black text-[#5C3A33] text-xs">
+                          {primarySkill}/100
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-1.5 rounded-lg border border-[#FFEBF0]">
+                        <div className="text-[9px] text-[#8C6258]">⭐ Kinh nghiệm</div>
+                        <div className="font-black text-amber-600 text-xs">
+                          {emp.experience || 0} XP
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-1.5 rounded-lg border border-[#FFEBF0]">
+                        <div className="text-[9px] text-[#8C6258]">💎 Độ gắn bó</div>
+                        <div className="font-black text-indigo-600 text-xs">
+                          {emp.loyalty || 50}%
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-1.5 rounded-lg border border-[#FFEBF0]">
+                        <div className="text-[9px] text-[#8C6258]">🎓 Đã đào tạo</div>
+                        <div className="font-black text-pink-600 text-xs">
+                          {emp.trainingCount || 0} lần
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hàng 3: Thanh Tâm trạng (Mood) & Độ căng thẳng (Stress) */}
                     <div className="grid grid-cols-2 gap-2 bg-[#FFF5F8]/60 p-2 rounded-xl border border-[#FFCCD9] text-[9.5px] font-bold text-[#5C3A33]">
                       <div>
                         <div className="flex justify-between mb-0.5">
@@ -317,45 +371,86 @@ export const EmployeesModal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Hàng 3: Các nút hành động phát triển nhân sự + Nút đi chợ tức thì nếu là Shopper */}
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-[#FFEBF0] flex-wrap">
-                      {isShopper && (
+                    {/* Hàng 4: Các nút hành động phát triển nhân sự V2 */}
+                    <div className="flex flex-col gap-1.5 pt-1 border-t border-[#FFEBF0]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {isShopper && (
+                          <button
+                            onClick={() => {
+                              soundManager.playClick();
+                              dispatchShopperRun(emp.id);
+                            }}
+                            className="flex-1 min-w-[120px] py-1.5 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-105 text-white rounded-xl text-[10px] font-black border border-emerald-400 flex items-center justify-center gap-1 active:scale-95 shadow-xs cursor-pointer"
+                            title="Lập tức đi chợ gom nguyên liệu còn thiếu về kho với giá chiết khấu"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5 fill-current" />
+                            <span>Đi Chợ Ngay 🛵</span>
+                          </button>
+                        )}
+
+                        {/* Nút Đào tạo (Chi phí lũy tiến + Chặn Cap) */}
                         <button
-                          onClick={() => {
-                            soundManager.playClick();
-                            dispatchShopperRun(emp.id);
-                          }}
-                          className="flex-1 min-w-[120px] py-1.5 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-105 text-white rounded-xl text-[10px] font-black border border-emerald-400 flex items-center justify-center gap-1 active:scale-95 shadow-xs cursor-pointer"
-                          title="Lập tức đi chợ gom nguyên liệu còn thiếu về kho với giá chiết khấu"
+                          onClick={() => handleTrain(emp.id)}
+                          disabled={!canTrain}
+                          className={`flex-1 min-w-[100px] py-1.5 px-2 rounded-xl text-[10px] font-black border flex items-center justify-center gap-1 transition-all ${
+                            canTrain
+                              ? 'bg-[#FFF5F8] hover:bg-[#FFE4EC] text-[#5C3A33] border-[#FFCCD9] active:scale-95 cursor-pointer'
+                              : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          }`}
+                          title={!trainCap.canTrain ? trainCap.reason : !canAffordTrain ? 'Không đủ tiền' : ''}
                         >
-                          <ShoppingBag className="w-3.5 h-3.5 fill-current" />
-                          <span>Đi Chợ Ngay 🛵</span>
+                          <GraduationCap className={`w-3.5 h-3.5 ${canTrain ? 'text-[#FF6584]' : 'text-slate-400'}`} />
+                          <span>
+                            {!trainCap.canTrain
+                              ? 'Đạt Cực Hạn'
+                              : `Đào Tạo (${trainCost.toLocaleString('vi-VN')}đ)`}
+                          </span>
                         </button>
+
+                        {/* Nút Thăng chức (Có kiểm tra điều kiện minh bạch) */}
+                        <button
+                          onClick={() => handlePromote(emp.id)}
+                          disabled={!promoCheck.eligible}
+                          className={`flex-1 min-w-[100px] py-1.5 px-2 rounded-xl text-[10px] font-black border flex items-center justify-center gap-1 transition-all ${
+                            !promoCheck.req
+                              ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-default'
+                              : promoCheck.eligible
+                              ? 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white border-amber-400 active:scale-95 shadow-xs animate-bounce-short cursor-pointer'
+                              : 'bg-amber-50/60 text-amber-700/60 border-amber-200 cursor-not-allowed'
+                          }`}
+                        >
+                          <Award className="w-3.5 h-3.5 text-current" />
+                          <span>
+                            {!promoCheck.req
+                              ? 'Cấp Tối Đa 👑'
+                              : promoCheck.eligible
+                              ? `Lên ${promoCheck.req.nextName} 🌟`
+                              : 'Thăng Chức'}
+                          </span>
+                        </button>
+
+                        {/* Nút Thưởng khích lệ */}
+                        <button
+                          onClick={() => handleBonus(emp.id)}
+                          disabled={gameState.money < 50000}
+                          className={`flex-1 min-w-[85px] py-1.5 px-2 rounded-xl text-[10px] font-black border flex items-center justify-center gap-1 transition-all ${
+                            gameState.money >= 50000
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 active:scale-95 cursor-pointer'
+                              : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          }`}
+                        >
+                          <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500" />
+                          <span>Thưởng (50k)</span>
+                        </button>
+                      </div>
+
+                      {/* Gợi ý / Lý do chưa thể thăng chức nếu có */}
+                      {promoCheck.req && !promoCheck.eligible && (
+                        <div className="text-[9px] text-amber-900 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1">
+                          <Info className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>{promoCheck.reason}</span>
+                        </div>
                       )}
-
-                      <button
-                        onClick={() => handleTrain(emp.id)}
-                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-[#FFF5F8] hover:bg-[#FFE4EC] text-[#5C3A33] rounded-xl text-[10px] font-black border border-[#FFCCD9] flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      >
-                        <GraduationCap className="w-3.5 h-3.5 text-[#FF6584]" />
-                        <span>Đào Tạo (25k)</span>
-                      </button>
-
-                      <button
-                        onClick={() => handlePromote(emp.id)}
-                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-[10px] font-black border border-amber-300 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      >
-                        <Award className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Thăng Chức</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleBonus(emp.id)}
-                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-black border border-emerald-300 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      >
-                        <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500" />
-                        <span>Thưởng (50k)</span>
-                      </button>
                     </div>
                   </div>
                 );

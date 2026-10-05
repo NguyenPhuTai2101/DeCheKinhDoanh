@@ -16,8 +16,32 @@ import {
   ActiveOrder,
   RestaurantTypeId,
   SurpriseIncident,
+  DailyFinance,
+  BranchDailyFinance,
+  ShopperPolicy,
 } from '../../../shared/types';
 import { getRandomSurpriseIncident } from '../../../shared/simulationConfig';
+import {
+  calculateDishCOGS,
+  generateDailyMarketPrices,
+  getIngredientCurrentPrice,
+} from '../../../shared/economy/pricing';
+import {
+  calculateCustomerSatisfaction,
+  updateShopRating,
+  calculateTipAmount,
+} from '../../../shared/simulation/customers';
+import {
+  calculateEmployeeTrainingCost,
+  checkTrainingCap,
+  checkPromotionEligibility,
+} from '../../../shared/simulation/employees';
+import {
+  createInitialDailyFinance,
+  createInitialBranchFinance,
+  calculateStageFixedCosts,
+  generateDailyInsights,
+} from '../../../shared/economy/finance';
 import {
   INITIAL_GAME_STATE,
   INGREDIENTS,
@@ -61,6 +85,7 @@ export type ModalType =
   | 'menuMore'
   | 'franchise'
   | 'starterSelection'
+  | 'menuPricing'
   | null;
 
 export interface FloatingFeedback {
@@ -145,7 +170,7 @@ export interface GameStoreState {
   consumeEnergy: (amount: number) => boolean;
   buyIngredients: (items: Record<IngredientId, number>, totalCost: number) => boolean;
   completeCooking: (recipeId: RecipeId, tableIndex: number) => boolean;
-  finishServing: (tableIndex: number, revenue: number, tip: number) => void;
+  finishServing: (tableIndex: number, revenue: number, tip: number, order?: ActiveOrder) => void;
   handleCustomerLeaveAngry: (tableIndex: number) => void;
   purchaseUpgrade: (upgradeId: string) => boolean;
   
@@ -193,6 +218,12 @@ export interface GameStoreState {
   switchActiveRestaurant: (restaurantId: RestaurantTypeId) => void;
   unlockRestaurantFranchise: (restaurantId: RestaurantTypeId) => boolean;
   upgradeBranch: (restaurantId: RestaurantTypeId) => boolean;
+
+  // V2: Menu Catalog, Định giá Món Ăn & Vận Hành Kinh Tế
+  setDishPrice: (restaurantId: RestaurantTypeId, recipeId: RecipeId, price: number) => void;
+  toggleActiveRecipe: (restaurantId: RestaurantTypeId, recipeId: RecipeId) => boolean;
+  setShopperPolicy: (policy: Partial<ShopperPolicy>) => void;
+  recordBranchSales: (restaurantId: RestaurantTypeId, revenue: number, cogs: number, dishName: string) => void;
 
   // Day Cycle
   endDayAndSleep: () => void;
@@ -302,15 +333,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   collectPayment: (orderId) => {
-    const { activeOrders } = get();
+    const { activeOrders, gameState } = get();
     const order = activeOrders.find((o) => o.id === orderId);
     if (!order) return false;
 
     const recipe = RECIPES[order.recipeId];
     if (!recipe) return false;
 
+    const restId = gameState.activeRestaurantId || 'banh_mi';
+    const playerPrice = gameState.menuSettings?.[restId]?.prices?.[order.recipeId] ?? recipe.basePrice;
     const tip = order.calculatedTip ?? 0;
-    get().finishServing(order.tableIndex, recipe.basePrice, tip);
+
+    get().finishServing(order.tableIndex, playerPrice, tip, order);
 
     set((state) => ({
       activeOrders: state.activeOrders.filter((o) => o.id !== orderId),
@@ -498,8 +532,95 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return true;
   },
 
-  finishServing: (tableIndex, revenue, tip) => {
+  finishServing: (tableIndex: number, revenue: number, tip: number, order?: ActiveOrder) => {
     const totalEarned = revenue + tip;
+    const { gameState } = get();
+    const recipeId = order?.recipeId;
+    const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+
+    // 1. Tính toán COGS thực tế theo giá thị trường hôm nay
+    const dishCOGS = recipeId ? calculateDishCOGS(recipeId, gameState.marketPrices) : Math.round(revenue * 0.4);
+
+    // 2. Tính toán độ hài lòng của khách (Satisfaction: 0 - 100) & sao đánh giá (1 - 5)
+    let reviewOutcome = {
+      satisfaction: 80,
+      stars: 4 as 1 | 2 | 3 | 4 | 5,
+      icon: '😊',
+      label: '4 Sao - Hài Lòng',
+      comment: 'Ăn ngon miệng!',
+      fameChange: 1,
+    };
+
+    if (order && recipeId) {
+      const cookEmp = order.chefId ? gameState.employeeDetails[order.chefId] : undefined;
+      const serverEmp = order.serverId ? gameState.employeeDetails[order.serverId] : undefined;
+      const patienceRatio = order.maxPatience > 0 ? order.patienceRemaining / order.maxPatience : 0.8;
+
+      // Tính tổng cozyPoints từ trang trí
+      const cozyPoints = gameState.equippedDecorations.reduce((sum, dId) => {
+        const item = DECORATION_ITEMS.find((d) => d.id === dId);
+        return sum + (item?.cozyPoints || 0);
+      }, 0);
+
+      reviewOutcome = calculateCustomerSatisfaction({
+        customerType: order.typeId,
+        recipeId,
+        playerPrice: revenue,
+        cookSkill: cookEmp?.cookingSkill,
+        serverSkill: serverEmp?.serviceSkill,
+        cozyPoints,
+        patienceRemainingRatio: patienceRatio,
+        isCreativeDish: cookEmp?.personality === 'creative' && Math.random() < 0.2,
+        hasFriendlyServer: serverEmp?.personality === 'friendly',
+      });
+    }
+
+    // 3. Cập nhật Rating mượt mà (Weighted Moving Average)
+    const currentRating = gameState.rating ?? 75;
+    const newRating = updateShopRating(currentRating, reviewOutcome.satisfaction);
+
+    // 4. Cập nhật Fame / Reputation (Không cap 100!)
+    const currentReputation = gameState.reputation || 0;
+    const newReputation = Math.max(0, currentReputation + reviewOutcome.fameChange);
+    const newFame = Math.max(0, (gameState.fame ?? currentReputation) + reviewOutcome.fameChange);
+
+    // 5. Cập nhật DailyFinance & BranchDailyFinance
+    const currentFinance: DailyFinance = gameState.dailyFinance || createInitialDailyFinance();
+    const updatedFinance: DailyFinance = {
+      ...currentFinance,
+      revenue: currentFinance.revenue + totalEarned,
+      cogs: currentFinance.cogs + dishCOGS,
+      grossProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + dishCOGS),
+      netProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + dishCOGS) - currentFinance.payroll - currentFinance.rent - currentFinance.utilities,
+    };
+
+    const currentBranchFinances = gameState.branchFinances || {};
+    const branchFin = currentBranchFinances[currentRestId] || createInitialBranchFinance(currentRestId);
+    const updatedBranchFin: BranchDailyFinance = {
+      ...branchFin,
+      revenue: branchFin.revenue + totalEarned,
+      cogs: branchFin.cogs + dishCOGS,
+      grossProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + dishCOGS),
+      customersServed: branchFin.customersServed + 1,
+      netProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + dishCOGS) - branchFin.payroll - branchFin.rent,
+    };
+
+    // 6. Cập nhật Business Metrics
+    const metrics = gameState.businessMetrics || {
+      lifetimeRevenue: 0,
+      lifetimeProfit: 0,
+      totalCustomers: 0,
+      fiveStarReviews: 0,
+      averageRating: 75,
+    };
+    const updatedMetrics = {
+      ...metrics,
+      lifetimeRevenue: metrics.lifetimeRevenue + totalEarned,
+      lifetimeProfit: metrics.lifetimeProfit + (totalEarned - dishCOGS),
+      totalCustomers: metrics.totalCustomers + 1,
+      fiveStarReviews: metrics.fiveStarReviews + (reviewOutcome.stars === 5 ? 1 : 0),
+      averageRating: newRating,
+    };
 
     set((state) => ({
       dailyRevenue: state.dailyRevenue + totalEarned,
@@ -507,23 +628,44 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...state.gameState,
         money: state.gameState.money + totalEarned,
-        reputation: state.gameState.reputation + 1,
+        reputation: newReputation,
+        fame: newFame,
+        rating: newRating,
+        dailyFinance: updatedFinance,
+        branchFinances: {
+          ...currentBranchFinances,
+          [currentRestId]: updatedBranchFin,
+        },
+        businessMetrics: updatedMetrics,
       },
     }));
 
-    get().showToast(`💰 Khách thanh toán: +${totalEarned.toLocaleString('vi-VN')} đ (Boa: ${tip.toLocaleString('vi-VN')} đ)`);
+    get().addFloatingFeedback(`+${totalEarned.toLocaleString('vi-VN')} đ`, 'money', 60, 45);
+    get().addFloatingFeedback(`${reviewOutcome.icon} ${reviewOutcome.stars}⭐`, 'star', 60, 20);
+    get().showToast(`😋 Khách thanh toán: +${totalEarned.toLocaleString('vi-VN')} đ (Boa: ${tip.toLocaleString('vi-VN')} đ) · Đánh giá: ${reviewOutcome.label}`);
     get().saveLocal();
   },
 
   handleCustomerLeaveAngry: (tableIndex) => {
+    const { gameState } = get();
+    // Khách tức giận bỏ về xem như đánh giá 1 sao (satisfaction 20)
+    const currentRating = gameState.rating ?? 75;
+    const newRating = updateShopRating(currentRating, 20);
+    const newReputation = Math.max(0, (gameState.reputation || 0) - 1);
+    const newFame = Math.max(0, (gameState.fame ?? gameState.reputation ?? 0) - 1);
+
     set((state) => ({
       dailyCustomersLost: state.dailyCustomersLost + 1,
       gameState: {
         ...state.gameState,
-        reputation: Math.max(0, state.gameState.reputation - 2),
+        reputation: newReputation,
+        fame: newFame,
+        rating: newRating,
       },
     }));
-    get().showToast('💔 Khách đã bỏ về vì chờ quá lâu! (-2 Uy tín)');
+    get().addFloatingFeedback('💔 1⭐', 'warning', 50, 40);
+    get().showToast('💔 Khách đã giận dữ bỏ về vì chờ quá lâu! (Đánh giá 1⭐ làm giảm Rating)');
+    get().saveLocal();
   },
 
   purchaseUpgrade: (upgradeId) => {
@@ -737,18 +879,28 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   trainEmployee: (employeeId) => {
     const { gameState } = get();
-    const trainCost = 25000;
-    if (gameState.money < trainCost) {
-      get().showToast('❌ Cần 25,000 đ chi phí đào tạo chuyên môn!');
-      return false;
-    }
-
     const emp = gameState.employeeDetails[employeeId];
     if (!emp) return false;
 
-    const newSpeed = +(emp.speed + 0.05).toFixed(2);
-    const newSkill = Math.min(100, emp.cookingSkill + 8);
-    const newExp = emp.experience + 50;
+    // Kiểm tra Cap kỹ năng (BUG 6)
+    const capCheck = checkTrainingCap(emp);
+    if (!capCheck.canTrain) {
+      get().showToast(`⚠️ ${capCheck.reason || 'Kỹ năng nhân viên đã đạt mức tối đa!'}`);
+      return false;
+    }
+
+    const trainingCount = emp.trainingCount || 0;
+    const trainCost = calculateEmployeeTrainingCost(trainingCount, 25000);
+    if (gameState.money < trainCost) {
+      get().showToast(`❌ Cần ${trainCost.toLocaleString('vi-VN')} đ chi phí đào tạo chuyên môn (lần ${trainingCount + 1})!`);
+      return false;
+    }
+
+    const isCook = emp.role === 'cook';
+    const newSpeed = +Math.min(1.6, emp.speed + 0.05).toFixed(2);
+    const newCooking = isCook ? Math.min(100, (emp.cookingSkill || 50) + 10) : emp.cookingSkill;
+    const newService = !isCook ? Math.min(100, (emp.serviceSkill || 50) + 10) : emp.serviceSkill;
+    const newExp = (emp.experience || 0) + 60;
 
     set({
       gameState: {
@@ -759,15 +911,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           [employeeId]: {
             ...emp,
             speed: newSpeed,
-            cookingSkill: newSkill,
+            cookingSkill: newCooking,
+            serviceSkill: newService,
             experience: newExp,
-            mood: Math.min(100, emp.mood + 5),
+            mood: Math.min(100, (emp.mood || 80) + 5),
+            trainingCount: trainingCount + 1,
           },
         },
       },
     });
 
-    get().showToast(`🎓 ${emp.name} đã hoàn thành khóa đào tạo! Tốc độ & Kỹ năng tăng vượt bậc.`);
+    get().showToast(`🎓 ${emp.name} đã hoàn thành khóa đào tạo chuyên sâu lần ${trainingCount + 1}! (-${trainCost.toLocaleString('vi-VN')} đ)`);
     get().saveLocal();
     return true;
   },
@@ -777,15 +931,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const emp = gameState.employeeDetails[employeeId];
     if (!emp) return false;
 
-    const careerLadder: CareerTier[] = ['intern', 'junior', 'senior', 'shift_leader', 'store_manager'];
-    const currentIdx = careerLadder.indexOf(emp.careerTier);
-    if (currentIdx >= careerLadder.length - 1) {
-      get().showToast('⭐ Nhân viên đã đạt cấp bậc cao nhất (Quản lý cửa hàng)!');
+    // Kiểm tra điều kiện thăng chức (BUG 7)
+    const eligibility = checkPromotionEligibility(emp);
+    if (!eligibility.eligible) {
+      get().showToast(`❌ Chưa đủ điều kiện: ${eligibility.reason}`);
       return false;
     }
 
-    const nextTier = careerLadder[currentIdx + 1];
-    const newSalary = Math.round(emp.salaryPerDay * 1.35);
+    const req = eligibility.req!;
+    const nextTier = req.nextTier;
+    const newSalary = emp.salaryPerDay + req.salaryIncrease;
 
     set({
       gameState: {
@@ -796,16 +951,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             ...emp,
             careerTier: nextTier,
             salaryPerDay: newSalary,
-            loyalty: 100,
+            loyalty: Math.min(100, (emp.loyalty || 60) + 20),
             mood: 100,
-            stress: 0,
-            speed: +(emp.speed + 0.1).toFixed(2),
+            stress: Math.max(0, (emp.stress || 20) - 25),
+            speed: +Math.min(1.6, (emp.speed || 1.0) + 0.08).toFixed(2),
           },
         },
       },
     });
 
-    get().showToast(`🎉 Chúc mừng ${emp.name} đã được thăng chức lên ${nextTier.toUpperCase()}! Lòng trung thành đạt 100%.`);
+    get().showToast(`🎉 Chúc mừng ${emp.name} đã được thăng chức lên "${req.nextName}"! Lương mới: ${newSalary.toLocaleString('vi-VN')} đ/ngày.`);
     get().saveLocal();
     return true;
   },
@@ -867,18 +1022,174 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   addBranchRevenue: (restaurantId, amount, dishName) => {
+    // Gọi chuyển tiếp đến recordBranchSales với COGS ước lượng nếu không chỉ định
+    const estimatedCOGS = Math.round(amount * 0.4);
+    get().recordBranchSales(restaurantId, amount, estimatedCOGS, dishName);
+  },
+
+  recordBranchSales: (restaurantId, revenue, cogs, dishName) => {
     const rest = RESTAURANT_TYPES[restaurantId];
+    const { gameState } = get();
+
+    // Cập nhật DailyFinance
+    const currentFinance: DailyFinance = gameState.dailyFinance || createInitialDailyFinance();
+    const updatedFinance: DailyFinance = {
+      ...currentFinance,
+      revenue: currentFinance.revenue + revenue,
+      cogs: currentFinance.cogs + cogs,
+      grossProfit: (currentFinance.revenue + revenue) - (currentFinance.cogs + cogs),
+      netProfit: (currentFinance.revenue + revenue) - (currentFinance.cogs + cogs) - currentFinance.payroll - currentFinance.rent - currentFinance.utilities,
+    };
+
+    // Cập nhật BranchDailyFinance
+    const currentBranchFinances = gameState.branchFinances || {};
+    const branchFin = currentBranchFinances[restaurantId] || createInitialBranchFinance(restaurantId);
+    const updatedBranchFin: BranchDailyFinance = {
+      ...branchFin,
+      revenue: branchFin.revenue + revenue,
+      cogs: branchFin.cogs + cogs,
+      grossProfit: (branchFin.revenue + revenue) - (branchFin.cogs + cogs),
+      customersServed: branchFin.customersServed + 1,
+      netProfit: (branchFin.revenue + revenue) - (branchFin.cogs + cogs) - branchFin.payroll - branchFin.rent,
+    };
+
+    // Cập nhật Business Metrics
+    const metrics = gameState.businessMetrics || {
+      lifetimeRevenue: 0,
+      lifetimeProfit: 0,
+      totalCustomers: 0,
+      fiveStarReviews: 0,
+      averageRating: 75,
+    };
+    const updatedMetrics = {
+      ...metrics,
+      lifetimeRevenue: metrics.lifetimeRevenue + revenue,
+      lifetimeProfit: metrics.lifetimeProfit + (revenue - cogs),
+      totalCustomers: metrics.totalCustomers + 1,
+    };
+
     set((state) => ({
-      dailyRevenue: state.dailyRevenue + amount,
+      dailyRevenue: state.dailyRevenue + revenue,
       dailyCustomersServed: state.dailyCustomersServed + 1,
       gameState: {
         ...state.gameState,
-        money: state.gameState.money + amount,
-        reputation: state.gameState.reputation + 1,
+        money: state.gameState.money + revenue,
+        // BUG 3 FIXED: Chi nhánh chạy ngầm KHÔNG cộng Fame bừa bãi mỗi 8s!
+        dailyFinance: updatedFinance,
+        branchFinances: {
+          ...currentBranchFinances,
+          [restaurantId]: updatedBranchFin,
+        },
+        businessMetrics: updatedMetrics,
       },
     }));
 
-    get().addFloatingFeedback(`+${amount.toLocaleString('vi-VN')} đ (${rest?.shortName || 'Chi nhánh'})`, 'money', 50, 40);
+    get().addFloatingFeedback(`+${revenue.toLocaleString('vi-VN')} đ (${rest?.shortName || 'Chi nhánh'})`, 'money', 50, 40);
+  },
+
+  // === V2: MENU CATALOG, PRICING & POLICIES ===
+  setDishPrice: (restaurantId, recipeId, price) => {
+    const { gameState } = get();
+    const currentMenuSettings = gameState.menuSettings || {};
+    const restSettings = currentMenuSettings[restaurantId] || {
+      activeRecipes: RESTAURANT_TYPES[restaurantId]?.primaryRecipeIds || [],
+      prices: {},
+    };
+
+    const updatedPrices = {
+      ...restSettings.prices,
+      [recipeId]: Math.max(1000, Math.round(price)),
+    };
+
+    set({
+      gameState: {
+        ...gameState,
+        menuSettings: {
+          ...currentMenuSettings,
+          [restaurantId]: {
+            ...restSettings,
+            prices: updatedPrices,
+          },
+        },
+      },
+    });
+
+    const recipe = RECIPES[recipeId];
+    get().showToast(`🏷️ Đã cập nhật giá bán "${recipe?.name || recipeId}": ${price.toLocaleString('vi-VN')} đ`);
+    get().saveLocal();
+  },
+
+  toggleActiveRecipe: (restaurantId, recipeId) => {
+    const { gameState } = get();
+    const rest = RESTAURANT_TYPES[restaurantId];
+    if (!rest) return false;
+
+    const currentMenuSettings = gameState.menuSettings || {};
+    const restSettings = currentMenuSettings[restaurantId] || {
+      activeRecipes: [...rest.primaryRecipeIds],
+      prices: {},
+    };
+
+    const isActive = restSettings.activeRecipes.includes(recipeId);
+    let newActiveList: RecipeId[] = [];
+
+    if (isActive) {
+      // Không được tắt hết toàn bộ món (tối thiểu 1 món)
+      if (restSettings.activeRecipes.length <= 1) {
+        get().showToast('⚠️ Quán phải duy trì ít nhất 1 món trong thực đơn phục vụ!');
+        return false;
+      }
+      newActiveList = restSettings.activeRecipes.filter((r) => r !== recipeId);
+    } else {
+      newActiveList = [...restSettings.activeRecipes, recipeId];
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        menuSettings: {
+          ...currentMenuSettings,
+          [restaurantId]: {
+            ...restSettings,
+            activeRecipes: newActiveList,
+          },
+        },
+      },
+    });
+
+    const recipe = RECIPES[recipeId];
+    get().showToast(
+      isActive
+        ? `⛔ Đã tạm ngưng bán món "${recipe?.name || recipeId}" hôm nay.`
+        : `✅ Đã đưa món "${recipe?.name || recipeId}" vào thực đơn phục vụ!`
+    );
+    get().saveLocal();
+    return true;
+  },
+
+  setShopperPolicy: (policy) => {
+    const { gameState } = get();
+    const currentPolicy = gameState.shopperPolicy || {
+      autoRestock: true,
+      minStock: 5,
+      targetStock: 25,
+      maxPriceMultiplier: 1.3,
+    };
+
+    const updatedPolicy = {
+      ...currentPolicy,
+      ...policy,
+    };
+
+    set({
+      gameState: {
+        ...gameState,
+        shopperPolicy: updatedPolicy,
+      },
+    });
+
+    get().showToast('⚙️ Đã cập nhật chính sách nhập hàng cho nhân viên đi chợ!');
+    get().saveLocal();
   },
 
   // V0.3: Trang trí & Themes
@@ -997,6 +1308,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     };
     const data = NEIGHBORS_DATA[neighborId];
 
+    // BUG 8 FIXED: Giới hạn 1 lần tương tác trò chuyện mỗi ngày
+    if (neighbor.lastInteractedDay === gameState.day) {
+      get().showToast(`💬 Hôm nay bạn đã trò chuyện cùng ${data?.name || 'Hàng xóm'} rồi! Hãy quay lại vào ngày mai nhé.`);
+      return;
+    }
+
     const newExp = neighbor.intimacyExp + 20;
     let newLevel = neighbor.level;
     const newSecrets = [...neighbor.unlockedSecretIds];
@@ -1041,6 +1358,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const data = NEIGHBORS_DATA[neighborId];
     const recipe = RECIPES[recipeId];
     if (!recipe || !data) return false;
+
+    // BUG 8 FIXED: Giới hạn 1 lần tặng quà mỗi ngày
+    if (neighbor.lastInteractedDay === gameState.day) {
+      get().showToast(`🎁 Hôm nay bạn đã gửi quà cho ${data.name} rồi! Đừng tặng quá nhiều trong một ngày nhé.`);
+      return false;
+    }
 
     // Chi phí làm quà tặng cho hàng xóm
     const giftCost = Math.round(recipe.basePrice * 0.5);
@@ -1518,7 +1841,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const repDiff = activeIncident.reputationChange;
 
     const newMoney = Math.max(0, gameState.money + moneyDiff);
-    const newReputation = Math.max(0, Math.min(100, (gameState.reputation || 50) + repDiff * 4));
+    // BUG 1 FIXED: Không giới hạn cap 100 điểm với uy tín / danh tiếng!
+    const newReputation = Math.max(0, (gameState.reputation || 0) + repDiff * 4);
+    const newFame = Math.max(0, (gameState.fame ?? gameState.reputation ?? 0) + repDiff * 4);
+
+    const currentFinance: DailyFinance = gameState.dailyFinance || createInitialDailyFinance();
+    const updatedFinance: DailyFinance = {
+      ...currentFinance,
+      eventExpenses: moneyDiff < 0 ? currentFinance.eventExpenses + Math.abs(moneyDiff) : currentFinance.eventExpenses,
+      otherIncome: moneyDiff > 0 ? currentFinance.otherIncome + moneyDiff : currentFinance.otherIncome,
+    };
 
     set((state) => ({
       activeIncident: null,
@@ -1528,6 +1860,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         ...state.gameState,
         money: newMoney,
         reputation: newReputation,
+        fame: newFame,
+        dailyFinance: updatedFinance,
       },
     }));
 
@@ -1841,11 +2175,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       get().checkLotteryDraw();
     }
 
-    // Tính lương nhân viên
+    // 1. Tính lương nhân viên
     let totalSalaries = 0;
     const updatedEmployees = { ...gameState.employeeDetails };
-
-    // Kiểm tra có tranh mèo giảm stress không
     const hasCatPainting = gameState.equippedDecorations.includes('deco_cat_painting');
 
     for (const empId of gameState.hiredEmployees) {
@@ -1862,28 +2194,72 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           ...emp,
           stress: newStress,
           mood: newMood,
-          experience: (emp.experience || 0) + 20,
+          experience: (emp.experience || 0) + 25,
+          daysWorked: (emp.daysWorked || 0) + 1,
+          lastWorkedDay: gameState.day,
         };
       }
     }
 
-    const netProfit = dailyRevenue - dailyCost - totalSalaries;
+    // 2. Tính chi phí cố định theo Business Stage (Mặt bằng & Điện nước)
+    const stageCosts = calculateStageFixedCosts(gameState.businessStage || 'cart');
+    const rentPaid = stageCosts.rent;
+    const utilitiesPaid = stageCosts.utilities;
+
+    // 3. Tính toán Báo cáo Tài chính P&L Chuẩn Mực F&B
+    const currentFinance = gameState.dailyFinance || createInitialDailyFinance();
+    const cogsPaid = currentFinance.cogs > 0 ? currentFinance.cogs : dailyCost;
+    const grossProfit = dailyRevenue - cogsPaid;
+    const marketingPaid = currentFinance.marketing || 0;
+    const otherExpenses = currentFinance.eventExpenses + currentFinance.otherExpense;
+    const otherIncome = currentFinance.otherIncome;
+    const netProfit = grossProfit - totalSalaries - rentPaid - utilitiesPaid - marketingPaid - otherExpenses + otherIncome;
+
+    // 4. Sinh Insights thông minh cho báo cáo ngày
+    const insights = generateDailyInsights({
+      finance: {
+        ...currentFinance,
+        revenue: dailyRevenue,
+        cogs: cogsPaid,
+        grossProfit,
+        payroll: totalSalaries,
+        rent: rentPaid,
+        utilities: utilitiesPaid,
+        marketing: marketingPaid,
+        netProfit,
+      },
+      servedCount: dailyCustomersServed,
+      lostCount: dailyCustomersLost,
+      averageRating: gameState.rating ?? 75,
+    });
 
     const summary: DailySummary = {
       day: gameState.day,
       totalRevenue: dailyRevenue,
+      cogs: cogsPaid,
       ingredientCost: dailyCost,
       salariesPaid: totalSalaries,
+      rentPaid,
+      utilitiesPaid,
+      marketingPaid,
+      grossProfit,
       netProfit,
       servedCustomers: dailyCustomersServed,
       lostCustomers: dailyCustomersLost,
-      reputationChange: dailyCustomersServed - dailyCustomersLost * 2,
+      reputationChange: Math.max(0, dailyCustomersServed - dailyCustomersLost),
+      averageRating: gameState.rating ?? 75,
+      fameGain: Math.max(0, dailyCustomersServed - dailyCustomersLost),
+      insights,
+      branchFinances: gameState.branchFinances,
     };
 
-    // Chu kỳ thời tiết ngẫu nhiên: Nắng (50%), Mưa (30%), Gió mát (20%)
+    // 5. Chu kỳ thời tiết ngẫu nhiên cho ngày hôm sau
     const weatherRoll = Math.random();
     const nextWeather: 'sunny' | 'rainy' | 'breezy' =
       weatherRoll < 0.5 ? 'sunny' : weatherRoll < 0.8 ? 'rainy' : 'breezy';
+
+    // 6. Sinh giá thị trường biến động cho ngày hôm sau (Biến động -30% đến +50%)
+    const nextMarketPrices = generateDailyMarketPrices(nextWeather);
 
     // Sự kiện đặc biệt chợ đầu mối giảm giá mỗi ngày
     const marketSpecialCandidates: { ingredientId: IngredientId; discountPercent: number; newsText: string }[] = [
@@ -1900,16 +2276,22 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     ];
     const pickedSpecial = marketSpecialCandidates[Math.floor(Math.random() * marketSpecialCandidates.length)];
 
+    // Trừ các chi phí cố định (lương + mặt bằng + điện nước) khỏi ví
+    const fixedCostDeductions = totalSalaries + rentPaid + utilitiesPaid;
+
     const nextDayState: GameSaveState = {
       ...gameState,
       day: gameState.day + 1,
       gameTimeMinutes: 360, // 06:00 sáng
-      money: Math.max(0, gameState.money - totalSalaries),
+      money: gameState.money - fixedCostDeductions, // Cho phép dòng tiền âm theo mục 50
       player: {
         ...gameState.player,
         energy: gameState.player.maxEnergy, // Hồi phục 100% năng lượng
       },
       weather: nextWeather,
+      marketPrices: nextMarketPrices,
+      dailyFinance: createInitialDailyFinance(),
+      branchFinances: {},
       marketSpecial: pickedSpecial,
       employeeDetails: updatedEmployees,
       historySummaries: [summary, ...gameState.historySummaries],
@@ -1935,7 +2317,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
 
     const weatherEmoji = nextWeather === 'sunny' ? '☀️' : nextWeather === 'rainy' ? '🌧️' : '🍃';
-    get().showToast(`${weatherEmoji} Chào buổi sáng Ngày ${nextDayState.day}! Đã trả lương (-${totalSalaries.toLocaleString('vi-VN')} đ). ${pickedSpecial.newsText}`);
+    get().showToast(
+      `${weatherEmoji} Chào buổi sáng Ngày ${nextDayState.day}! Đã trừ chi phí cố định (-${fixedCostDeductions.toLocaleString('vi-VN')} đ: Lương, Mặt bằng, Điện nước). Chợ nông sản đã cập nhật giá mới!`
+    );
     get().saveLocal();
     get().syncCloud();
   },

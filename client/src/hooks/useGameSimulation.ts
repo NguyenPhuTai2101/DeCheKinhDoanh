@@ -17,6 +17,8 @@ import {
 } from '../../../shared/gameData';
 import { ActiveOrder, CustomerTypeId, Employee, NeighborId, RecipeId, IngredientId } from '../../../shared/types';
 import { getRandomRecipeCustomization } from '../../../shared/simulationConfig';
+import { calculateRatingMultiplier } from '../../../shared/economy/demand';
+import { simulatePassiveBranchTick } from '../../../shared/simulation/branches';
 import { soundManager } from '../utils/soundManager';
 import confetti from 'canvas-confetti';
 
@@ -34,6 +36,7 @@ export const useGameSimulation = () => {
     showToast,
     setEmployeeActionStatus,
     addBranchRevenue,
+    recordBranchSales,
   } = useGameStore();
 
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
@@ -112,7 +115,8 @@ export const useGameSimulation = () => {
       const managers = activeStaff.filter((e) => e.role === 'manager');
       const hasManager = managers.length > 0;
       const managerBoost = hasManager ? 1.25 : 1.0;
-      const hasTuan = hiredList.some((e) => e.id === 'emp_tuan');
+      // BUG 4 FIXED: Chỉ nhân viên Tuấn trực tại quán này mới kích hoạt buff
+      const hasTuan = activeStaff.some((e) => e.id === 'emp_tuan');
 
       const simStageId = currentGameState.businessStage || 'cart';
       const simStageUpgrades = currentGameState.stageUpgrades?.[simStageId] || currentGameState.purchasedUpgrades || {};
@@ -144,12 +148,19 @@ export const useGameSimulation = () => {
       let moneySpentOnShopping = 0;
       const newActionStatuses: Record<string, string> = {};
 
-      // 1.2b Tự động đi chợ sỉ (Shopper Auto Procurement)
+      // 1.2b Tự động đi chợ sỉ thông minh theo Shopper Policy (Mục 33)
       const shoppers = hiredList.filter(
         (e) => e.role === 'shopper' && (!e.assignedRestaurantId || e.assignedRestaurantId === currentRestId)
       );
 
-      if (shoppers.length > 0) {
+      const shopperPolicy = currentGameState.shopperPolicy || {
+        autoRestock: true,
+        minStock: 5,
+        targetStock: 25,
+        maxPriceMultiplier: 1.3,
+      };
+
+      if (shoppers.length > 0 && shopperPolicy.autoRestock) {
         autoShopCooldownRef.current += tickMs * timeSpeed;
         const bestShopper = shoppers[0];
         const shopperInterval = Math.max(7000, 14000 / (bestShopper.speed || 1.2));
@@ -160,9 +171,9 @@ export const useGameSimulation = () => {
           const currentRest = RESTAURANT_TYPES[currentRestId];
           const neededIngs = currentRest?.allowedIngredientIds || [];
 
-          // Tìm các nguyên liệu đang cạn (<= 4 món)
+          // Tìm các nguyên liệu dưới ngưỡng tối thiểu (minStock)
           const lowIngs = neededIngs.filter(
-            (id) => (updatedInventory[id] || 0) <= 4
+            (id) => (updatedInventory[id] || 0) < shopperPolicy.minStock
           );
 
           if (lowIngs.length > 0) {
@@ -176,17 +187,24 @@ export const useGameSimulation = () => {
               let rawCost = 0;
               const itemsToBuy: Record<string, number> = {};
 
-              const targetPerItem = Math.min(15, Math.floor(freeSpace / lowIngs.length));
-
               for (const ingId of lowIngs) {
                 if (totalItemsToBuy >= freeSpace) break;
                 const ing = INGREDIENTS[ingId];
                 if (!ing) continue;
-                const buyQty = Math.min(targetPerItem, freeSpace - totalItemsToBuy);
+
+                // Kiểm tra chính sách giá trần (maxPriceMultiplier)
+                const currentMarketPrice = currentGameState.marketPrices?.[ingId] ?? ing.cost;
+                if (currentMarketPrice > ing.cost * shopperPolicy.maxPriceMultiplier) {
+                  // Giá chợ hôm nay quá đắt, bỏ qua không mua
+                  continue;
+                }
+
+                const neededQty = Math.max(0, shopperPolicy.targetStock - (updatedInventory[ingId] || 0));
+                const buyQty = Math.min(neededQty, freeSpace - totalItemsToBuy);
                 if (buyQty > 0) {
                   itemsToBuy[ingId] = buyQty;
                   totalItemsToBuy += buyQty;
-                  rawCost += ing.cost * buyQty;
+                  rawCost += currentMarketPrice * buyQty;
                 }
               }
 
@@ -371,13 +389,15 @@ export const useGameSimulation = () => {
             newActionStatuses[assignedServer.id] = 'serving';
             const tip = order.calculatedTip ?? 0;
             soundManager.playCoin();
-            finishServing(order.tableIndex, recipe.basePrice, tip);
+            const restMenu = currentGameState.menuSettings?.[currentRestId];
+            const playerPrice = restMenu?.prices?.[recipe.id] ?? recipe.basePrice;
+            finishServing(order.tableIndex, playerPrice, tip, order);
             confetti({
               particleCount: 25,
               spread: 45,
               origin: { y: 0.65 },
             });
-            showToast(`💰 ${assignedServer.name} dọn bàn & thu tiền Bàn ${order.tableIndex}: +${(recipe.basePrice + tip).toLocaleString('vi-VN')}đ!`);
+            showToast(`💰 ${assignedServer.name} dọn bàn & thu tiền Bàn ${order.tableIndex}: +${(playerPrice + tip).toLocaleString('vi-VN')}đ!`);
             // Không đẩy vào nextOrders để dọn bàn đón khách mới
           } else {
             // Chờ người chơi bấm nút "THU TIỀN"
@@ -414,9 +434,10 @@ export const useGameSimulation = () => {
       // Cập nhật danh sách đơn hàng
       setActiveOrders(nextOrders);
 
-      // 1.4 Sinh khách hàng mới vào bàn ăn
+      // 1.4 Sinh khách hàng mới vào bàn ăn theo Rating & Thực đơn mở bán (Active Menu)
+      const ratingMult = calculateRatingMultiplier(currentGameState.rating ?? 75);
       const baseRate = currentStage.customerRateMs * weatherSpawnDelay;
-      const spawnRate = Math.max(600, Math.round(baseRate / (1 + spawnRateBoost)));
+      const spawnRate = Math.max(500, Math.round(baseRate / ((1 + spawnRateBoost) * ratingMult)));
 
       spawnTimerRef.current += tickMs * timeSpeed;
       if (spawnTimerRef.current >= spawnRate) {
@@ -433,7 +454,13 @@ export const useGameSimulation = () => {
           }
 
           const activeRest = RESTAURANT_TYPES[currentRestId] || RESTAURANT_TYPES.banh_mi;
-          const availableRecipes = activeRest.primaryRecipeIds;
+          // V2: Khách hàng chỉ gọi những món nằm trong Active Menu của ngày hôm nay!
+          const restMenu = currentGameState.menuSettings?.[currentRestId];
+          const activeMenu =
+            restMenu?.activeRecipes && restMenu.activeRecipes.length > 0
+              ? restMenu.activeRecipes.filter((r) => activeRest.primaryRecipeIds.includes(r))
+              : activeRest.primaryRecipeIds;
+          const availableRecipes = activeMenu.length > 0 ? activeMenu : activeRest.primaryRecipeIds;
 
           const isNeighbor = Math.random() < 0.22;
           let chosenType: CustomerTypeId = 'student';
@@ -464,7 +491,7 @@ export const useGameSimulation = () => {
             patienceSeconds = cType.patienceSeconds + extraPatience;
           }
 
-          // Sinh biến tấu ngẫu nhiên chân thực theo từng món (VD: "bánh mì không hành, 2 trứng", "phở không hành, nhiều bánh"...)
+          // Sinh biến tấu ngẫu nhiên chân thực theo từng món
           const customization = getRandomRecipeCustomization(chosenRecipe);
           let dialogue = customization.dialogue;
           const customTag = customization.tag;
@@ -493,7 +520,7 @@ export const useGameSimulation = () => {
         }
       }
 
-      // 1.5 TỰ ĐỘNG KIẾM TIỀN CHO CÁC CHI NHÁNH ĐÃ MỞ (BẮT BUỘC PHẢI CÓ NHÂN VIÊN TRỰC)
+      // 1.5 MÔ PHỎNG CHI NHÁNH CHẠY NỀN CHÂN THỰC (V2: Có tính COGS & Không còn in tiền ảo)
       branchPassiveTimerRef.current += tickMs * timeSpeed;
       if (branchPassiveTimerRef.current >= 8000) {
         branchPassiveTimerRef.current = 0;
@@ -502,31 +529,32 @@ export const useGameSimulation = () => {
         const otherBranches = unlockedRestaurants.filter((rId) => rId !== currentRestId);
 
         for (const branchId of otherBranches) {
-          // Kiểm tra xem chi nhánh này có nhân viên được phân công không
           const branchStaff = hiredList.filter(
             (e) => (e.assignedRestaurantId || 'banh_mi') === branchId
           );
 
-          if (branchStaff.length > 0) {
-            // Chi nhánh có nhân viên -> Tự động bán hàng và thu tiền!
-            const branchRest = RESTAURANT_TYPES[branchId];
-            if (branchRest && branchRest.primaryRecipeIds.length > 0) {
-              const randomRecipeId =
-                branchRest.primaryRecipeIds[
-                  Math.floor(Math.random() * branchRest.primaryRecipeIds.length)
-                ];
-              const recipe = RECIPES[randomRecipeId];
-              if (recipe) {
-                const staffBonus = 1 + 0.15 * branchStaff.length;
-                const branchLevels: Record<string, number> = currentGameState.branchLevels || {};
-                const branchLvl = branchLevels[branchId] || 1;
-                const tier = branchRest.branchTiers?.[branchLvl - 1];
-                const tierMultiplier = tier?.bonusMultiplier || (1 + (branchLvl - 1) * 0.5);
+          const branchLevels: Record<string, number> = currentGameState.branchLevels || {};
+          const branchLvl = branchLevels[branchId] || 1;
+          const bMenu = currentGameState.menuSettings?.[branchId];
 
-                const earned = Math.round(recipe.basePrice * staffBonus * managerBoost * tierMultiplier);
-                addBranchRevenue(branchId, earned, recipe.name);
-              }
-            }
+          // BUG 2, BUG 3, BUG 5 FIXED: Mô phỏng có tính đầy đủ Cook, Server, Manager và COGS
+          const simResult = simulatePassiveBranchTick({
+            restaurantId: branchId,
+            branchLevel: branchLvl,
+            branchStaff,
+            marketPrices: currentGameState.marketPrices,
+            weather: currentWeather,
+            playerPrices: bMenu?.prices,
+            activeRecipes: bMenu?.activeRecipes,
+          });
+
+          if (simResult && simResult.earnedRevenue > 0) {
+            recordBranchSales(
+              branchId,
+              simResult.earnedRevenue,
+              simResult.cogsCost,
+              simResult.dishName
+            );
           }
         }
       }
@@ -546,5 +574,6 @@ export const useGameSimulation = () => {
     showToast,
     setEmployeeActionStatus,
     addBranchRevenue,
+    recordBranchSales,
   ]);
 };

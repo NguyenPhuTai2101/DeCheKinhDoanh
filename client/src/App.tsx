@@ -18,6 +18,7 @@ import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
 import { StarterSelectionModal } from './components/modals/StarterSelectionModal';
 import { FranchiseModal } from './components/modals/FranchiseModal';
 import { MenuMoreDrawer } from './components/modals/MenuMoreDrawer';
+import { MenuPricingModal } from './components/modals/MenuPricingModal';
 import { IncidentModal } from './components/modals/IncidentModal';
 import { FlashScreen } from './components/views/FlashScreen';
 import { ToastNotification } from './components/ToastNotification';
@@ -83,6 +84,7 @@ export const App: React.FC = () => {
             {activeModal === 'delivery' && <DeliveryModal />}
             {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
             {activeModal === 'menuMore' && <MenuMoreDrawer />}
+            {activeModal === 'menuPricing' && <MenuPricingModal />}
 
             {/* 4.1. Pop-up Biến Cố Bất Ngờ Đời Thực (Surprise Incidents) */}
             {activeIncident && <IncidentModal />}

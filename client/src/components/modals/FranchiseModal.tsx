@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { RESTAURANT_TYPES, RECIPES, getBranchTierInfo, BUSINESS_STAGES } from '../../../../shared/gameData';
+import { RESTAURANT_TYPES, RECIPES, getBranchTierInfo, BUSINESS_STAGES, EMPLOYEES } from '../../../../shared/gameData';
 import { RestaurantTypeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -17,6 +17,9 @@ import {
   Crown,
   ChevronRight,
   Coins,
+  AlertTriangle,
+  Receipt,
+  DollarSign,
 } from 'lucide-react';
 
 export const FranchiseModal: React.FC = () => {
@@ -129,9 +132,14 @@ export const FranchiseModal: React.FC = () => {
             const canAffordRep = gameState.reputation >= rest.requiredReputation;
             const canUnlock = !isUnlocked && canAffordMoney && canAffordRep && hasStaffReq && !isBranchCapReached;
 
-            const branchStaff = gameState.hiredEmployees.filter(
-              (id) => (gameState.employeeDetails[id]?.assignedRestaurantId || 'banh_mi') === rest.id
-            );
+            const branchStaff = gameState.hiredEmployees
+              .map((id) => gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id))
+              .filter((e) => e && (e.assignedRestaurantId || 'banh_mi') === rest.id);
+
+            const hasCook = branchStaff.some((e) => e?.role === 'cook');
+            const hasServer = branchStaff.some((e) => e?.role === 'server');
+            const hasManager = branchStaff.some((e) => e?.role === 'manager');
+            const branchFinance = gameState.branchFinances?.[rest.id];
 
             const branchLvl = branchLevels[rest.id] || 1;
             const tierInfo = getBranchTierInfo(rest.id, branchLvl);
@@ -182,15 +190,15 @@ export const FranchiseModal: React.FC = () => {
                         {isUnlocked && !isCurrent && (
                           <span
                             className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 ${
-                              branchStaff.length > 0
+                              hasCook
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                                : 'bg-rose-100 text-rose-800 border border-rose-300'
                             }`}
                           >
                             <CheckCircle2 className="w-2.5 h-2.5" />
-                            {branchStaff.length > 0
+                            {hasCook
                               ? `Tự động bán (${branchStaff.length} NV)`
-                              : 'Chưa có NV trực ⚠️'}
+                              : 'Thiếu Đầu Bếp ⚠️'}
                           </span>
                         )}
                       </div>
@@ -220,6 +228,67 @@ export const FranchiseModal: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* BÁO CÁO P&L HÔM NAY VÀ TRẠNG THÁI NHÂN SỰ CHI NHÁNH */}
+                {isUnlocked && (
+                  <div className="mt-2.5 space-y-1.5">
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center text-[10px]">
+                      <div className="bg-white p-1 rounded-lg border border-slate-100">
+                        <span className="text-slate-500 block text-[9px]">Doanh thu</span>
+                        <span className="font-black text-emerald-600">
+                          +{(branchFinance?.revenue || 0).toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                      <div className="bg-white p-1 rounded-lg border border-slate-100">
+                        <span className="text-slate-500 block text-[9px]">Giá vốn (COGS)</span>
+                        <span className="font-black text-rose-500">
+                          -{(branchFinance?.cogs || 0).toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                      <div className="bg-white p-1 rounded-lg border border-slate-100">
+                        <span className="text-slate-500 block text-[9px]">Lợi nhuận gộp</span>
+                        <span className="font-black text-slate-800">
+                          +{(branchFinance?.grossProfit || 0).toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+                      <div className="bg-white p-1 rounded-lg border border-slate-100">
+                        <span className="text-slate-500 block text-[9px]">Khách phục vụ</span>
+                        <span className="font-black text-amber-700">
+                          {branchFinance?.customersServed || 0} khách
+                        </span>
+                      </div>
+                    </div>
+
+                    {!isCurrent && (
+                      <div className="flex flex-wrap gap-1 text-[9.5px]">
+                        {!hasCook && (
+                          <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                            <span>Thiếu đầu bếp: Chi nhánh tạm ngưng tự nấu bán!</span>
+                          </span>
+                        )}
+                        {hasCook && !hasServer && (
+                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>Thiếu phục vụ: Tốc độ bán giảm 50%!</span>
+                          </span>
+                        )}
+                        {hasCook && hasServer && (
+                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>Vận hành tự động ổn định ({branchStaff.length} nhân sự)</span>
+                          </span>
+                        )}
+                        {hasManager && (
+                          <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <Crown className="w-3 h-3 text-indigo-600 shrink-0" />
+                            <span>Có Quản lý (+15% Doanh thu, -10% COGS)</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* KHU VỰC NÂNG CẤP CHI NHÁNH (NẾU ĐÃ MỞ QUÁN) */}
                 {isUnlocked ? (

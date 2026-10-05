@@ -52,7 +52,7 @@ export const TopBar: React.FC = () => {
     <header className="w-full bg-gradient-to-b from-[#FFF5F8] to-[#FFEBF1] border-b-2 border-[#FFCCD9] px-2 sm:px-3 py-1.5 sm:py-2 flex flex-col gap-1.5 shadow-[0_2px_12px_rgba(255,168,197,0.15)] z-30 shrink-0">
       {/* Hàng 1: Quán ăn & Cấp độ, Tiền mặt & Nút Mở Cửa - Chuẩn Mobile Responsive */}
       <div className="w-full flex items-center justify-between gap-1.5">
-        {/* Tên Quán, Cấp Độ & Uy Tín (Bấm để Đổi Quán / Quản lý chuỗi) */}
+        {/* Tên Quán, Cấp Độ, Danh Tiếng (Fame) & Điểm Đánh Giá (Rating) */}
         <button
           onClick={() => {
             soundManager.playClick();
@@ -74,17 +74,35 @@ export const TopBar: React.FC = () => {
               </span>
               <span className="text-[9px] text-[#E91E63] font-black">▾</span>
             </div>
-            <div className="text-[9px] sm:text-[9.5px] text-amber-700 font-extrabold flex items-center gap-0.5 mt-0.5">
-              <span>⭐</span>
-              <span>{gameState.reputation.toFixed(1)}</span>
+            <div className="text-[8.5px] sm:text-[9.5px] text-amber-800 font-extrabold flex items-center gap-1.5 mt-0.5">
+              <span title="Điểm Đánh Giá Chất Lượng Dịch Vụ (0 - 100)">
+                ⭐ {(gameState.rating ?? 75).toFixed(0)}
+              </span>
+              <span className="text-[#FFA8C5]">|</span>
+              <span title="Điểm Danh Tiếng Doanh Nghiệp (Fame)">
+                🏆 {gameState.fame ?? gameState.reputation}
+              </span>
             </div>
           </div>
+        </button>
+
+        {/* Nút Thực Đơn & Định Giá Món */}
+        <button
+          onClick={() => {
+            soundManager.playClick();
+            openModal('menuPricing');
+          }}
+          className="flex items-center gap-1 bg-white/90 hover:bg-white px-2 py-1 rounded-2xl border border-[#FFA8C5] shadow-2xs active:scale-95 transition-all text-xs font-black text-[#6D4C41] cursor-pointer"
+          title="Chọn Món Bán & Thiết Lập Giá Bán Hôm Nay"
+        >
+          <span className="text-sm">📋</span>
+          <span className="hidden sm:inline">Menu & Giá</span>
         </button>
 
         {/* Tiền mặt - To, Nổi Bật Ở Giữa */}
         <div className="flex items-center gap-1 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border-2 border-[#FFA8C5] shadow-[0_2px_8px_rgba(255,168,197,0.2)] shrink-0">
           <span className="text-sm sm:text-base">🪙</span>
-          <span className="font-black text-xs sm:text-sm text-[#5C3A33] tracking-tight">
+          <span className={`font-black text-xs sm:text-sm tracking-tight ${gameState.money < 0 ? 'text-rose-600' : 'text-[#5C3A33]'}`}>
             {gameState.money.toLocaleString('vi-VN')} <span className="text-[9px] sm:text-[10px] font-black text-[#E91E63]">đ</span>
           </span>
         </div>

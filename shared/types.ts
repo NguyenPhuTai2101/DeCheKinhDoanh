@@ -223,6 +223,10 @@ export interface Employee {
   hired: boolean;
   description: string;
   assignedRestaurantId?: RestaurantTypeId;
+  trainingCount?: number;
+  lastWorkedDay?: number;
+  daysWorked?: number;
+  mistakes?: number;
 }
 
 export type ShopThemeId = 'sakura_pink' | 'mint_cafe' | 'lavender_dream' | 'cream_bakery';
@@ -251,15 +255,80 @@ export interface DecorationItem {
   description: string;
 }
 
+export interface DailyFinance {
+  revenue: number;
+  branchRevenue?: number;
+  cogs: number; // Giá vốn hàng bán thực tế theo giá thị trường
+  grossProfit: number;
+  payroll: number;
+  rent: number;
+  utilities: number;
+  marketing: number;
+  deliveryFees: number;
+  eventExpenses: number;
+  otherIncome: number;
+  otherExpense: number;
+  tips?: number;
+  netProfit: number;
+}
+
+export interface BranchDailyFinance {
+  restaurantId: RestaurantTypeId;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  payroll: number;
+  rent: number;
+  utilities: number;
+  marketing: number;
+  netProfit: number;
+  customersServed: number;
+}
+
+export interface RestaurantMenuSettings {
+  activeRecipes: RecipeId[];
+  prices: Partial<Record<RecipeId, number>>;
+}
+
+export interface ShopperPolicy {
+  autoRestock: boolean;
+  autoBuyEnabled?: boolean;
+  minStock: number;
+  targetStock: number;
+  maxPriceMultiplier: number;
+}
+
+export interface BusinessMetrics {
+  lifetimeRevenue: number;
+  lifetimeProfit: number;
+  totalCustomers: number;
+  fiveStarReviews: number;
+  averageRating: number;
+}
+
 export interface DailySummary {
   day: number;
   totalRevenue: number;
-  ingredientCost: number;
+  cogs: number;
+  ingredientCost: number; // Giữ để tương thích ngược
   salariesPaid: number;
+  wages?: number;
+  staffSalaries?: number;
+  rentPaid: number;
+  rent?: number;
+  utilitiesPaid: number;
+  utilities?: number;
+  marketingPaid: number;
+  grossProfit: number;
   netProfit: number;
   servedCustomers: number;
   lostCustomers: number;
   reputationChange: number;
+  averageRating: number;
+  fameGain: number;
+  insights?: string[];
+  smartInsights?: string[];
+  branchFinances?: Partial<Record<RestaurantTypeId, BranchDailyFinance>>;
 }
 
 export interface PlayerStats {
@@ -421,6 +490,16 @@ export interface GameSaveState {
     discountPercent: number;
     newsText: string;
   } | null;
+
+  // === V2: KINH TẾ CHUYÊN SÂU & ĐẾ CHẾ KINH DOANH ===
+  rating?: number; // Điểm chất lượng dịch vụ hiện tại (0 - 100)
+  fame?: number; // Danh tiếng tích lũy (Fame >= 0, mở rộng không giới hạn)
+  dailyFinance?: DailyFinance;
+  branchFinances?: Partial<Record<RestaurantTypeId, BranchDailyFinance>>;
+  menuSettings?: Partial<Record<RestaurantTypeId, RestaurantMenuSettings>>;
+  marketPrices?: Partial<Record<IngredientId, number>>;
+  shopperPolicy?: ShopperPolicy;
+  businessMetrics?: BusinessMetrics;
 }
 
 // ============================================================================

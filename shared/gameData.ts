@@ -2243,7 +2243,7 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     maxTables: 3,
     customerRateMs: 4500,
     cost: 250000,
-    requiredReputation: 45,
+    requiredReputation: 50,
     maxRestaurants: 1, // Vẫn 1 quán nhưng mở rộng chỗ ngồi
     maxStaff: 4, // Tối đa 4 nhân viên (Mở khóa tuyển nhân viên đi chợ)
     description: 'Bàn ghế kê râm mát dưới bóng cây, mở rộng thêm bàn ăn và tuyển chuyên viên đi chợ sỉ.',
@@ -2256,7 +2256,7 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     maxTables: 4,
     customerRateMs: 3800,
     cost: 1500000,
-    requiredReputation: 120,
+    requiredReputation: 150,
     maxRestaurants: 2, // ⭐ CHÍNH THỨC MỞ KHÓA CHI NHÁNH THỨ 2!
     maxStaff: 7, // Tối đa 7 nhân viên phục vụ 2 quán
     description: 'Mái hiên di động che mưa nắng, thương hiệu uy tín chính thức được mở thêm Chi Nhánh thứ 2!',
@@ -2269,9 +2269,9 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     maxTables: 5,
     customerRateMs: 3000,
     cost: 6000000,
-    requiredReputation: 350,
+    requiredReputation: 500,
     maxRestaurants: 4, // ⭐ MỞ KHÓA CHI NHÁNH THỨ 3 & 4!
-    maxStaff: 12, // Tối đa 12 nhân viên
+    maxStaff: 15, // Tối đa 15 nhân viên
     description: 'Mặt tiền phố lớn đông đúc, mở rộng lên đến 4 chi nhánh đa ngành ẩm thực.',
   },
   empire: {
@@ -2282,9 +2282,9 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     maxTables: 6,
     customerRateMs: 2400,
     cost: 25000000,
-    requiredReputation: 850,
+    requiredReputation: 1500,
     maxRestaurants: 5, // ⭐ MỞ TRỌN BỘ 5 CHI NHÁNH TOÀN NĂNG!
-    maxStaff: 20, // Tối đa 20 nhân viên
+    maxStaff: 25, // Tối đa 25 nhân viên
     description: 'Đỉnh cao đế chế ẩm thực quốc dân! Mở trọn vẹn cả 5 chuỗi thương hiệu khắp thành phố.',
   },
 };
@@ -2912,6 +2912,61 @@ export const INITIAL_GAME_STATE: GameSaveState = {
   hasChosenStarter: false,
   weather: 'sunny',
   marketSpecial: null,
+
+  // === V2: KINH TẾ CHUYÊN SÂU & ĐẾ CHẾ KINH DOANH ===
+  rating: 75, // Điểm đánh giá chất lượng dịch vụ khởi điểm (0 - 100)
+  fame: 10,   // Danh tiếng khởi điểm
+  dailyFinance: {
+    revenue: 0,
+    cogs: 0,
+    grossProfit: 0,
+    payroll: 0,
+    rent: 0,
+    utilities: 0,
+    marketing: 0,
+    deliveryFees: 0,
+    eventExpenses: 0,
+    otherIncome: 0,
+    otherExpense: 0,
+    netProfit: 0,
+  },
+  branchFinances: {},
+  menuSettings: {
+    banh_mi: {
+      activeRecipes: ['banh_mi_trung', 'banh_mi_thit', 'cafe_sua', 'tra_dao'],
+      prices: {},
+    },
+    pho: {
+      activeRecipes: ['pho_tai', 'pho_nam', 'cafe_sua'],
+      prices: {},
+    },
+    bun: {
+      activeRecipes: ['bun_bo_hue', 'bun_rieu_cua', 'tra_dao'],
+      prices: {},
+    },
+    beefsteak: {
+      activeRecipes: ['bo_ne_op_la', 'beefsteak_sot_tieu', 'cafe_sua'],
+      prices: {},
+    },
+    com_tam: {
+      activeRecipes: ['com_tam_suon', 'com_tam_suon_bi_cha', 'tra_dao'],
+      prices: {},
+    },
+  },
+  marketPrices: {},
+  shopperPolicy: {
+    autoRestock: true,
+    minStock: 5,
+    targetStock: 25,
+    maxPriceMultiplier: 1.3,
+  },
+  businessMetrics: {
+    lifetimeRevenue: 0,
+    lifetimeProfit: 0,
+    totalCustomers: 0,
+    fiveStarReviews: 0,
+    averageRating: 75,
+  },
 };
 
 
