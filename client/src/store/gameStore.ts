@@ -31,6 +31,11 @@ import {
   RESTAURANT_TYPES,
   getUpgradeTierInfo,
   getBranchTierInfo,
+  getStageCatalog,
+  getStageUpgrades,
+  getStageUpgradeTierInfo,
+  calculateStorageCapacity,
+  calculateMaxTables,
 } from '../../../shared/gameData';
 
 const LOCAL_STORAGE_KEY = 'cozy_empire_save_v4';
@@ -467,14 +472,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   purchaseUpgrade: (upgradeId) => {
     const { gameState } = get();
-    const upgrade = SHOP_UPGRADES.find((u) => u.id === upgradeId);
+    const stageId = gameState.businessStage || 'cart';
+    const stageCatalog = getStageCatalog(stageId);
+    const upgrade = stageCatalog.upgrades.find((u) => u.id === upgradeId);
     if (!upgrade) return false;
 
-    const currentLvl = gameState.purchasedUpgrades[upgradeId] || 0;
-    const tierInfo = getUpgradeTierInfo(upgrade, currentLvl);
+    const currentStageUpgrades = gameState.stageUpgrades?.[stageId] || {};
+    const currentLvl = currentStageUpgrades[upgradeId] ?? (gameState.purchasedUpgrades[upgradeId] || 0);
+    const tierInfo = getStageUpgradeTierInfo(stageId, upgradeId, currentLvl);
 
     if (tierInfo.isMax) {
-      get().showToast('ℹ️ Trang bị này đã đạt cấp tối đa!');
+      get().showToast('ℹ️ Trang bị này đã đạt cấp tối đa của kỷ nguyên!');
       return false;
     }
 
@@ -483,20 +491,27 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return false;
     }
 
-    let extraCapacity = 0;
-    if (upgrade.effect.type === 'storage_capacity') {
-      extraCapacity = tierInfo.effectValue;
-    }
+    const updatedStageUpgrades = {
+      ...(gameState.stageUpgrades || {}),
+      [stageId]: {
+        ...currentStageUpgrades,
+        [upgradeId]: currentLvl + 1,
+      },
+    };
+
+    // Tính toán lại dung tích kho chính xác theo sàn + tier
+    const newStorageCapacity = calculateStorageCapacity(stageId, updatedStageUpgrades[stageId]);
 
     set({
       gameState: {
         ...gameState,
         money: gameState.money - tierInfo.cost,
-        storageCapacity: gameState.storageCapacity + extraCapacity,
+        storageCapacity: newStorageCapacity,
         purchasedUpgrades: {
           ...gameState.purchasedUpgrades,
           [upgradeId]: currentLvl + 1,
         },
+        stageUpgrades: updatedStageUpgrades,
       },
     });
 
@@ -1321,15 +1336,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return false;
     }
 
+    const nextStageUpgrades = gameState.stageUpgrades?.[nextStageId] || {};
+    const newStorageCapacity = Math.max(
+      gameState.storageCapacity,
+      calculateStorageCapacity(nextStageId, nextStageUpgrades)
+    );
+
     set({
       gameState: {
         ...gameState,
         money: gameState.money - nextStage.cost,
         businessStage: nextStageId,
+        storageCapacity: newStorageCapacity,
+        stageUpgrades: {
+          ...(gameState.stageUpgrades || {}),
+          [nextStageId]: nextStageUpgrades,
+        },
       },
     });
 
-    get().showToast(`🎉 Thăng cấp thành công! Chào mừng đến với "${nextStage.name}"!`);
+    get().showToast(`🎉 Đột phá Kỷ Nguyên! Chào mừng đến với "${nextStage.name}"! Kho mở rộng đạt ${newStorageCapacity} ô!`);
     get().saveLocal();
     return true;
   },
@@ -1595,64 +1621,95 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const local = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local) as GameSaveState;
-        // Merge with safe initial fallback values
-        set({
-          gameState: {
-            ...INITIAL_GAME_STATE,
-            ...parsed,
-            ownedThemes: parsed.ownedThemes || ['sakura_pink'],
-            ownedDecorations: parsed.ownedDecorations || [],
-            equippedDecorations: parsed.equippedDecorations || [],
-            employeeDetails: parsed.employeeDetails || {},
-            shopName: parsed.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
-            businessStage: parsed.businessStage || 'cart',
-            neighbors: {
-              ...INITIAL_GAME_STATE.neighbors,
-              ...(parsed.neighbors || {}),
-            },
-            lotteryHistory: parsed.lotteryHistory || [],
-            activeLotteryTicket: parsed.activeLotteryTicket || null,
-            activeRestaurantId: parsed.activeRestaurantId || 'banh_mi',
-            unlockedRestaurants: parsed.unlockedRestaurants || ['banh_mi'],
-            hasChosenStarter: parsed.hasChosenStarter ?? false,
-          },
-        });
-      }
+            const stg = parsed.businessStage || 'cart';
+            const loadedStageUpgrades = parsed.stageUpgrades || {
+              cart: parsed.purchasedUpgrades || {},
+              corner: {},
+              awning: {},
+              eatery: {},
+              empire: {},
+            };
+            const currentStageUpgrades = loadedStageUpgrades[stg] || {};
+            const correctCapacity = Math.max(
+              parsed.storageCapacity || 100,
+              calculateStorageCapacity(stg, currentStageUpgrades)
+            );
 
-      const res = await fetch('/api/save/player_default');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const cloudState = json.data as GameSaveState;
-          const currentLocal = get().gameState;
-          if (
-            new Date(cloudState.lastSavedAt).getTime() >
-            new Date(currentLocal.lastSavedAt || 0).getTime()
-          ) {
             set({
               gameState: {
                 ...INITIAL_GAME_STATE,
-                ...cloudState,
-                ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
-                ownedDecorations: cloudState.ownedDecorations || [],
-                equippedDecorations: cloudState.equippedDecorations || [],
-                employeeDetails: cloudState.employeeDetails || {},
-                shopName: cloudState.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
-                businessStage: cloudState.businessStage || 'cart',
+                ...parsed,
+                businessStage: stg,
+                stageUpgrades: loadedStageUpgrades,
+                storageCapacity: correctCapacity,
+                ownedThemes: parsed.ownedThemes || ['sakura_pink'],
+                ownedDecorations: parsed.ownedDecorations || [],
+                equippedDecorations: parsed.equippedDecorations || [],
+                employeeDetails: parsed.employeeDetails || {},
+                shopName: parsed.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
                 neighbors: {
                   ...INITIAL_GAME_STATE.neighbors,
-                  ...(cloudState.neighbors || {}),
+                  ...(parsed.neighbors || {}),
                 },
-                lotteryHistory: cloudState.lotteryHistory || [],
-                activeLotteryTicket: cloudState.activeLotteryTicket || null,
-                activeRestaurantId: cloudState.activeRestaurantId || 'banh_mi',
-                unlockedRestaurants: cloudState.unlockedRestaurants || ['banh_mi'],
-                hasChosenStarter: cloudState.hasChosenStarter ?? false,
+                lotteryHistory: parsed.lotteryHistory || [],
+                activeLotteryTicket: parsed.activeLotteryTicket || null,
+                activeRestaurantId: parsed.activeRestaurantId || 'banh_mi',
+                unlockedRestaurants: parsed.unlockedRestaurants || ['banh_mi'],
+                hasChosenStarter: parsed.hasChosenStarter ?? false,
               },
             });
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
           }
-        }
+
+          const res = await fetch('/api/save/player_default');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) {
+              const cloudState = json.data as GameSaveState;
+              const currentLocal = get().gameState;
+              if (
+                new Date(cloudState.lastSavedAt).getTime() >
+                new Date(currentLocal.lastSavedAt || 0).getTime()
+              ) {
+                const cloudStg = cloudState.businessStage || 'cart';
+                const cloudStageUpgrades = cloudState.stageUpgrades || {
+                  cart: cloudState.purchasedUpgrades || {},
+                  corner: {},
+                  awning: {},
+                  eatery: {},
+                  empire: {},
+                };
+                const cloudCurrentUpgrades = cloudStageUpgrades[cloudStg] || {};
+                const cloudCapacity = Math.max(
+                  cloudState.storageCapacity || 100,
+                  calculateStorageCapacity(cloudStg, cloudCurrentUpgrades)
+                );
+
+                set({
+                  gameState: {
+                    ...INITIAL_GAME_STATE,
+                    ...cloudState,
+                    businessStage: cloudStg,
+                    stageUpgrades: cloudStageUpgrades,
+                    storageCapacity: cloudCapacity,
+                    ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
+                    ownedDecorations: cloudState.ownedDecorations || [],
+                    equippedDecorations: cloudState.equippedDecorations || [],
+                    employeeDetails: cloudState.employeeDetails || {},
+                    shopName: cloudState.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
+                    neighbors: {
+                      ...INITIAL_GAME_STATE.neighbors,
+                      ...(cloudState.neighbors || {}),
+                    },
+                    lotteryHistory: cloudState.lotteryHistory || [],
+                    activeLotteryTicket: cloudState.activeLotteryTicket || null,
+                    activeRestaurantId: cloudState.activeRestaurantId || 'banh_mi',
+                    unlockedRestaurants: cloudState.unlockedRestaurants || ['banh_mi'],
+                    hasChosenStarter: cloudState.hasChosenStarter ?? false,
+                  },
+                });
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
+              }
+            }
       }
     } catch (e) {
       console.warn('Sử dụng Local save do Cloud offline:', e);

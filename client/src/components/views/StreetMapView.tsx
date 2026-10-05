@@ -8,6 +8,7 @@ import {
   RESTAURANT_TYPES,
   EMPLOYEES,
   getBranchTierInfo,
+  calculateMaxTables,
 } from '../../../../shared/gameData';
 import { BusinessStageId, RestaurantTypeId, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
@@ -67,12 +68,9 @@ export const StreetMapView: React.FC = () => {
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
-  const upgrades = gameState.purchasedUpgrades;
-  const extraTableCount =
-    (upgrades['extra_tables'] || 0) +
-    (upgrades['extra_table_1'] ? 1 : 0) +
-    (upgrades['extra_table_2'] ? 1 : 0);
-  const maxTables = currentStage.maxTables + extraTableCount;
+  const stageId = gameState.businessStage || 'cart';
+  const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
+  const maxTables = calculateMaxTables(stageId, stageUpgrades);
 
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
 

@@ -12,6 +12,7 @@ import {
   RestaurantType,
   RestaurantTypeId,
   BranchTier,
+  BusinessStageId,
 } from './types';
 
 export const INGREDIENTS: Record<IngredientId, Ingredient> = {
@@ -809,180 +810,821 @@ export const CUSTOMER_TYPES: Record<string, CustomerType> = {
   },
 };
 
-export const SHOP_UPGRADES: ShopUpgrade[] = [
-  // 1. BẾP NẤU SIÊU TỐC (Cook Speed - 5 Cấp)
-  {
-    id: 'modern_stove',
-    name: 'Bếp Nấu Siêu Tốc',
-    icon: '⚡',
-    description: 'Nâng cấp công suất bếp, giúp đầu bếp nấu chín món ăn nhanh chóng.',
-    cost: 180000,
-    level: 0,
-    maxLevel: 5,
-    category: 'kitchen',
-    effect: { type: 'cook_speed', value: 0.15 },
-    tiers: [
-      { level: 1, title: 'Bếp Gas Đôi Lửa Xanh', cost: 180000, effectValue: 0.15, description: 'Giảm 15% thời gian nấu nướng cho mọi món ăn.' },
-      { level: 2, title: 'Bếp Khè Gang Công Nghiệp', cost: 550000, effectValue: 0.25, description: 'Lửa cực mạnh, giảm 25% thời gian chế biến.' },
-      { level: 3, title: 'Bếp Từ Cao Tần Siêu Tốc', cost: 1600000, effectValue: 0.38, description: 'Kiểm soát nhiệt chuẩn xác, giảm 38% thời gian nấu.' },
-      { level: 4, title: 'Dàn Bếp Thông Minh AI Hẹn Giờ', cost: 4800000, effectValue: 0.50, description: 'Tự động canh lửa chuẩn xác, giảm 50% thời gian nấu.' },
-      { level: 5, title: 'Lò Nấu Luyện Kim Hoàng Gia', cost: 14000000, effectValue: 0.65, description: 'Nấu chín món ăn trong nháy mắt, giảm tới 65% thời gian nấu!' },
+export interface StageUpgradeCatalog {
+  stageId: BusinessStageId;
+  stageName: string;
+  stageIcon: string;
+  stageTagline: string;
+  baseStorage: number;
+  baseCookSpeed: number;
+  baseSpawnRate: number;
+  basePatience: number;
+  baseTipRate: number;
+  baseDeliveryBonus: number;
+  baseRepBonus: number;
+  upgrades: ShopUpgrade[];
+}
+
+export const STAGE_SHOP_UPGRADES: Record<BusinessStageId, StageUpgradeCatalog> = {
+  // === KỶ NGUYÊN 1: XE ĐẨY LỀ ĐƯỜNG 🛒 ===
+  cart: {
+    stageId: 'cart',
+    stageName: 'Xe Đẩy Lề Đường',
+    stageIcon: '🛒',
+    stageTagline: 'Khởi đầu mộc mạc vỉa hè với xe nhôm kính và ghế nhựa',
+    baseStorage: 100,
+    baseCookSpeed: 0.0,
+    baseSpawnRate: 0.0,
+    basePatience: 0,
+    baseTipRate: 0.0,
+    baseDeliveryBonus: 0.0,
+    baseRepBonus: 0.0,
+    upgrades: [
+      {
+        id: 'cozy_storage',
+        name: 'Thùng & Ngăn Chứa Xe Đẩy',
+        icon: '📦',
+        description: 'Mở rộng ngăn chứa nguyên liệu trên xe đẩy (Tối đa 250 ô).',
+        cost: 30000,
+        level: 0,
+        maxLevel: 5,
+        category: 'storage',
+        effect: { type: 'storage_capacity', value: 25 },
+        tiers: [
+          { level: 1, title: 'Thùng Xốp Đựng Đá Ướp Lạnh', cost: 30000, effectValue: 25, description: '+25 ô kho (Đạt 125 ô), giữ pate rau củ tươi mát cả buổi.' },
+          { level: 2, title: 'Thùng Nhựa Đại Có Quai Xách', cost: 70000, effectValue: 25, description: '+25 ô kho (Đạt 150 ô), chia ngăn gia vị bánh mì gọn gàng.' },
+          { level: 3, title: 'Thùng Giữ Nhiệt 3 Lớp Inox', cost: 140000, effectValue: 30, description: '+30 ô kho (Đạt 180 ô), trữ thịt chả không sợ ôi thiu.' },
+          { level: 4, title: 'Kệ Gỗ Đóng Thêm Hông Xe Đẩy', cost: 250000, effectValue: 30, description: '+30 ô kho (Đạt 210 ô), xếp bánh mì và nước sốt ngăn nắp.' },
+          { level: 5, title: 'Tủ Nhôm Kính Kín Gió Tinh Tế', cost: 420000, effectValue: 40, description: '+40 ô kho (Đạt 250 ô - Max Xe Đẩy), bảo quản tối đa trên xe đẩy!' },
+        ],
+      },
+      {
+        id: 'modern_stove',
+        name: 'Bếp Nướng & Khò Xe Đẩy',
+        icon: '⚡',
+        description: 'Tăng tốc độ nướng bánh mì và làm nóng món ăn.',
+        cost: 35000,
+        level: 0,
+        maxLevel: 5,
+        category: 'kitchen',
+        effect: { type: 'cook_speed', value: 0.08 },
+        tiers: [
+          { level: 1, title: 'Bếp Gas Mini Du Lịch Chống Gió', cost: 35000, effectValue: 0.08, description: 'Giảm 8% thời gian chế biến, lửa đều không tắt khi có gió.' },
+          { level: 2, title: 'Bếp Gas Đơn Đánh Lửa Magneto', cost: 80000, effectValue: 0.09, description: 'Giảm thêm 9% thời gian nấu, chiên trứng ốp la nhanh giòn.' },
+          { level: 3, title: 'Đầu Khò Lửa Cầm Tay Tiện Dụng', cost: 160000, effectValue: 0.10, description: 'Giảm thêm 10% thời gian nấu, khò phô mai và thịt thơm lừng.' },
+          { level: 4, title: 'Bếp Gas Đôi Lửa Xanh Tiết Kiệm', cost: 280000, effectValue: 0.10, description: 'Giảm thêm 10% thời gian nấu, thao tác 2 chảo cùng lúc.' },
+          { level: 5, title: 'Bếp Khè Vỉa Hè Chế Lại Siêu Tốc', cost: 450000, effectValue: 0.11, description: 'Giảm thêm 11% thời gian nấu (Tổng +48%), tốc độ ra món vèo vèo!' },
+        ],
+      },
+      {
+        id: 'flower_signboard',
+        name: 'Bảng Hiệu & Đèn Bão Xe Đẩy',
+        icon: '🌸',
+        description: 'Trang trí xe đẩy bắt mắt, thu hút khách đi đường ghé mua.',
+        cost: 30000,
+        level: 0,
+        maxLevel: 5,
+        category: 'marketing',
+        effect: { type: 'attract_customers', value: 0.08 },
+        tiers: [
+          { level: 1, title: 'Bìa Carton Viết Bút Lông Dạ Đỏ', cost: 30000, effectValue: 0.08, description: 'Khách đi đường ghé nhanh hơn 8% nhờ chữ viết to rõ nét.' },
+          { level: 2, title: 'Đèn Bão Treo Móc Xe Đêm Tối', cost: 75000, effectValue: 0.09, description: 'Khách ghé nhanh hơn 9%, rực sáng một góc vỉa hè buổi tối.' },
+          { level: 3, title: 'Biển Bạt Mini In Hình Món Hấp Dẫn', cost: 150000, effectValue: 0.10, description: 'Khách ghé nhanh hơn 10%, hình ảnh món ăn kích thích vị giác.' },
+          { level: 4, title: 'Dây Đèn Nháy Nhiều Màu Quấn Xe', cost: 260000, effectValue: 0.11, description: 'Khách ghé nhanh hơn 11%, xe đẩy lung linh nổi bật nhất phố.' },
+          { level: 5, title: 'Bảng Đèn LED Nhỏ Sạc Bình Ắc-quy', cost: 420000, effectValue: 0.12, description: 'Khách ghé nhanh hơn 12% (Tổng +50%), khách đông nườm nượp!' },
+        ],
+      },
+      {
+        id: 'seating_comfort',
+        name: 'Ghế Nhựa Vỉa Hè Tiện Lợi',
+        icon: '🪑',
+        description: 'Chỗ ngồi tạm ven đường giúp khách thoải mái chờ đợi.',
+        cost: 25000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'customer_patience', value: 3 },
+        tiers: [
+          { level: 1, title: 'Ghế Nhựa Lùn Xanh Dương Song Long', cost: 25000, effectValue: 3, description: '+3s thời gian khách kiên nhẫn ngồi chờ lấy món.' },
+          { level: 2, title: 'Ghế Nhựa Đỏ Dày Đỡ Mỏi Lưng', cost: 60000, effectValue: 3, description: '+3s kiên nhẫn, ngồi chắc chắn không sợ gãy lún.' },
+          { level: 3, title: 'Bàn Nhựa Vuông Ăn Uống Đỡ Vướng', cost: 130000, effectValue: 3, description: '+3s kiên nhẫn, có chỗ đặt ly trà đá mát rượi.' },
+          { level: 4, title: 'Bàn Xếp Inox Dã Chiến Sạch Sẽ', cost: 230000, effectValue: 3, description: '+3s kiên nhẫn, bàn sáng bóng tạo thiện cảm.' },
+          { level: 5, title: 'Bộ Ghế Xếp Dù Mini Thoải Mái', cost: 380000, effectValue: 3, description: '+3s kiên nhẫn (Tổng +15s), khách vui vẻ chờ đợi không hối thúc!' },
+        ],
+      },
+      {
+        id: 'dishware_premium',
+        name: 'Bao Gói & Dụng Cụ Bánh Mì',
+        icon: '🍽️',
+        description: 'Đóng gói sạch sẽ, khách hài lòng boa thêm tiền tip.',
+        cost: 25000,
+        level: 0,
+        maxLevel: 5,
+        category: 'service',
+        effect: { type: 'tip_rate', value: 0.05 },
+        tiers: [
+          { level: 1, title: 'Túi Giấy Xi-Măng Thân Thiện Môi Trường', cost: 25000, effectValue: 0.05, description: '+5% tiền tip boa từ khách vì bọc bánh mì sạch đẹp.' },
+          { level: 2, title: 'Dĩa Nhựa Phíp Dày Dặn Ăn Tại Chỗ', cost: 60000, effectValue: 0.05, description: '+5% tiền tip, món ăn bày biện gọn gàng.' },
+          { level: 3, title: 'Đũa Muỗng Dùng Một Lần Cao Cấp', cost: 120000, effectValue: 0.05, description: '+5% tiền tip, vệ sinh tiện lợi cho khách văn phòng.' },
+          { level: 4, title: 'Muỗng Nĩa Inox Cầm Đầm Chắc Tay', cost: 220000, effectValue: 0.05, description: '+5% tiền tip, cảm giác dùng bữa xịn sò hơn hẳn.' },
+          { level: 5, title: 'Khay Bưng Nhựa Giả Gỗ Sạch Sẽ', cost: 380000, effectValue: 0.05, description: '+5% tiền tip (Tổng +25% tip), khách thường xuyên thưởng thêm!' },
+        ],
+      },
+      {
+        id: 'delivery_fleet',
+        name: 'Đồ Nghề Giao Hàng Bằng Xe Máy',
+        icon: '🛵',
+        description: 'Trang bị giao hàng đơn giản cho đơn mang đi.',
+        cost: 25000,
+        level: 0,
+        maxLevel: 5,
+        category: 'logistics',
+        effect: { type: 'delivery_bonus', value: 0.05 },
+        tiers: [
+          { level: 1, title: 'Túi Xốp 2 Quai Buộc Chắc Ghi-đông', cost: 25000, effectValue: 0.05, description: '+5% thưởng đơn giao hàng mang đi an toàn.' },
+          { level: 2, title: 'Túi Giữ Nhiệt Lót Bạc Ghi Đông', cost: 60000, effectValue: 0.05, description: '+5% thưởng đơn, bánh mì giữ độ nóng giòn khi tới tay.' },
+          { level: 3, title: 'Thùng Xốp Nhỏ Cột Đuôi Xe Máy', cost: 120000, effectValue: 0.06, description: '+6% thưởng đơn, chở được nhiều ổ bánh một chuyến.' },
+          { level: 4, title: 'Dây Ràng Chun Bản To Siêu Chắc', cost: 220000, effectValue: 0.06, description: '+6% thưởng đơn, phóng nhanh qua ổ gà không lo đổ súp.' },
+          { level: 5, title: 'Thùng Nhựa Xếp Gọn Sau Xe Máy', cost: 380000, effectValue: 0.06, description: '+6% thưởng đơn (Tổng +28%), shipper giao nhanh thưởng cao!' },
+        ],
+      },
+      {
+        id: 'sound_ambience',
+        name: 'Đài Radio & Âm Thanh Vỉa Hè',
+        icon: '🎵',
+        description: 'Tạo không khí vỉa hè vui tươi, nhận thêm sao uy tín ⭐.',
+        cost: 25000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'reputation_boost', value: 0.05 },
+        tiers: [
+          { level: 1, title: 'Đài Radio Cũ Nghe Thời Sự Buổi Sáng', cost: 25000, effectValue: 0.05, description: '+5% tỷ lệ nhận sao uy tín ⭐ từ các bác hàng xóm.' },
+          { level: 2, title: 'Loa Bluetooth Cầm Tay Nhỏ Nhắn', cost: 60000, effectValue: 0.05, description: '+5% nhận sao uy tín, phát nhạc trẻ thu hút sinh viên.' },
+          { level: 3, title: 'Nhạc Điện Thoại Tuyển Tập Hot TikTok', cost: 120000, effectValue: 0.05, description: '+5% nhận sao uy tín, quán luôn sôi động tràn ngập niềm vui.' },
+          { level: 4, title: 'Loa Thùng Mini Đặt Góc Xe Đẩy', cost: 220000, effectValue: 0.05, description: '+5% nhận sao uy tín, tiếng nhạc lan tỏa khắp đoạn phố.' },
+          { level: 5, title: 'Loa Kẹo Kéo Vỉa Hè Hát Bolero Vui Nhộn', cost: 380000, effectValue: 0.06, description: '+6% nhận sao uy tín (Tổng +26%), quán thân thiện cả phố yêu mến!' },
+        ],
+      },
+      {
+        id: 'extra_tables',
+        name: 'Kê Thêm Bàn Ăn Lề Đường',
+        icon: '🪑',
+        description: 'Kê thêm bàn nhựa đón khách giờ cao điểm (Tối đa 3 bàn).',
+        cost: 200000,
+        level: 0,
+        maxLevel: 1,
+        category: 'kitchen',
+        effect: { type: 'add_table', value: 1 },
+        tiers: [
+          { level: 1, title: 'Kê Thêm Bàn Nhựa Số 3 (Vỉa Hè Bên Cạnh)', cost: 200000, effectValue: 1, description: 'Mở thêm Bàn 3 phục vụ đồng thời 3 nhóm thực khách!' },
+        ],
+      },
     ],
   },
-  // 2. KHO LẠNH & TỦ BẢO QUẢN (Storage Capacity - 5 Cấp)
-  {
-    id: 'cozy_storage',
-    name: 'Kho Lạnh & Tủ Bảo Quản',
-    icon: '📦',
-    description: 'Mở rộng sức chứa kho nguyên liệu, tha hồ tích trữ.',
-    cost: 150000,
-    level: 0,
-    maxLevel: 5,
-    category: 'storage',
-    effect: { type: 'storage_capacity', value: 30 },
-    tiers: [
-      { level: 1, title: 'Thùng Giữ Nhiệt Lớn', cost: 150000, effectValue: 30, description: 'Tăng thêm +30 ô sức chứa kho nguyên liệu.' },
-      { level: 2, title: 'Tủ Mát Kính Đứng Sài Gòn', cost: 450000, effectValue: 50, description: 'Tăng thêm +50 ô sức chứa kho, giữ rau củ tươi ngon.' },
-      { level: 3, title: 'Tủ Cấp Đông 2 Ngăn Sâu', cost: 1400000, effectValue: 80, description: 'Tăng thêm +80 ô sức chứa kho, trữ thịt cá thoải mái.' },
-      { level: 4, title: 'Phòng Kho Lạnh Mini Tiệt Trùng', cost: 4200000, effectValue: 120, description: 'Tăng thêm +120 ô sức chứa kho đạt chuẩn an toàn thực phẩm.' },
-      { level: 5, title: 'Kho Tổng Logistics Công Nghiệp', cost: 12000000, effectValue: 200, description: 'Tăng thêm +200 ô sức chứa kho, tích trữ số lượng lớn không lo hết hàng!' },
+
+  // === KỶ NGUYÊN 2: GÓC CÂY ME / QUÁN CÓC 🌳 ===
+  corner: {
+    stageId: 'corner',
+    stageName: 'Góc Cây Me / Quán Cóc',
+    stageIcon: '🌳',
+    stageTagline: 'Quán cóc râm mát bóng cây, dù che nắng mưa và bàn gỗ mộc mạc',
+    baseStorage: 250, // Kế thừa đỉnh cao từ Xe Đẩy
+    baseCookSpeed: 0.30,
+    baseSpawnRate: 0.35,
+    basePatience: 10,
+    baseTipRate: 0.15,
+    baseDeliveryBonus: 0.18,
+    baseRepBonus: 0.18,
+    upgrades: [
+      {
+        id: 'cozy_storage',
+        name: 'Tủ Mát & Ngăn Trữ Quán Cóc',
+        icon: '📦',
+        description: 'Mở rộng tủ bảo quản tại quán cóc (Tối đa 450 ô).',
+        cost: 250000,
+        level: 0,
+        maxLevel: 5,
+        category: 'storage',
+        effect: { type: 'storage_capacity', value: 35 },
+        tiers: [
+          { level: 1, title: 'Tủ Mát Mini Dưới Gốc Cây Sanaky', cost: 250000, effectValue: 35, description: '+35 ô kho (Đạt 285 ô), giữ nước ngọt và pate lạnh buốt.' },
+          { level: 2, title: 'Tủ Đông Nằm 1 Ngăn Nhỏ 100L', cost: 550000, effectValue: 40, description: '+40 ô kho (Đạt 325 ô), trữ thịt bò, sườn heo tươi rói.' },
+          { level: 3, title: 'Kệ Sắt V Lỗ Chống Chuột Thông Thoáng', cost: 1000000, effectValue: 40, description: '+40 ô kho (Đạt 365 ô), bảo quản bột mì, bánh mì khô ráo.' },
+          { level: 4, title: 'Tủ Mát Cánh Kính Đèn LED Trưng Bày', cost: 1800000, effectValue: 40, description: '+40 ô kho (Đạt 405 ô), khách nhìn thấy topping bắt mắt thèm thuồng.' },
+          { level: 5, title: 'Tủ Đông 2 Chế Độ Đông - Mát Quán Cóc', cost: 2800000, effectValue: 45, description: '+45 ô kho (Đạt 450 ô - Max Quán Cóc), kho hàng rộng rãi không lo cạn hàng!' },
+        ],
+      },
+      {
+        id: 'modern_stove',
+        name: 'Hệ Bếp Á & Nồi Hầm Quán Cóc',
+        icon: '⚡',
+        description: 'Bếp khò công suất vừa, nấu nước dùng và chiên xào nhanh chóng.',
+        cost: 280000,
+        level: 0,
+        maxLevel: 5,
+        category: 'kitchen',
+        effect: { type: 'cook_speed', value: 0.10 },
+        tiers: [
+          { level: 1, title: 'Bếp Á 1 Họng Gang Khè Áp Lực', cost: 280000, effectValue: 0.10, description: 'Giảm thêm 10% thời gian nấu, lửa khò xanh biếc xào chín tức thì.' },
+          { level: 2, title: 'Quạt Hút Khói Gốc Cây Thoáng Khí', cost: 650000, effectValue: 0.10, description: 'Giảm thêm 10% thời gian nấu, đầu bếp đứng nấu không bị cay mắt.' },
+          { level: 3, title: 'Nồi Nấu Nước Lèo Cách Thủy Tiết Kiệm', cost: 1200000, effectValue: 0.11, description: 'Giảm thêm 11% thời gian nấu, nước dùng sôi sùng sục cả ngày.' },
+          { level: 4, title: 'Bếp Chiên Nhúng Đơn Chống Khét', cost: 2000000, effectValue: 0.12, description: 'Giảm thêm 12% thời gian nấu, chả lụa và tóp mỡ vàng rụm.' },
+          { level: 5, title: 'Cụm Bếp Khè Đôi Công Nghiệp Chuyên Dụng', cost: 3200000, effectValue: 0.12, description: 'Giảm thêm 12% thời gian nấu (Tổng +85%), phục vụ liên tục không nghỉ!' },
+        ],
+      },
+      {
+        id: 'flower_signboard',
+        name: 'Biển Hiệu Gỗ & Dù Che Mát Quán',
+        icon: '🌸',
+        description: 'Không gian góc cây me rực rỡ, khách ghé quán đông đúc.',
+        cost: 250000,
+        level: 0,
+        maxLevel: 5,
+        category: 'marketing',
+        effect: { type: 'attract_customers', value: 0.12 },
+        tiers: [
+          { level: 1, title: 'Biển Gỗ Mộc Treo Cành Cây Me', cost: 250000, effectValue: 0.12, description: 'Khách ghé nhanh hơn 12%, biển gỗ phong cách xưa thơ mộng.' },
+          { level: 2, title: 'Dây Đèn Lồng Treo Râm Mát Buổi Trưa', cost: 60000, effectValue: 0.12, description: 'Khách ghé nhanh hơn 12%, góc phố chill mát hút dân văn phòng.' },
+          { level: 3, title: 'Bảng Menu Huỳnh Quang Dạ Quang Đêm', cost: 1100000, effectValue: 0.14, description: 'Khách ghé nhanh hơn 14%, thực đơn phát sáng rực rỡ từ xa.' },
+          { level: 4, title: 'Hộp Đèn Tròn Hút Nổi Si-bô Nhận Diện', cost: 1900000, effectValue: 0.16, description: 'Khách ghé nhanh hơn 16%, thương hiệu quán cóc dần thành quen thuộc.' },
+          { level: 5, title: 'Biển Đèn LED Hai Mặt Đón Khách 2 Chiều', cost: 3000000, effectValue: 0.16, description: 'Khách ghé nhanh hơn 16% (Tổng +105%), khách đến không ngớt tay!' },
+        ],
+      },
+      {
+        id: 'seating_comfort',
+        name: 'Bàn Ghế Gỗ & Dù Che Nắng',
+        icon: '🪑',
+        description: 'Bóng mát gốc cây cùng bàn gỗ giúp khách thư thái ngồi lâu.',
+        cost: 220000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'customer_patience', value: 4 },
+        tiers: [
+          { level: 1, title: 'Ghế Đẩu Gỗ Cà Phê Mộc Mạc', cost: 220000, effectValue: 4, description: '+4s khách kiên nhẫn, ngồi tán gẫu ngắm phố phường.' },
+          { level: 2, title: 'Bàn Gỗ Thông Tự Nhiên Rộng Rãi', cost: 520000, effectValue: 4, description: '+4s khách kiên nhẫn, để được nhiều đĩa đồ ăn thoải mái.' },
+          { level: 3, title: 'Dù Lệch Tâm 3m Che Nắng Râm Mát', cost: 1000000, effectValue: 4, description: '+4s khách kiên nhẫn, che trọn bóng râm tránh nắng gắt trưa hè.' },
+          { level: 4, title: 'Quạt Hơi Nước Xua Tan Nóng Bức', cost: 1800000, effectValue: 5, description: '+5s khách kiên nhẫn, gió mát rượi phe phẩy khoan khoái.' },
+          { level: 5, title: 'Góc Trà Đạo Cây Xanh Mát Rượi Chữa Lành', cost: 2800000, effectValue: 5, description: '+5s khách kiên nhẫn (Tổng +32s), khách ngồi thưởng thức thư thái!' },
+        ],
+      },
+      {
+        id: 'dishware_premium',
+        name: 'Bộ Đĩa Phíp & Ly Trà Đá Cóc',
+        icon: '🍽️',
+        description: 'Trình bày đậm chất quán cóc Sài Gòn xưa, khách boa tiền đều đặn.',
+        cost: 220000,
+        level: 0,
+        maxLevel: 5,
+        category: 'service',
+        effect: { type: 'tip_rate', value: 0.06 },
+        tiers: [
+          { level: 1, title: 'Bộ Dĩa Nhựa Melamine Chống Trầy Cao Cấp', cost: 220000, effectValue: 0.06, description: '+6% tiền boa tip, dĩa phíp sạch sáng bóng.' },
+          { level: 2, title: 'Ly Thủy Tinh Khía Uống Trà Đá Đã Khát', cost: 500000, effectValue: 0.06, description: '+6% tiền boa, trà đá mát lạnh làm hài lòng thực khách.' },
+          { level: 3, title: 'Ống Đũa Inox Có Nắp Đậy Khử Trùng', cost: 950000, effectValue: 0.07, description: '+7% tiền boa, vệ sinh an toàn tạo niềm tin tuyệt đối.' },
+          { level: 4, title: 'Bộ Hũ Gia Vị Thủy Tinh Nắp Gỗ Vintage', cost: 1700000, effectValue: 0.08, description: '+8% tiền boa, ớt ngâm tỏi tương ớt chỉn chu.' },
+          { level: 5, title: 'Khay Nhôm Dày Sáng Bóng Chuẩn Quán Xưa', cost: 2800000, effectValue: 0.09, description: '+9% tiền boa (Tổng +51% tip), khách rút ví boa không ngần ngại!' },
+        ],
+      },
+      {
+        id: 'delivery_fleet',
+        name: 'Thùng Ship Xe Máy & Liên Minh Shipper',
+        icon: '🛵',
+        description: 'Mở rộng đội giao hàng quen mặt khu phố.',
+        cost: 220000,
+        level: 0,
+        maxLevel: 5,
+        category: 'logistics',
+        effect: { type: 'delivery_bonus', value: 0.07 },
+        tiers: [
+          { level: 1, title: 'Thùng Giao Hàng Bọc Bạt 30L Sau Xe', cost: 220000, effectValue: 0.07, description: '+7% tiền thưởng ship, thùng chống mưa hắt bảo vệ món ăn.' },
+          { level: 2, title: 'Túi Khí Chống Sốc Chống Đổ Nước Lèo', cost: 500000, effectValue: 0.07, description: '+7% tiền thưởng ship, bát nước dùng nguyên vẹn không tràn ra ngoài.' },
+          { level: 3, title: 'Bình Thủy Giữ Nóng Nước Dùng 5L', cost: 950000, effectValue: 0.08, description: '+8% tiền thưởng ship, nước súp giao tới nơi vẫn bốc khói nghi ngút.' },
+          { level: 4, title: 'Thùng Đôi Phân Loại Nóng & Lạnh Riêng', cost: 1700000, effectValue: 0.09, description: '+9% tiền thưởng ship, bánh mì nóng giòn đi kèm cà phê đá mát lạnh.' },
+          { level: 5, title: 'Liên Minh Shipper Quen Mặt Nhanh Nhẹn', cost: 2800000, effectValue: 0.11, description: '+11% tiền thưởng ship (Tổng +60%), giao hàng thần tốc trong ngõ ngách!' },
+        ],
+      },
+      {
+        id: 'sound_ambience',
+        name: 'Loa Kẹo Kéo Bolero Quán Cóc',
+        icon: '🎵',
+        description: 'Âm nhạc trữ tình lắng đọng, tạo điểm đến quen thuộc của cả xóm.',
+        cost: 220000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'reputation_boost', value: 0.07 },
+        tiers: [
+          { level: 1, title: 'Loa Kẹo Kéo Tiếng Ấm Bass Dày Vừa Vặn', cost: 220000, effectValue: 0.07, description: '+7% sao uy tín ⭐, âm lượng vừa phải không gây ồn ào lối xóm.' },
+          { level: 2, title: 'Tuyển Tập Nhạc Trịnh & Bolero Say Đắm Lòng Người', cost: 500000, effectValue: 0.07, description: '+7% sao uy tín, khách vừa ăn vừa nhịp chân theo điệu nhạc.' },
+          { level: 3, title: 'Cặp Loa Treo Thân Cây Âm Thanh Vòm Tự Nhiên', cost: 950000, effectValue: 0.08, description: '+8% sao uy tín, giai điệu phủ đều dưới bóng cây mát rượi.' },
+          { level: 4, title: 'Bộ Micro Không Dây Giao Lưu Cùng Thực Khách', cost: 1700000, effectValue: 0.09, description: '+9% sao uy tín, tiếng cười rộn rã gắn kết tình làng nghĩa xóm.' },
+          { level: 5, title: 'Không Khí Quán Cóc Rôm Rả Hút Hồn Cả Khu Phố', cost: 2800000, effectValue: 0.11, description: '+11% sao uy tín (Tổng +60%), quán cóc trở thành biểu tượng khu phố!' },
+        ],
+      },
+      {
+        id: 'extra_tables',
+        name: 'Kê Thêm Bàn Gỗ Quán Cóc',
+        icon: '🪑',
+        description: 'Kê thêm bàn gỗ dưới tán cây (Tối đa 4 bàn).',
+        cost: 1200000,
+        level: 0,
+        maxLevel: 1,
+        category: 'kitchen',
+        effect: { type: 'add_table', value: 1 },
+        tiers: [
+          { level: 1, title: 'Kê Thêm Bàn Gỗ Quán Cóc Số 4 (Dưới Bóng Cây Me)', cost: 1200000, effectValue: 1, description: 'Mở thêm Bàn 4 phục vụ cùng lúc 4 nhóm khách ngồi chill mát!' },
+        ],
+      },
     ],
   },
-  // 3. BIỂN HIỆU & ĐÈN NEON HÚT KHÁCH (Attract Customers - 5 Cấp)
-  {
-    id: 'flower_signboard',
-    name: 'Biển Hiệu & Đèn Neon Hút Khách',
-    icon: '🌸',
-    description: 'Trang trí biển hiệu bắt mắt, kéo khách nườm nượp đến quán.',
-    cost: 220000,
-    level: 0,
-    maxLevel: 5,
-    category: 'marketing',
-    effect: { type: 'attract_customers', value: 0.15 },
-    tiers: [
-      { level: 1, title: 'Bạt Biển Hiệu Hoa Tươi Tắn', cost: 220000, effectValue: 0.15, description: 'Khách ghé thăm quán nhanh hơn 15%.' },
-      { level: 2, title: 'Biển Gỗ Vintage Khắc Chữ Nổi', cost: 680000, effectValue: 0.25, description: 'Khách ghé thăm quán nhanh hơn 25%.' },
-      { level: 3, title: 'Hộp Đèn LED Nhấp Nháy Sắc Màu', cost: 2000000, effectValue: 0.38, description: 'Nổi bật trong đêm, khách ghé nhanh hơn 38%.' },
-      { level: 4, title: 'Dàn Đèn Neon Sài Gòn Không Ngủ', cost: 5800000, effectValue: 0.50, description: 'Góc phố rực rỡ, khách ghé nhanh hơn 50%.' },
-      { level: 5, title: 'Màn Hình LED 3D Hologram Tráng Lệ', cost: 16500000, effectValue: 0.65, description: 'Đỉnh cao thị giác, khách nườm nượp kéo đến nhanh hơn 65%!' },
+
+  // === KỶ NGUYÊN 3: TIỆM MÁI HIÊN BÌNH DÂN 🏮 ===
+  awning: {
+    stageId: 'awning',
+    stageName: 'Tiệm Mái Hiên Bình Dân',
+    stageIcon: '🏮',
+    stageTagline: 'Mặt bằng kiên cố, mái hiên di động che mưa nắng, bàn inox sáng bóng',
+    baseStorage: 450, // Kế thừa đỉnh cao từ Quán Cóc
+    baseCookSpeed: 0.60,
+    baseSpawnRate: 0.70,
+    basePatience: 20,
+    baseTipRate: 0.30,
+    baseDeliveryBonus: 0.35,
+    baseRepBonus: 0.35,
+    upgrades: [
+      {
+        id: 'cozy_storage',
+        name: 'Tủ Đông & Phòng Kho Mát Tiệm',
+        icon: '📦',
+        description: 'Mở rộng kho bảo quản đạt chuẩn an toàn thực phẩm (Tối đa 900 ô).',
+        cost: 1500000,
+        level: 0,
+        maxLevel: 5,
+        category: 'storage',
+        effect: { type: 'storage_capacity', value: 70 },
+        tiers: [
+          { level: 1, title: 'Tủ Mát 2 Cánh Kính Cường Lực Alaska', cost: 1500000, effectValue: 70, description: '+70 ô kho (Đạt 520 ô), trữ hàng trăm nguyên liệu tươi ngon.' },
+          { level: 2, title: 'Tủ Đông Đứng 4 Ngăn Độc Lập Chống Mùi', cost: 3200000, effectValue: 80, description: '+80 ô kho (Đạt 600 ô), phân loại thịt cá nước sốt riêng biệt.' },
+          { level: 3, title: 'Phòng Kho Mát Tiệt Trùng Ozon Nhỏ Sau Tiệm', cost: 5800000, effectValue: 90, description: '+90 ô kho (Đạt 690 ô), không khí tuần hoàn giữ thực phẩm tươi mới.' },
+          { level: 4, title: 'Dàn Giá Kệ Inox 304 Dày Chịu Tải 500kg', cost: 9500000, effectValue: 100, description: '+100 ô kho (Đạt 790 ô), xếp bao bột gạo, thùng gia vị đồ hộp.' },
+          { level: 5, title: 'Tủ Cấp Đông Nhanh Chuẩn F&B Chuyên Nghiệp', cost: 15000000, effectValue: 110, description: '+110 ô kho (Đạt 900 ô - Max Mái Hiên), kho thực phẩm dồi dào sẵn sàng đón bão khách!' },
+        ],
+      },
+      {
+        id: 'modern_stove',
+        name: 'Hệ Bếp Á Công Suất & Nồi Hầm Điện',
+        icon: '⚡',
+        description: 'Bếp đôi đánh lửa tự động, nấu nhanh và tiết kiệm nhiên liệu.',
+        cost: 1800000,
+        level: 0,
+        maxLevel: 5,
+        category: 'kitchen',
+        effect: { type: 'cook_speed', value: 0.15 },
+        tiers: [
+          { level: 1, title: 'Bếp Á 2 Họng Đánh Lửa Tự Động Cao Cấp', cost: 1800000, effectValue: 0.15, description: 'Giảm thêm 15% thời gian nấu, ngọn lửa xanh cuốn xoáy chín đều.' },
+          { level: 2, title: 'Nồi Hầm Điện Áp Suất Giữ Nhiệt 80L', cost: 3800000, effectValue: 0.15, description: 'Giảm thêm 15% thời gian nấu, ninh xương nhừ tơi trong thời gian kỷ lục.' },
+          { level: 3, title: 'Chảo Đảo Xào Bán Tự Động Chống Dính', cost: 7000000, effectValue: 0.18, description: 'Giảm thêm 18% thời gian nấu, xào thịt bò giòn mềm chỉ trong 10 giây.' },
+          { level: 4, title: 'Bếp Từ Nhập Khẩu 3500W Siêu Tiết Kiệm', cost: 12000000, effectValue: 0.20, description: 'Giảm thêm 20% thời gian nấu, điều khiển nhiệt độ chính xác từng độ C.' },
+          { level: 5, title: 'Hệ Thống Bếp Khò 4 Họng Chuyên Dụng Nhà Nghề', cost: 18000000, effectValue: 0.22, description: 'Giảm thêm 22% thời gian nấu (Tổng +150%), phục vụ tốc độ siêu bão!' },
+        ],
+      },
+      {
+        id: 'flower_signboard',
+        name: 'Bạt Mái Hiên & Đèn LED Mặt Tiền',
+        icon: '🌸',
+        description: 'Mặt bằng sáng bừng cả góc phố, khách chen chúc xếp hàng.',
+        cost: 1600000,
+        level: 0,
+        maxLevel: 5,
+        category: 'marketing',
+        effect: { type: 'attract_customers', value: 0.15 },
+        tiers: [
+          { level: 1, title: 'Bạt Mái Hiên Tự Động In Logo Sắc Nét', cost: 1600000, effectValue: 0.15, description: 'Khách ghé nhanh hơn 15%, tiệm che kín mưa nắng khang trang.' },
+          { level: 2, title: 'Dàn Đèn Pha LED Chiếu Rọi Mặt Tiền Sáng Rực', cost: 3500000, effectValue: 0.17, description: 'Khách ghé nhanh hơn 17%, đứng cách 200m vẫn thấy biển tiệm sáng ngời.' },
+          { level: 3, title: 'Biển Chữ Nổi Mica Có Đèn LED Hắt Sáng Chân', cost: 6500000, effectValue: 0.20, description: 'Khách ghé nhanh hơn 20%, vẻ ngoài hiện đại uy tín vượt trội.' },
+          { level: 4, title: 'Màn Hình TV Trình Chiếu Video Nấu Món Hấp Dẫn', cost: 11000000, effectValue: 0.23, description: 'Khách ghé nhanh hơn 23%, người đi đường dừng xe ngắm nhìn thòm thèm.' },
+          { level: 5, title: 'Hộp Đèn Siêu Sáng Đẳng Cấp Phố Ăn Uống Nổi Tiếng', cost: 17000000, effectValue: 0.25, description: 'Khách ghé nhanh hơn 25% (Tổng +170%), tiệm trở thành điểm hẹn số 1 trên phố!' },
+        ],
+      },
+      {
+        id: 'seating_comfort',
+        name: 'Bàn Inox & Quạt Trần Đảo Mát',
+        icon: '🪑',
+        description: 'Bàn ghế inox chắc chắn, quạt gió làm mát khắp không gian tiệm.',
+        cost: 1400000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'customer_patience', value: 5 },
+        tiers: [
+          { level: 1, title: 'Bàn Inox Chân Tròn Chắc Chắn Không Rung Lắc', cost: 1400000, effectValue: 5, description: '+5s khách kiên nhẫn, bàn sáng bóng lau sạch trong 1 giây.' },
+          { level: 2, title: 'Ghế Tựa Lưng Có Đệm Ngồi Êm Ái Chống Mỏi', cost: 3000000, effectValue: 5, description: '+5s khách kiên nhẫn, ngồi ăn thoải mái như ở nhà.' },
+          { level: 3, title: 'Dàn Quạt Đảo Trần Mát Rượi Toàn Không Gian Tiệm', cost: 5800000, effectValue: 6, description: '+6s khách kiên nhẫn, gió đối lưu thoáng mát xua tan oi ả.' },
+          { level: 4, title: 'Hệ Thống Đèn Vàng Ấm Cúng & Gối Tựa Lưng', cost: 10000000, effectValue: 7, description: '+7s khách kiên nhẫn, tạo cảm giác sum vầy ấm cúng gia đình.' },
+          { level: 5, title: 'Khu Bàn Dài Tiệc Nhỏ Cho Hội Nhóm & Gia Đình', cost: 16000000, effectValue: 7, description: '+7s khách kiên nhẫn (Tổng +50s), thực khách ngồi lâu gọi thêm nhiều món!' },
+        ],
+      },
+      {
+        id: 'dishware_premium',
+        name: 'Bát Đĩa Sứ Trắng & Đũa Gỗ Mun',
+        icon: '🍽️',
+        description: 'Dụng cụ sứ sáng bóng nâng tầm trải nghiệm món ăn.',
+        cost: 1400000,
+        level: 0,
+        maxLevel: 5,
+        category: 'service',
+        effect: { type: 'tip_rate', value: 0.08 },
+        tiers: [
+          { level: 1, title: 'Bộ Bát Đĩa Sứ Trắng Bề Mặt Nhẵn Chống Trầy', cost: 1400000, effectValue: 0.08, description: '+8% tiền tip boa, món ăn bày biện sạch đẹp ngon miệng.' },
+          { level: 2, title: 'Đũa Gỗ Muồng Đen Khắc Chìm Chống Trơn Trượt', cost: 3000000, effectValue: 0.09, description: '+9% tiền tip, gắp sợi phở bún mượt mà không văng nước dùng.' },
+          { level: 3, title: 'Thố Đựng Gia Vị Sứ Hoa Lam Cao Cấp', cost: 5800000, effectValue: 0.11, description: '+11% tiền tip, hũ gia vị sang trọng kích thích thực khách.' },
+          { level: 4, title: 'Khay Bưng Gỗ Tự Nhiên Thẩm Mỹ Tinh Tế', cost: 10000000, effectValue: 0.12, description: '+12% tiền tip, nhân viên bưng bê nhẹ nhàng chuyên nghiệp.' },
+          { level: 5, title: 'Dĩa Inox 304 Dày Dặn Sang Trọng Chống Rỉ Sét', cost: 16000000, effectValue: 0.15, description: '+15% tiền tip (Tổng +85% tip), tiền tip đổ về túi ào ào!' },
+        ],
+      },
+      {
+        id: 'delivery_fleet',
+        name: 'Đội Giao Hàng Chống Nước Chuyên Nghiệp',
+        icon: '🛵',
+        description: 'Thùng giữ nhiệt 60L cùng máy đóng hộp tự động.',
+        cost: 1400000,
+        level: 0,
+        maxLevel: 5,
+        category: 'logistics',
+        effect: { type: 'delivery_bonus', value: 0.08 },
+        tiers: [
+          { level: 1, title: 'Thùng Giao Hàng Chống Nước 60L Khóa Chốt An Toàn', cost: 1400000, effectValue: 0.08, description: '+8% thưởng đơn ship, mưa to gió lớn vẫn bảo toàn nguyên vẹn.' },
+          { level: 2, title: 'Hệ Thống Ngăn Hút Chân Không Giữ Ấm 4 Tiếng', cost: 3000000, effectValue: 10, description: '+10% thưởng đơn ship, món ăn thơm nóng như vừa nhấc khỏi bếp.' },
+          { level: 3, title: 'Máy Ép Miệng Ly & Hộp Đồ Ăn Tự Động Kín Mép', cost: 5800000, effectValue: 0.12, description: '+12% thưởng đơn ship, không bao giờ bị rỉ rỉ đổ nước ra ngoài.' },
+          { level: 4, title: 'Đồng Hồ Điện Tử Báo Nhiệt Đơn Hàng Thông Minh', cost: 10000000, effectValue: 0.14, description: '+14% thưởng đơn ship, đảm bảo chuẩn nhiệt 70°C khi tới tay khách.' },
+          { level: 5, title: 'Biệt Đội Giao Nhanh Khu Vực Nội Phố Cam Kết 20 Phút', cost: 16000000, effectValue: 0.16, description: '+16% thưởng đơn ship (Tổng +95%), nhận đơn ship liên tục lợi nhuận khủng!' },
+        ],
+      },
+      {
+        id: 'sound_ambience',
+        name: 'Dàn Âm Thanh Stereo & Acoustic Tiệm',
+        icon: '🎵',
+        description: 'Âm nhạc acoustic thư thái, quán đông khách khen ngợi khắp nơi.',
+        cost: 1400000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'reputation_boost', value: 0.08 },
+        tiers: [
+          { level: 1, title: 'Dàn Âm Thanh Stereo 2 Kênh Trong Trẻo', cost: 1400000, effectValue: 0.08, description: '+8% sao uy tín ⭐, âm sắc ấm áp phủ đều các góc bàn.' },
+          { level: 2, title: 'Tuyển Tập Acoustic Thư Thái Buổi Sáng & Chiều Tà', cost: 3000000, effectValue: 0.10, description: '+10% sao uy tín, giai điệu nhẹ nhàng giữ chân thực khách thư giãn.' },
+          { level: 3, title: 'Loa Phân Vùng Trong Nhà & Ngoài Mái Hiên', cost: 5800000, effectValue: 0.12, description: '+12% sao uy tín, mọi chỗ ngồi đều có trải nghiệm âm thanh tuyệt hảo.' },
+          { level: 4, title: 'Rèm Chống Ồn Giảm Tiếng Xe Cộ Ngoài Đường Lớn', cost: 10000000, effectValue: 0.14, description: '+14% sao uy tín, không gian ẩm thực yên bình giữa phố xá tấp nập.' },
+          { level: 5, title: 'Không Khí Ẩm Thực Phố Hấp Dẫn Khách Quen & Du Khách', cost: 16000000, effectValue: 0.16, description: '+16% sao uy tín (Tổng +95%), điểm dừng chân văn hóa nức tiếng gần xa!' },
+        ],
+      },
+      {
+        id: 'extra_tables',
+        name: 'Kê Thêm Bàn Inox Tiệm Mái Hiên',
+        icon: '🪑',
+        description: 'Mở rộng thêm bàn inox (Tối đa 5 bàn).',
+        cost: 6000000,
+        level: 0,
+        maxLevel: 1,
+        category: 'kitchen',
+        effect: { type: 'add_table', value: 1 },
+        tiers: [
+          { level: 1, title: 'Kê Thêm Bàn Inox Số 5 (Khu Mái Hiên Phía Trước)', cost: 6000000, effectValue: 1, description: 'Mở thêm Bàn 5 phục vụ đồng thời 5 nhóm khách gia đình!' },
+        ],
+      },
     ],
   },
-  // 4. BÀN GHẾ & TRẢI NGHIỆM KHÁCH NGỒI (Customer Patience - 5 Cấp)
-  {
-    id: 'seating_comfort',
-    name: 'Bàn Ghế & Trải Nghiệm Khách',
-    icon: '🪑',
-    description: 'Chỗ ngồi thoải mái giúp khách vui vẻ kiên nhẫn chờ món ăn.',
-    cost: 140000,
-    level: 0,
-    maxLevel: 5,
-    category: 'comfort',
-    effect: { type: 'customer_patience', value: 15 },
-    tiers: [
-      { level: 1, title: 'Ghế Nhựa Đỏ Dày & Đệm Lót', cost: 140000, effectValue: 15, description: 'Tăng thêm +15s độ kiên nhẫn của khách hàng.' },
-      { level: 2, title: 'Bàn Ghế Xếp Gỗ Cafe Vỉa Hè', cost: 420000, effectValue: 25, description: 'Tăng thêm +25s độ kiên nhẫn, ngồi chill thoải mái.' },
-      { level: 3, title: 'Quạt Phun Sương Mát Mùa Hè', cost: 1300000, effectValue: 40, description: 'Tăng thêm +40s độ kiên nhẫn, khách không lo oi bức.' },
-      { level: 4, title: 'Phòng Đệm Ghế Sofa Êm Ái', cost: 3800000, effectValue: 60, description: 'Tăng thêm +60s độ kiên nhẫn của mọi thực khách.' },
-      { level: 5, title: 'Không Gian VIP Lounge Máy Lạnh', cost: 11000000, effectValue: 90, description: 'Tăng thêm +90s độ kiên nhẫn, khách thư thả không bao giờ giận dỗi!' },
+
+  // === KỶ NGUYÊN 4: QUÁN ĂN PHỐ LỚN 🏪 ===
+  eatery: {
+    stageId: 'eatery',
+    stageName: 'Quán Ăn Phố Lớn',
+    stageIcon: '🏪',
+    stageTagline: 'Mặt bằng phố lớn 2 tầng, máy lạnh 24/7, bếp inox công nghiệp toàn phần',
+    baseStorage: 900, // Kế thừa đỉnh cao từ Mái Hiên
+    baseCookSpeed: 1.00,
+    baseSpawnRate: 1.10,
+    basePatience: 32,
+    baseTipRate: 0.50,
+    baseDeliveryBonus: 0.60,
+    baseRepBonus: 0.60,
+    upgrades: [
+      {
+        id: 'cozy_storage',
+        name: 'Kho Lạnh Walk-In & Pallet Nhôm',
+        icon: '📦',
+        description: 'Kho bảo quản lạnh công nghiệp tiêu chuẩn khách sạn (Tối đa 1,900 ô).',
+        cost: 8000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'storage',
+        effect: { type: 'storage_capacity', value: 160 },
+        tiers: [
+          { level: 1, title: 'Tủ Mát Công Nghiệp 4 Cửa Inox 304 Khổng Lồ', cost: 8000000, effectValue: 160, description: '+160 ô kho (Đạt 1,060 ô), tích trữ nguyên liệu cho cả tuần buôn bán.' },
+          { level: 2, title: 'Tủ Đông Âm Sâu -25°C Chống Đóng Tuyết Tự Động', cost: 16000000, effectValue: 180, description: '+180 ô kho (Đạt 1,240 ô), giữ độ tươi ngon thịt bò thăn, tôm cua thượng hạng.' },
+          { level: 3, title: 'Kho Lạnh Walk-In Mini Bước Vào Trong Tiện Lợi', cost: 30000000, effectValue: 200, description: '+200 ô kho (Đạt 1,440 ô), nhân viên đẩy xe xếp dỡ hàng hóa dễ dàng.' },
+          { level: 4, title: 'Hệ Thống Giá Pallet Nhôm Chống Ẩm & Sâu Bọ', cost: 52000000, effectValue: 220, description: '+220 ô kho (Đạt 1,660 ô), tối ưu hóa diện tích kho chứa tối đa.' },
+          { level: 5, title: 'Phòng Kho Tiệt Trùng Ozon & Lọc Khí Khép Kín Cao Cấp', cost: 85000000, effectValue: 240, description: '+240 ô kho (Đạt 1,900 ô - Max Quán Lớn), kho nguyên liệu bao la không sợ gián đoạn!' },
+        ],
+      },
+      {
+        id: 'modern_stove',
+        name: 'Dàn Bếp Trung Tâm & Lò Combi',
+        icon: '⚡',
+        description: 'Công nghệ nấu nướng nhà hàng 5 sao, chế biến thần tốc chuẩn vị.',
+        cost: 10000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'kitchen',
+        effect: { type: 'cook_speed', value: 0.22 },
+        tiers: [
+          { level: 1, title: 'Hệ Thống Hút Khói Khử Mùi Màng Nước Hiện Đại', cost: 10000000, effectValue: 0.22, description: 'Giảm thêm 22% thời gian nấu, bếp thông thoáng mát mẻ như phòng làm việc.' },
+          { level: 2, title: 'Lò Hấp Nướng Đa Năng Combi 10 Khay Điện Tử', cost: 22000000, effectValue: 0.24, description: 'Giảm thêm 24% thời gian nấu, nướng sườn chín mềm mọng nước chỉ vài phút.' },
+          { level: 3, title: 'Dây Chuyền Bếp Á & Bếp Âu Inox Toàn Khối 304', cost: 42000000, effectValue: 0.26, description: 'Giảm thêm 26% thời gian nấu, 3 đầu bếp phối hợp nhịp nhàng ra đĩa liên hồi.' },
+          { level: 4, title: 'Bếp Chiên Tách Dầu Tuần Hoàn Tự Động Thông Minh', cost: 70000000, effectValue: 0.30, description: 'Giảm thêm 30% thời gian nấu, đồ chiên vàng giòn rụm không ngấy mỡ.' },
+          { level: 5, title: 'Dàn Bếp Trung Tâm Smart Master Hẹn Giờ Chuẩn Xác', cost: 110000000, effectValue: 0.38, description: 'Giảm thêm 38% thời gian nấu (Tổng +240%), tốc độ nấu vượt mọi kỷ lục phố ẩm thực!' },
+        ],
+      },
+      {
+        id: 'flower_signboard',
+        name: 'Mặt Dựng Alu & Biển Đèn Neon Nghệ Thuật',
+        icon: '🌸',
+        description: 'Mặt tiền phố lớn tráng lệ, khách xếp hàng dài chờ có bàn.',
+        cost: 9000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'marketing',
+        effect: { type: 'attract_customers', value: 0.22 },
+        tiers: [
+          { level: 1, title: 'Ốp Toàn Bộ Mặt Dựng Alu Vàng Ánh Kim Sang Trọng', cost: 9000000, effectValue: 0.22, description: 'Khách ghé nhanh hơn 22%, mặt tiền đồ sộ nổi bật cả tuyến phố.' },
+          { level: 2, title: 'Bộ Chữ Inox Mạ Vàng Gương Phát Sáng Đèn LED', cost: 20000000, effectValue: 0.26, description: 'Khách ghé nhanh hơn 26%, thương hiệu ẩm thực đẳng cấp ghi dấu ấn sâu đậm.' },
+          { level: 3, title: 'Đèn Neon Sign Nghệ Thuật Điểm Check-In Hot Trend', cost: 38000000, effectValue: 0.30, description: 'Khách ghé nhanh hơn 30%, giới trẻ xếp hàng chụp ảnh viral mạng xã hội.' },
+          { level: 4, title: 'Màn Hình LED Ngoài Trời Ma Trận Đầy Màu Sắc', cost: 65000000, effectValue: 0.34, description: 'Khách ghé nhanh hơn 34%, trình chiếu câu chuyện món ăn sống động.' },
+          { level: 5, title: 'Biển Hiệu Nhận Diện Thương Hiệu Độc Bản Phố Trung Tâm', cost: 105000000, effectValue: 0.38, description: 'Khách ghé nhanh hơn 38% (Tổng +260%), quán ăn trở thành biểu tượng sầm uất!' },
+        ],
+      },
+      {
+        id: 'seating_comfort',
+        name: 'Phòng Máy Lạnh & Bàn Ghế Gỗ Sồi',
+        icon: '🪑',
+        description: 'Không gian máy lạnh 24°C, ghế nệm da cao cấp khách ngồi mê mẩn.',
+        cost: 8000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'customer_patience', value: 7 },
+        tiers: [
+          { level: 1, title: 'Bàn Ăn Gỗ Sồi Sơn Mài Sang Trọng Lau Bóng', cost: 8000000, effectValue: 7, description: '+7s khách kiên nhẫn, mặt bàn gỗ vân tự nhiên mát rượi dễ chịu.' },
+          { level: 2, title: 'Ghế Nệm Bọc Da Kháng Khuẩn Êm Ái Chống Đau Lưng', cost: 18000000, effectValue: 8, description: '+8s khách kiên nhẫn, ngồi trò chuyện hàng giờ không biết mỏi.' },
+          { level: 3, title: 'Hệ Thống Điều Hòa Trung Tâm Inverter 24°C Êm Ái', cost: 35000000, effectValue: 10, description: '+10s khách kiên nhẫn, không khí mát dịu sảng khoái xua tan nắng nóng.' },
+          { level: 4, title: 'Vách Gỗ Điêu Khắc Không Gian Riêng Tư Lịch Thiệp', cost: 60000000, effectValue: 12, description: '+12s khách kiên nhẫn, thích hợp tiếp khách bàn công việc kinh doanh.' },
+          { level: 5, title: 'Không Gian Phòng Ăn VIP Độc Bản Sang Trọng 5 Sao', cost: 95000000, effectValue: 13, description: '+13s khách kiên nhẫn (Tổng +82s), thực khách thư thái tuyệt đối không bao giờ phàn nàn!' },
+        ],
+      },
+      {
+        id: 'dishware_premium',
+        name: 'Gốm Sứ Bát Tràng & Dao Nĩa Inox 316',
+        icon: '🍽️',
+        description: 'Bát đĩa tráng men ngọc, khách sẵn sàng boa tip tiền triệu.',
+        cost: 8000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'service',
+        effect: { type: 'tip_rate', value: 0.12 },
+        tiers: [
+          { level: 1, title: 'Bát Đĩa Gốm Sứ Bát Tràng Men Ngọc Nghệ Thuật', cost: 8000000, effectValue: 0.12, description: '+12% tiền tip boa, món ăn toát lên vẻ đẹp mỹ thực truyền thống.' },
+          { level: 2, title: 'Bộ Dao Nĩa Inox 316 Đánh Bóng Gương Chống Trầy', cost: 18000000, effectValue: 0.14, description: '+14% tiền tip, cắt thái thịt mềm mại đầm chắc.' },
+          { level: 3, title: 'Thố Đất Nung Nướng Giữ Nóng Cháy Cạnh Xèo Xèo', cost: 35000000, effectValue: 0.16, description: '+16% tiền tip, giữ độ nóng hổi đến thìa cuối cùng.' },
+          { level: 4, title: 'Khay Đá Nóng Chuyên Dụng Giữ Nhiệt Suốt Bữa Tiệc', cost: 60000000, effectValue: 0.18, description: '+18% tiền tip, miếng beefsteak giữ trọn hương vị tuyệt hảo.' },
+          { level: 5, title: 'Bộ Bát Đĩa Minh Long Mạ Chỉ Vàng Đẳng Cấp Hoàng Gia', cost: 95000000, effectValue: 0.22, description: '+22% tiền tip (Tổng +132% tip), khách VIP thưởng tiền boa liên tiếp!' },
+        ],
+      },
+      {
+        id: 'delivery_fleet',
+        name: 'Đội Xe Điện & Hộp Điều Nhiệt GPS',
+        icon: '🛵',
+        description: 'Đội xe máy điện chuyên biệt, quản lý đơn hàng theo thời gian thực.',
+        cost: 8000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'logistics',
+        effect: { type: 'delivery_bonus', value: 0.12 },
+        tiers: [
+          { level: 1, title: 'Đội Xe Máy Điện Xanh Chuyên Biệt Nhanh Nhẹn', cost: 8000000, effectValue: 0.12, description: '+12% thưởng đơn ship, di chuyển êm ái luồn lách mọi cung đường.' },
+          { level: 2, title: 'Thùng Giao Hàng Cắm Điện Giữ Nóng 80°C Suốt Hành Trình', cost: 18000000, effectValue: 0.14, description: '+14% thưởng đơn ship, khách mở hộp ngửi thấy mùi thơm bốc lên.' },
+          { level: 3, title: 'Hộp Cách Nhiệt Sợi Carbon Siêu Nhẹ Kháng Va Đập', cost: 35000000, effectValue: 0.16, description: '+16% thưởng đơn ship, đồ ăn giữ hình dạng nguyên vẹn mỹ miều.' },
+          { level: 4, title: 'Hệ Thống GPS Điều Phối & Báo Lộ Trình Realtime', cost: 60000000, effectValue: 0.18, description: '+18% thưởng đơn ship, tối ưu quãng đường nhanh nhất từng giây.' },
+          { level: 5, title: 'Biệt Đội Giao Hàng Hỏa Tốc Cam Kết Dưới 15 Phút', cost: 95000000, effectValue: 0.22, description: '+22% thưởng đơn ship (Tổng +142%), chiếm lĩnh thị phần giao đồ ăn cả quận!' },
+        ],
+      },
+      {
+        id: 'sound_ambience',
+        name: 'Hệ Thống Loa Âm Trần & Nhạc Jazz',
+        icon: '🎵',
+        description: 'Không gian thư thái cao cấp, uy tín quán vang xa toàn thành phố.',
+        cost: 8000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'reputation_boost', value: 0.12 },
+        tiers: [
+          { level: 1, title: 'Hệ Thống Loa Âm Trần Hi-Fi BGM Phát Nhạc Nền Tinh Tế', cost: 8000000, effectValue: 0.12, description: '+12% sao uy tín ⭐, âm lượng dịu nhẹ tạo sự thư thái khi trò chuyện.' },
+          { level: 2, title: 'Tuyển Tập Jazz & Bossa Nova Thư Giãn Bản Quyền', cost: 18000000, effectValue: 0.14, description: '+14% sao uy tín, giai điệu dẫn dắt cảm xúc thăng hoa vị giác.' },
+          { level: 3, title: 'Tường Ốp Tiêu Âm Tiêu Chuẩn Phòng Trà Cách Biệt Phố', cost: 35000000, effectValue: 0.16, description: '+16% sao uy tín, giữ trọn sự yên tĩnh riêng tư cho thực khách.' },
+          { level: 4, title: 'Hệ Thống Đèn Chiếu Sáng Đổi Màu Theo Giai Điệu Bài Hát', cost: 60000000, effectValue: 0.18, description: '+18% sao uy tín, trải nghiệm thị giác và thính giác tuyệt đỉnh.' },
+          { level: 5, title: 'Sân Khấu Nhạc Sống Acoustic Cuối Tuần Hút Khách VIP', cost: 95000000, effectValue: 0.22, description: '+22% sao uy tín (Tổng +142%), điểm đến thời thượng được săn đón!' },
+        ],
+      },
+      {
+        id: 'extra_tables',
+        name: 'Kê Thêm Bàn Đá Quán Ăn Phố Lớn',
+        icon: '🪑',
+        description: 'Mở rộng thêm bàn đá sang trọng (Tối đa 6 bàn).',
+        cost: 25000000,
+        level: 0,
+        maxLevel: 1,
+        category: 'kitchen',
+        effect: { type: 'add_table', value: 1 },
+        tiers: [
+          { level: 1, title: 'Kê Thêm Bàn Đá Sang Trọng Số 6 (Khu Tầng Trệt Mặt Tiền)', cost: 25000000, effectValue: 1, description: 'Mở thêm Bàn 6 phục vụ đồng thời 6 nhóm khách đông đúc!' },
+        ],
+      },
     ],
   },
-  // 5. BỘ DỤNG CỤ BÁT ĐĨA & TRÌNH BÀY (Tip Rate - 5 Cấp)
-  {
-    id: 'dishware_premium',
-    name: 'Bộ Dụng Cụ Bát Đĩa & Trình Bày',
-    icon: '🍽️',
-    description: 'Trình bày món ăn đẹp mắt, khách hài lòng boa tiền hào phóng.',
-    cost: 160000,
-    level: 0,
-    maxLevel: 5,
-    category: 'service',
-    effect: { type: 'tip_rate', value: 0.10 },
-    tiers: [
-      { level: 1, title: 'Tô Chén Sứ Trắng Sạch Bong', cost: 160000, effectValue: 0.10, description: 'Khách thưởng thêm +10% tiền tip khi dùng bữa.' },
-      { level: 2, title: 'Khay Gỗ Mộc & Giấy Thấm Dầu', cost: 480000, effectValue: 0.20, description: 'Khách thưởng thêm +20% tiền tip hài lòng.' },
-      { level: 3, title: 'Bộ Muỗng Nĩa Inox 304 Cao Cấp', cost: 1500000, effectValue: 0.35, description: 'Khách thưởng thêm +35% tiền tip hào phóng.' },
-      { level: 4, title: 'Gốm Sứ Bát Tràng Tráng Men Ngọc', cost: 4500000, effectValue: 0.50, description: 'Khách thưởng thêm +50% tiền tip ấn tượng.' },
-      { level: 5, title: 'Bộ Đĩa Thìa Hoàng Gia Mạ Vàng', cost: 13000000, effectValue: 0.75, description: 'Khách thưởng thêm tới +75% tiền tip cực lớn!' },
+
+  // === KỶ NGUYÊN 5: CHUỖI ĐẾ CHẾ VỈA HÈ 👑 ===
+  empire: {
+    stageId: 'empire',
+    stageName: 'Chuỗi Đế Chế Vỉa Hè',
+    stageIcon: '👑',
+    stageTagline: 'Kỳ lân F&B quốc gia, chuỗi nhượng quyền phủ sóng, trung tâm logistics hiện đại',
+    baseStorage: 1900, // Kế thừa đỉnh cao từ Quán Lớn
+    baseCookSpeed: 1.60,
+    baseSpawnRate: 1.70,
+    basePatience: 50,
+    baseTipRate: 0.80,
+    baseDeliveryBonus: 0.90,
+    baseRepBonus: 0.90,
+    upgrades: [
+      {
+        id: 'cozy_storage',
+        name: 'Chuỗi Logistics Hub & Cung Ứng Quốc Gia',
+        icon: '📦',
+        description: 'Trung tâm tổng kho phân phối và chuỗi cung ứng tự động (Tối đa 4,000 ô).',
+        cost: 40000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'storage',
+        effect: { type: 'storage_capacity', value: 300 },
+        tiers: [
+          { level: 1, title: 'Kho Trung Tâm Hub & Spoke Phân Phối Đa Chi Nhánh', cost: 40000000, effectValue: 300, description: '+300 ô kho (Đạt 2,200 ô), tiếp ứng nguồn hàng đồng bộ cho toàn bộ chuỗi.' },
+          { level: 2, title: 'Đội Xe Tải Lạnh Tiếp Ứng 24/7 Không Bao Giờ Đứt Gãy', cost: 80000000, effectValue: 350, description: '+350 ô kho (Đạt 2,550 ô), điều chuyển nguyên liệu tươi ngon tức thì.' },
+          { level: 3, title: 'Kho Lạnh Tự Động Hóa Robot Phân Loại Hàng Hóa', cost: 150000000, effectValue: 400, description: '+400 ô kho (Đạt 2,950 ô), độ chính xác tuyệt đối không thất thoát.' },
+          { level: 4, title: 'Hệ Thống Quản Lý Kho Chuỗi AI Đa Điểm Tiêu Chuẩn Quốc Tế', cost: 260000000, effectValue: 450, description: '+450 ô kho (Đạt 3,400 ô), quản trị dòng chảy nguyên liệu quy mô lớn.' },
+          { level: 5, title: 'Mạng Lưới Chuỗi Cung Ứng Độc Quyền Toàn Quốc', cost: 420000000, effectValue: 600, description: '+600 ô kho (Đạt 4,000 ô - Kỳ Lân Đế Chế), sức chứa kho khổng lồ dẫn đầu ngành F&B!' },
+        ],
+      },
+      {
+        id: 'modern_stove',
+        name: 'Siêu Bếp AI & Dây Chuyền Bếp Trung Tâm',
+        icon: '⚡',
+        description: 'Công nghệ chế biến tự động hóa chuẩn xác từng miligiây.',
+        cost: 45000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'kitchen',
+        effect: { type: 'cook_speed', value: 0.35 },
+        tiers: [
+          { level: 1, title: 'Robot Chế Biến Món Ăn Bán Tự Động Đa Năng', cost: 45000000, effectValue: 0.35, description: 'Giảm thêm 35% thời gian nấu, ra món nhanh gấp đôi đầu bếp thông thường.' },
+          { level: 2, title: 'Hệ Thống Hơi Nước Áp Suất Siêu Tốc Giữ Trọn Dinh Dưỡng', cost: 95000000, effectValue: 0.40, description: 'Giảm thêm 40% thời gian nấu, món ăn giữ nguyên vị ngọt mọng tự nhiên.' },
+          { level: 3, title: 'Trạm Chế Biến Khép Kín Công Suất Khủng Phục Vụ Hàng Ngàn Khách', cost: 180000000, effectValue: 0.45, description: 'Giảm thêm 45% thời gian nấu, không bị nghẽn đơn dù đông khách cỡ nào.' },
+          { level: 4, title: 'Dây Chuyền AI Định Lượng Gia Vị Chuẩn Xác Từng Giọt', cost: 300000000, effectValue: 0.50, description: 'Giảm thêm 50% thời gian nấu, hương vị triệu món như một tuyệt hảo.' },
+          { level: 5, title: 'Siêu Bếp AI Trung Tâm Kỳ Lân Ẩm Thực Toàn Quốc', cost: 480000000, effectValue: 0.70, description: 'Giảm thêm 70% thời gian nấu (Tổng +400%), nấu món trong chớp mắt như ảo thuật!' },
+        ],
+      },
+      {
+        id: 'flower_signboard',
+        name: 'Màn Hình LED 3D Ngoài Trời & Biểu Tượng Quốc Gia',
+        icon: '🌸',
+        description: 'Biểu tượng văn hóa ẩm thực vang danh cả nước, khách nườm nượp kéo đến.',
+        cost: 40000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'marketing',
+        effect: { type: 'attract_customers', value: 0.35 },
+        tiers: [
+          { level: 1, title: 'Màn Hình LED Cong 3D Khổng Lồ Ngoài Trời Đỉnh Cao', cost: 40000000, effectValue: 0.35, description: 'Khách kéo đến nhanh hơn 35%, hiệu ứng 3D mãn nhãn thu hút cả ngã tư.' },
+          { level: 2, title: 'Cột Tháp Biển Hiệu Landmark Đầu Tuyến Đô Thị', cost: 85000000, effectValue: 0.40, description: 'Khách kéo đến nhanh hơn 40%, trở thành điểm mốc định vị của cả thành phố.' },
+          { level: 3, title: 'Chiến Dịch Truyền Thông Phủ Sóng Toàn Bộ Kênh Số', cost: 160000000, effectValue: 0.45, description: 'Khách kéo đến nhanh hơn 45%, thương hiệu xuất hiện trên mọi bản tin ẩm thực.' },
+          { level: 4, title: 'Hệ Thống Nhận Diện Nhượng Quyền Chuỗi Vàng Tiêu Chuẩn', cost: 280000000, effectValue: 0.55, description: 'Khách kéo đến nhanh hơn 55%, khách hàng tin tưởng tuyệt đối vào chất lượng.' },
+          { level: 5, title: 'Biểu Tượng Ẩm Thực Vang Danh Cả Nước & Quốc Tế', cost: 450000000, effectValue: 0.75, description: 'Khách kéo đến nhanh hơn 75% (Tổng +420%), khách xếp hàng dài từ sáng tới khuya!' },
+        ],
+      },
+      {
+        id: 'seating_comfort',
+        name: 'Phòng Tiệc Hoàng Gia & Sofa Da Ý',
+        icon: '🪑',
+        description: 'Nội thất xa xỉ, phòng VIP cách âm phục vụ giới thượng lưu.',
+        cost: 35000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'customer_patience', value: 12 },
+        tiers: [
+          { level: 1, title: 'Sofa Da Bò Ý Nhập Khẩu Thương Gia Đẳng Cấp', cost: 35000000, effectValue: 12, description: '+12s khách kiên nhẫn, ngồi êm ái thư giãn tận hưởng không gian.' },
+          { level: 2, title: 'Phòng VIP Kính Một Chiều Riêng Tư Độc Bản', cost: 75000000, effectValue: 13, description: '+13s khách kiên nhẫn, ngắm phố phường từ trên cao mà không bị làm phiền.' },
+          { level: 3, title: 'Hệ Thống Lọc Khí Ozon & Khuếch Tán Tinh Dầu Tự Nhiên', cost: 140000000, effectValue: 15, description: '+15s khách kiên nhẫn, hương thơm thảo mộc dịu nhẹ thanh lọc tâm hồn.' },
+          { level: 4, title: 'Bàn Ăn Cảm Biến Ánh Sáng Điều Chỉnh Cảm Xúc Thực Khách', cost: 240000000, effectValue: 18, description: '+18s khách kiên nhẫn, trải nghiệm ẩm thực kết hợp nghệ thuật đỉnh cao.' },
+          { level: 5, title: 'Phòng Tiệc Hoàng Gia Đẳng Cấp Quốc Tế Đón Tiếp Nguyên Thủ', cost: 400000000, effectValue: 22, description: '+22s khách kiên nhẫn (Tổng +130s), khách kiên nhẫn tuyệt đối với thái độ tôn kính!' },
+        ],
+      },
+      {
+        id: 'dishware_premium',
+        name: 'Bộ Dụng Cụ Dát Vàng & Pha Lê Bohemia',
+        icon: '🍽️',
+        description: 'Đồ bàn tiệc cung đình dát vàng 24K, tiền boa tip khổng lồ.',
+        cost: 35000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'service',
+        effect: { type: 'tip_rate', value: 0.18 },
+        tiers: [
+          { level: 1, title: 'Bộ Đồ Ăn Nghệ Thuật Thiết Kế Độc Quyền Theo Mùa', cost: 35000000, effectValue: 0.18, description: '+18% tiền tip boa, mỗi món ăn là một tác phẩm hội họa.' },
+          { level: 2, title: 'Ly Pha Lê Bohemia Cao Cấp Tinh Xảo Phát Tiếng Trong Trẻo', cost: 75000000, effectValue: 0.20, description: '+20% tiền tip, nâng chén cạn ly vang ngân tiếng pha lê.' },
+          { level: 3, title: 'Bộ Dao Nĩa Thìa Bạc Khắc Thủ Công Hoa Văn Cung Đình', cost: 140000000, effectValue: 0.24, description: '+24% tiền tip, cảm giác dùng bữa quyền quý hoàng tộc.' },
+          { level: 4, title: 'Bộ Thố Sứ Dát Vàng Hoàng Gia 24K Giữ Nhiệt Vĩnh Cửu', cost: 240000000, effectValue: 0.28, description: '+28% tiền tip, ánh vàng lấp lánh phản chiếu sự sang giàu.' },
+          { level: 5, title: 'Set Bàn Tiệc Tinh Hoa Ẩm Thực Cung Đình Đế Vương', cost: 400000000, effectValue: 0.35, description: '+35% tiền tip (Tổng +205% tip), tiền tip vượt xa cả tiền gốc món ăn!' },
+        ],
+      },
+      {
+        id: 'delivery_fleet',
+        name: 'Logistics Vận Tải Toàn Thành & Đội Drone',
+        icon: '🛵',
+        description: 'Mạng lưới vận chuyển đa phương thức hỏa tốc phủ sóng cả nước.',
+        cost: 35000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'logistics',
+        effect: { type: 'delivery_bonus', value: 0.18 },
+        tiers: [
+          { level: 1, title: 'Đội Xe Tải Lạnh Đô Thị Phủ Sóng Mọi Quận Huyện', cost: 35000000, effectValue: 0.18, description: '+18% thưởng đơn ship, vận chuyển số lượng lớn không giới hạn.' },
+          { level: 2, title: 'Hộp Điện Tử Điều Nhiệt Thông Minh Điều Khiển Qua App', cost: 75000000, effectValue: 0.20, description: '+20% thưởng đơn ship, kiểm soát độ ẩm và nhiệt độ hoàn hảo.' },
+          { level: 3, title: 'Trạm Sạc Nhanh & Đóng Gói Tự Động Bằng Cánh Tay Robot', cost: 140000000, effectValue: 0.24, description: '+24% thưởng đơn ship, đóng gói thần tốc 5 giây mỗi đơn hàng.' },
+          { level: 4, title: 'Đội Drone Giao Hàng Siêu Tốc Thử Nghiệm Tầng Không', cost: 240000000, effectValue: 0.28, description: '+28% thưởng đơn ship, bay thẳng qua tắc đường giao hàng tận ban công.' },
+          { level: 5, title: 'Mạng Lưới Logistics Vận Tải Toàn Thành Độc Quyền Kỳ Lân', cost: 400000000, effectValue: 0.35, description: '+35% thưởng đơn ship (Tổng +215%), doanh thu giao hàng hàng tỷ đồng mỗi ngày!' },
+        ],
+      },
+      {
+        id: 'sound_ambience',
+        name: 'Nhà Hát Ẩm Thực & Dàn Âm Thanh Dolby Atmos',
+        icon: '🎵',
+        description: 'Không gian trình diễn nghệ thuật ẩm thực đỉnh cao, uy tín huyền thoại.',
+        cost: 35000000,
+        level: 0,
+        maxLevel: 5,
+        category: 'comfort',
+        effect: { type: 'reputation_boost', value: 0.18 },
+        tiers: [
+          { level: 1, title: 'Dàn Âm Thanh Vòm Dolby Atmos Đẳng Cấp Thế Giới', cost: 35000000, effectValue: 0.18, description: '+18% sao uy tín ⭐, âm thanh sống động như đang xem phim rạp.' },
+          { level: 2, title: 'Sân Khấu Mini Mời Nghệ Sĩ Danh Tiếng Biểu Diễn Trực Tiếp', cost: 75000000, effectValue: 0.20, description: '+20% sao uy tín, thu hút giới doanh nhân và người nổi tiếng.' },
+          { level: 3, title: 'Thiết Kế Âm Học Chuẩn Nhà Hát Hoàng Gia Châu Âu', cost: 140000000, effectValue: 0.24, description: '+24% sao uy tín, âm thanh trong vắt đánh thức mọi giác quan.' },
+          { level: 4, title: 'Kịch Bản Âm Nhạc & Ánh Sáng Cá Nhân Hóa Từng Thực Khách', cost: 240000000, effectValue: 0.28, description: '+28% sao uy tín, mỗi bữa ăn là một trải nghiệm độc nhất vô nhị.' },
+          { level: 5, title: 'Phòng Hòa Nhạc Ẩm Thực Tinh Hoa Thượng Lưu Huyền Thoại', cost: 400000000, effectValue: 0.35, description: '+35% sao uy tín (Tổng +215%), ghi danh vào bản đồ ẩm thực thế giới!' },
+        ],
+      },
+      {
+        id: 'extra_tables',
+        name: 'Kê Thêm Bàn Hoàng Gia Chuỗi Đế Chế',
+        icon: '🪑',
+        description: 'Mở rộng bàn tiệc hoàng gia tối thượng (Tối đa 8 bàn).',
+        cost: 80000000,
+        level: 0,
+        maxLevel: 2,
+        category: 'kitchen',
+        effect: { type: 'add_table', value: 1 },
+        tiers: [
+          { level: 1, title: 'Kê Thêm Bàn Hoàng Gia Số 7 (Phòng Tiệc Thương Gia)', cost: 80000000, effectValue: 1, description: 'Mở thêm Bàn 7 tiếp đón đoàn khách VIP cấp cao!' },
+          { level: 2, title: 'Kê Thêm Bàn Hoàng Gia Số 8 (Khu Sky Lounge Đỉnh Cao)', cost: 200000000, effectValue: 1, description: 'Mở thêm Bàn 8 (Tối đa 8 bàn!), quy mô phục vụ đại tiệc đỉnh cao!' },
+        ],
+      },
     ],
   },
-  // 6. THÙNG GIỮ NHIỆT & ĐỘI GIAO HÀNG (Delivery Bonus - 5 Cấp)
-  {
-    id: 'delivery_fleet',
-    name: 'Thùng Giữ Nhiệt & Đội Xe Siêu Tốc',
-    icon: '🛵',
-    description: 'Trang bị cho đội giao hàng mang đi, tăng tiền thưởng mỗi chuyến ship.',
-    cost: 180000,
-    level: 0,
-    maxLevel: 5,
-    category: 'logistics',
-    effect: { type: 'delivery_bonus', value: 0.15 },
-    tiers: [
-      { level: 1, title: 'Túi Giữ Nhiệt 3 Lớp Chuyên Dụng', cost: 180000, effectValue: 0.15, description: 'Tăng 15% tiền thưởng cho các đơn giao hàng mang đi.' },
-      { level: 2, title: 'Thùng Nhựa Composite Sau Xe', cost: 520000, effectValue: 0.30, description: 'Tăng 30% tiền thưởng giao hàng giữ trọn độ nóng giòn.' },
-      { level: 3, title: 'Xe Tay Ga Phun Xăng Chạy Tỉnh', cost: 1600000, effectValue: 0.50, description: 'Tăng 50% tiền thưởng giao hàng tốc độ cao.' },
-      { level: 4, title: 'Đội Xe Điện Thông Minh Xanh 5 Sao', cost: 4900000, effectValue: 0.75, description: 'Tăng 75% tiền thưởng giao hàng chuyên nghiệp.' },
-      { level: 5, title: 'Trung Tâm Hỏa Tốc Drone Tận Bàn', cost: 15000000, effectValue: 1.10, description: 'Tăng 110% tiền thưởng giao hàng (nhận đơn siêu lợi nhuận)!' },
-    ],
-  },
-  // 7. DÀN ÂM THANH & BẦU KHÔNG KHÍ QUÁN (Reputation Boost - 5 Cấp)
-  {
-    id: 'sound_ambience',
-    name: 'Dàn Âm Thanh & Bầu Không Khí',
-    icon: '🎵',
-    description: 'Âm nhạc du dương lan tỏa niềm vui, tăng nhanh điểm uy tín quán.',
-    cost: 150000,
-    level: 0,
-    maxLevel: 5,
-    category: 'comfort',
-    effect: { type: 'reputation_boost', value: 0.15 },
-    tiers: [
-      { level: 1, title: 'Đài Radio Sài Gòn Cũ Hoài Niệm', cost: 150000, effectValue: 0.15, description: 'Khách vui vẻ, +15% tỷ lệ nhận thêm sao uy tín ⭐.' },
-      { level: 2, title: 'Loa Bluetooth Nhạc Trịnh & Lofi', cost: 450000, effectValue: 0.30, description: 'Không gian ấm áp, +30% tỷ lệ nhận sao uy tín ⭐.' },
-      { level: 3, title: 'Dàn Âm Thanh Vòm Hát Cho Nhau', cost: 1400000, effectValue: 0.50, description: 'Khách say mê quán, +50% tỷ lệ nhận sao uy tín ⭐.' },
-      { level: 4, title: 'Ban Nhạc Sống Acoustic Cuối Tuần', cost: 4200000, effectValue: 0.75, description: 'Tiếng vang xa xôi, +75% tỷ lệ nhận sao uy tín ⭐.' },
-      { level: 5, title: 'Sân Khấu Nghệ Thuật Ẩm Thực Phố', cost: 12500000, effectValue: 1.10, description: 'Đỉnh cao văn hóa, gấp đôi (+110%) điểm uy tín nhận được!' },
-    ],
-  },
-  // 8. KÊ THÊM BÀN ĐÓN KHÁCH (Add Tables - 4 Cấp)
-  {
-    id: 'extra_tables',
-    name: 'Kê Thêm Bàn Đón Khách',
-    icon: '🪑',
-    description: 'Mở rộng thêm nhiều bàn phục vụ khách cùng lúc giờ cao điểm.',
-    cost: 250000,
-    level: 0,
-    maxLevel: 4,
-    category: 'kitchen',
-    effect: { type: 'add_table', value: 1 },
-    tiers: [
-      { level: 1, title: 'Kê Thêm Bàn Số 3 (Bàn Gỗ Sồi)', cost: 250000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 3).' },
-      { level: 2, title: 'Kê Thêm Bàn Số 4 (Bàn Inox Cao Cấp)', cost: 750000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 4).' },
-      { level: 3, title: 'Kê Thêm Bàn Số 5 (Bàn Đá Hoa Cương)', cost: 2500000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 5).' },
-      { level: 4, title: 'Kê Thêm Bàn Số 6 (Bàn VIP Hoàng Gia)', cost: 7000000, effectValue: 1, description: 'Thêm 1 bàn đón khách (Bàn 6).' },
-    ],
-  },
-  // Tương thích ngược với save game cũ
-  {
-    id: 'extra_table_1',
-    name: 'Bàn Gỗ Sồi Cozy (Bàn 3 cũ)',
-    icon: '🪑',
-    description: 'Thêm 1 bàn phục vụ khách.',
-    cost: 150000,
-    level: 0,
-    maxLevel: 1,
-    effect: { type: 'add_table', value: 1 },
-  },
-  {
-    id: 'extra_table_2',
-    name: 'Bàn Gỗ Sồi Cozy (Bàn 4 cũ)',
-    icon: '🪑',
-    description: 'Thêm bàn thứ 4 cho quán.',
-    cost: 350000,
-    level: 0,
-    maxLevel: 1,
-    effect: { type: 'add_table', value: 1 },
-  },
-];
+};
+
+// Tương thích ngược: SHOP_UPGRADES mặc định lấy danh mục của Xe Đẩy (cart)
+export const SHOP_UPGRADES: ShopUpgrade[] = STAGE_SHOP_UPGRADES.cart.upgrades;
+
+// === CÁC HELPER TÍNH TOÁN CHỈ SỐ KỶ NGUYÊN (ERA SYSTEM HELPERS) ===
+
+export const getStageCatalog = (stageId: BusinessStageId = 'cart'): StageUpgradeCatalog => {
+  return STAGE_SHOP_UPGRADES[stageId] || STAGE_SHOP_UPGRADES.cart;
+};
+
+export const getStageUpgrades = (stageId: BusinessStageId = 'cart'): ShopUpgrade[] => {
+  return getStageCatalog(stageId).upgrades;
+};
 
 // Helper tính toán thông tin tầng nâng cấp của trang thiết bị
 export const getUpgradeTierInfo = (
@@ -1019,6 +1661,159 @@ export const getUpgradeTierInfo = (
     effectValue: upgrade.effect.value * (currentLevel + 1),
     isMax,
   };
+};
+
+export const getStageUpgradeTierInfo = (
+  stageId: BusinessStageId = 'cart',
+  upgradeId: string,
+  currentLevel: number
+): {
+  level: number;
+  title: string;
+  cost: number;
+  description: string;
+  effectValue: number;
+  isMax: boolean;
+} => {
+  const upgrades = getStageUpgrades(stageId);
+  const upgrade = upgrades.find((u) => u.id === upgradeId) || upgrades[0];
+  return getUpgradeTierInfo(upgrade, currentLevel);
+};
+
+// 1. Dung tích kho: Sàn của Kỷ Nguyên + Tổng các tầng nâng cấp đã mua trong kỷ nguyên
+export const calculateStorageCapacity = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseStorage;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'cozy_storage');
+  const lvl = stageUpgrades['cozy_storage'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 2. Tốc độ nấu: Sàn của Kỷ Nguyên + Tổng các tầng nâng cấp bếp
+export const calculateCookSpeedBoost = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseCookSpeed;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'modern_stove');
+  const lvl = stageUpgrades['modern_stove'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 3. Tỷ lệ khách kéo đến: Sàn của Kỷ Nguyên + Biển hiệu
+export const calculateSpawnRateBoost = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseSpawnRate;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'flower_signboard');
+  const lvl = stageUpgrades['flower_signboard'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 4. Thời gian khách kiên nhẫn (giây): Sàn của Kỷ Nguyên + Bàn ghế
+export const calculateCustomerPatienceBonus = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.basePatience;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'seating_comfort');
+  const lvl = stageUpgrades['seating_comfort'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 5. Tỷ lệ tiền tip boa: Sàn của Kỷ Nguyên + Bát đĩa
+export const calculateTipRateBonus = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseTipRate;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'dishware_premium');
+  const lvl = stageUpgrades['dishware_premium'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 6. Thưởng đơn giao hàng: Sàn của Kỷ Nguyên + Đội xe
+export const calculateDeliveryBonus = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseDeliveryBonus;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'delivery_fleet');
+  const lvl = stageUpgrades['delivery_fleet'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 7. Thưởng nhận sao uy tín: Sàn của Kỷ Nguyên + Âm thanh
+export const calculateReputationBonus = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const catalog = getStageCatalog(stageId);
+  let total = catalog.baseRepBonus;
+  const upgrade = catalog.upgrades.find((u) => u.id === 'sound_ambience');
+  const lvl = stageUpgrades['sound_ambience'] || 0;
+  if (upgrade?.tiers && lvl > 0) {
+    for (let i = 0; i < Math.min(lvl, upgrade.tiers.length); i++) {
+      total += upgrade.tiers[i].effectValue;
+    }
+  }
+  return total;
+};
+
+// 8. Số bàn ăn tối đa: Sàn theo stage + Kê thêm bàn
+export const calculateMaxTables = (
+  stageId: BusinessStageId = 'cart',
+  stageUpgrades: Record<string, number> = {}
+): number => {
+  const baseStageTables: Record<BusinessStageId, number> = {
+    cart: 2,
+    corner: 3,
+    awning: 4,
+    eatery: 5,
+    empire: 6,
+  };
+  const base = baseStageTables[stageId] || 2;
+  const extra = stageUpgrades['extra_tables'] || 0;
+  return Math.min(8, base + extra);
 };
 
 // Helper tính toán quy mô chi nhánh thương hiệu
@@ -1962,12 +2757,19 @@ export const INITIAL_GAME_STATE: GameSaveState = {
   ownedThemes: ['sakura_pink'],
   ownedDecorations: [],
   equippedDecorations: [],
-  storageCapacity: 120,
+  storageCapacity: 100,
   historySummaries: [],
   lastSavedAt: new Date().toISOString(),
 
   // Dữ liệu Đế Chế Vỉa Hè
   businessStage: 'cart',
+  stageUpgrades: {
+    cart: {},
+    corner: {},
+    awning: {},
+    eatery: {},
+    empire: {},
+  },
   neighbors: {
     bac_ba: {
       level: 1,

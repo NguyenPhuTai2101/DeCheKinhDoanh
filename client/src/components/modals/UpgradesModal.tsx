@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { SHOP_UPGRADES, BUSINESS_STAGES, getUpgradeTierInfo } from '../../../../shared/gameData';
+import {
+  BUSINESS_STAGES,
+  getStageCatalog,
+  getStageUpgradeTierInfo,
+} from '../../../../shared/gameData';
 import { BusinessStageId } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { soundManager } from '../../utils/soundManager';
@@ -13,6 +17,9 @@ export const UpgradesModal: React.FC = () => {
 
   const stageKeys: BusinessStageId[] = ['cart', 'corner', 'awning', 'eatery', 'empire'];
   const currentStageIndex = stageKeys.indexOf(gameState.businessStage);
+  const stageId = gameState.businessStage || 'cart';
+  const stageCatalog = getStageCatalog(stageId);
+  const currentStageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
 
   const handleBuyUpgrade = (upgradeId: string) => {
     soundManager.playClick();
@@ -88,7 +95,7 @@ export const UpgradesModal: React.FC = () => {
             }`}
           >
             <Store className="w-3.5 h-3.5" />
-            <span>Thiết Bị & Tiện Ích Quán</span>
+            <span>Thiết Bị Kỷ Nguyên ({stageCatalog.stageName})</span>
           </button>
         </div>
 
@@ -228,21 +235,43 @@ export const UpgradesModal: React.FC = () => {
               })}
             </div>
           ) : (
-            /* TAB 2: TRANG THIẾT BỊ VÀ TIỆN ÍCH (MULTI-TIER PROGRESSION) */
+            /* TAB 2: TRANG THIẾT BỊ KỶ NGUYÊN (MULTI-ERA SPECIALIZED PROGRESSION) */
             <div className="space-y-3">
+              {/* Banner Kỷ Nguyên Sự Nghiệp */}
+              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 rounded-2xl p-3.5 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl">{stageCatalog.stageIcon}</span>
+                    <h3 className="font-black text-sm sm:text-base leading-tight">
+                      Thiết Bị Kỷ Nguyên: {stageCatalog.stageName}
+                    </h3>
+                    <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-white/30">
+                      Cấp {currentStageIndex + 1}/5
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-100 mt-0.5 font-medium">
+                    {stageCatalog.stageTagline}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 bg-black/20 px-3 py-1.5 rounded-xl border border-white/20">
+                  <span className="text-xs font-bold text-amber-200">Kho hàng:</span>
+                  <span className="text-xs font-black text-white">{gameState.storageCapacity} ô</span>
+                </div>
+              </div>
+
               <div className="bg-amber-100/70 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold">
                   <span>💡</span>
-                  <span>Mỗi trang bị có 5 cấp độ chuyên sâu, cấp càng cao giá trị càng lớn!</span>
+                  <span>Mỗi cấp sự nghiệp sở hữu bộ trang bị chuyên sâu riêng. Lên đời để mở tiếp thế hệ mới!</span>
                 </div>
-                <span className="font-black text-rose-600 bg-white px-2 py-0.5 rounded-full border border-amber-300">
+                <span className="font-black text-rose-600 bg-white px-2 py-0.5 rounded-full border border-amber-300 shrink-0">
                   Ví: {gameState.money.toLocaleString('vi-VN')} đ
                 </span>
               </div>
 
-              {SHOP_UPGRADES.filter((u) => !['extra_table_1', 'extra_table_2'].includes(u.id)).map((upgrade) => {
-                const currentLevel = gameState.purchasedUpgrades[upgrade.id] || 0;
-                const tierInfo = getUpgradeTierInfo(upgrade, currentLevel);
+              {stageCatalog.upgrades.map((upgrade) => {
+                const currentLevel = currentStageUpgrades[upgrade.id] || 0;
+                const tierInfo = getStageUpgradeTierInfo(stageId, upgrade.id, currentLevel);
                 const isMax = tierInfo.isMax;
                 const canAfford = !isMax && gameState.money >= tierInfo.cost;
 
@@ -266,7 +295,7 @@ export const UpgradesModal: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Thanh chỉ báo cấp độ 5 nấc */}
+                        {/* Thanh chỉ báo cấp độ */}
                         <div className="flex items-center gap-1 my-1.5">
                           {Array.from({ length: upgrade.maxLevel }).map((_, stepIdx) => (
                             <div
@@ -282,8 +311,8 @@ export const UpgradesModal: React.FC = () => {
 
                         {/* Chi tiết tầng tiếp theo */}
                         {isMax ? (
-                          <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 inline-block mt-0.5">
-                            ✨ Đã đạt cấp độ tối đa của trang bị này!
+                          <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-300 inline-block mt-0.5">
+                            ✨ Đã đạt mốc tối đa của Kỷ Nguyên này! Thăng cấp Sự Nghiệp ở Tab 1 để đột phá đời mới.
                           </div>
                         ) : (
                           <div className="space-y-0.5 mt-0.5">

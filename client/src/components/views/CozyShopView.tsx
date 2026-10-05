@@ -9,6 +9,7 @@ import {
   NEIGHBORS_DATA,
   RESTAURANT_TYPES,
   EMPLOYEES,
+  calculateMaxTables,
 } from '../../../../shared/gameData';
 import { CustomerTypeId, RecipeId, IngredientId, NeighborId, ActiveOrder, Employee } from '../../../../shared/types';
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
@@ -61,12 +62,9 @@ export const CozyShopView: React.FC = () => {
 
   // Cấu hình cấp bậc & thương hiệu quán hiện tại
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
-  const upgrades = gameState.purchasedUpgrades;
-  const extraTableCount =
-    (upgrades['extra_tables'] || 0) +
-    (upgrades['extra_table_1'] ? 1 : 0) +
-    (upgrades['extra_table_2'] ? 1 : 0);
-  const maxTables = currentStage.maxTables + extraTableCount;
+  const stageId = gameState.businessStage || 'cart';
+  const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
+  const maxTables = calculateMaxTables(stageId, stageUpgrades);
   const activeTheme = SHOP_THEMES[gameState.activeTheme] || SHOP_THEMES.sakura_pink;
   const stageVisual = STAGE_VISUALS[gameState.businessStage] || STAGE_VISUALS.cart;
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';

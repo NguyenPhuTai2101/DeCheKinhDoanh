@@ -394,6 +394,7 @@ export interface GameSaveState {
 
   // Thuộc tính mới V0.4: Đế Chế Vỉa Hè (decheviahe.com)
   businessStage: BusinessStageId;
+  stageUpgrades?: Partial<Record<BusinessStageId, Record<string, number>>>;
   neighbors: Record<NeighborId, NeighborRelationship>;
   activeLotteryTicket?: LotteryTicket | null;
   lotteryHistory: LotteryTicket[];

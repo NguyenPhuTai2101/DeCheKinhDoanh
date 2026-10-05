@@ -7,6 +7,11 @@ import {
   NEIGHBORS_DATA,
   RESTAURANT_TYPES,
   EMPLOYEES,
+  calculateCookSpeedBoost,
+  calculateSpawnRateBoost,
+  calculateCustomerPatienceBonus,
+  calculateTipRateBonus,
+  calculateMaxTables,
 } from '../../../shared/gameData';
 import { ActiveOrder, CustomerTypeId, Employee, NeighborId, RecipeId } from '../../../shared/types';
 import { soundManager } from '../utils/soundManager';
@@ -29,12 +34,9 @@ export const useGameSimulation = () => {
   } = useGameStore();
 
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
-  const upgrades = gameState.purchasedUpgrades;
-  const extraTableCount =
-    (upgrades['extra_tables'] || 0) +
-    (upgrades['extra_table_1'] ? 1 : 0) +
-    (upgrades['extra_table_2'] ? 1 : 0);
-  const maxTables = currentStage.maxTables + extraTableCount;
+  const stageId = gameState.businessStage || 'cart';
+  const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
+  const maxTables = calculateMaxTables(stageId, stageUpgrades);
 
   // Timers tracked in refs so component re-renders do NOT reset them
   const spawnTimerRef = useRef(0);
@@ -69,6 +71,14 @@ export const useGameSimulation = () => {
       const hasManager = managers.length > 0;
       const managerBoost = hasManager ? 1.25 : 1.0;
       const hasTuan = hiredList.some((e) => e.id === 'emp_tuan');
+
+      const simStageId = currentGameState.businessStage || 'cart';
+      const simStageUpgrades = currentGameState.stageUpgrades?.[simStageId] || currentGameState.purchasedUpgrades || {};
+      const simMaxTables = calculateMaxTables(simStageId, simStageUpgrades);
+      const cookSpeedBoost = calculateCookSpeedBoost(simStageId, simStageUpgrades);
+      const spawnRateBoost = calculateSpawnRateBoost(simStageId, simStageUpgrades);
+      const extraPatience = calculateCustomerPatienceBonus(simStageId, simStageUpgrades);
+      const tipRateBoost = calculateTipRateBonus(simStageId, simStageUpgrades);
 
       // 1.3 Quản lý đơn hàng: Nấu ăn (Cook), Bưng món (Server), Kiên nhẫn (Waiting)
       // Tìm đầu bếp rảnh tay
@@ -148,11 +158,9 @@ export const useGameSimulation = () => {
         else if (order.state === 'cooking') {
           const cook = hiredList.find((e) => e.id === order.chefId);
           const cookSpeed = (cook?.speed || 1.0) * managerBoost;
-          const stoveLvl = currentGameState.purchasedUpgrades['modern_stove'] || 0;
-          const stoveBoost = Math.max(0.35, 1 - stoveLvl * 0.13); // Giảm đến 65% thời gian nấu
           const cookingDurationMs = Math.max(
-            500,
-            (recipe.cookingTimeMs * (hasTuan ? 0.75 : 1.0) * stoveBoost) / cookSpeed / timeSpeed
+            350,
+            (recipe.cookingTimeMs * (hasTuan ? 0.75 : 1.0)) / (1 + cookSpeedBoost) / cookSpeed / timeSpeed
           );
 
           const progressDelta = (tickMs / cookingDurationMs) * 100;
@@ -209,8 +217,7 @@ export const useGameSimulation = () => {
             // Ăn xong, thu tiền thanh toán + tip
             const cType = CUSTOMER_TYPES[order.typeId];
             const patiencePercent = Math.max(0, order.patienceRemaining / order.maxPatience);
-            const dishwareLvl = currentGameState.purchasedUpgrades['dishware_premium'] || 0;
-            const dishwareTipBoost = 1 + dishwareLvl * 0.15; // +15% tip mỗi cấp
+            const dishwareTipBoost = 1 + tipRateBoost;
             let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent * dishwareTipBoost);
             if (hasTuan) tip = Math.round(tip * 1.15);
             if (order.neighborId) {
@@ -260,18 +267,17 @@ export const useGameSimulation = () => {
       setActiveOrders(nextOrders);
 
       // 1.4 Sinh khách hàng mới vào bàn ăn
-      const signboardLvl = currentGameState.purchasedUpgrades['flower_signboard'] || 0;
       const baseRate = currentStage.customerRateMs;
-      const spawnRate = Math.round(baseRate * Math.max(0.35, 1 - signboardLvl * 0.13));
+      const spawnRate = Math.max(600, Math.round(baseRate / (1 + spawnRateBoost)));
 
       spawnTimerRef.current += tickMs * timeSpeed;
       if (spawnTimerRef.current >= spawnRate) {
         spawnTimerRef.current = 0;
 
-        if (nextOrders.length < maxTables) {
+        if (nextOrders.length < simMaxTables) {
           const takenTables = nextOrders.map((o) => o.tableIndex);
           let freeTable = 1;
-          for (let i = 1; i <= maxTables; i++) {
+          for (let i = 1; i <= simMaxTables; i++) {
             if (!takenTables.includes(i)) {
               freeTable = i;
               break;
@@ -280,10 +286,6 @@ export const useGameSimulation = () => {
 
           const activeRest = RESTAURANT_TYPES[currentRestId] || RESTAURANT_TYPES.banh_mi;
           const availableRecipes = activeRest.primaryRecipeIds;
-
-          // Tiện ích ghế ngồi tăng thêm độ kiên nhẫn
-          const comfortLvl = currentGameState.purchasedUpgrades['seating_comfort'] || 0;
-          const extraPatience = comfortLvl * 15;
 
           const isNeighbor = Math.random() < 0.22;
           let chosenType: CustomerTypeId = 'student';
