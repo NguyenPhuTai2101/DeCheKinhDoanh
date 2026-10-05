@@ -198,7 +198,7 @@ export type EmployeePersonality =
   | 'creative'
   | 'extrovert';
 
-export type EmployeeRole = 'cook' | 'server' | 'manager';
+export type EmployeeRole = 'cook' | 'server' | 'manager' | 'shopper';
 
 export type CareerTier = 'intern' | 'junior' | 'senior' | 'shift_leader' | 'store_manager';
 
@@ -211,6 +211,8 @@ export interface Employee {
   personality: EmployeePersonality;
   personalityDesc: string;
   salaryPerDay: number;
+  hiringCost?: number; // Tiền thuê / ký hợp đồng ban đầu (mắc cho nhân viên đi chợ)
+  marketSkill?: number; // Kỹ năng đi chợ: mặc cả & chiết khấu giá sỉ (0 - 100)
   speed: number;
   cookingSkill: number;
   serviceSkill: number;
@@ -281,6 +283,8 @@ export interface BusinessStage {
   customerRateMs: number;
   cost: number;
   requiredReputation: number;
+  maxRestaurants: number; // Hạn mức số lượng chi nhánh được phép sở hữu
+  maxStaff: number; // Hạn mức tối đa số lượng nhân sự được phép tuyển dụng
   description: string;
 }
 
@@ -358,16 +362,19 @@ export interface ActiveOrder {
   typeId: CustomerTypeId;
   neighborId?: NeighborId;
   dialogue?: string;
+  customTag?: string; // Ghi chú order ngẫu nhiên: "Không hành", "2 trứng", "Nhiều bánh phở", "Nước béo"...
   recipeId: RecipeId;
   patienceRemaining: number;
   maxPatience: number;
-  state: 'waiting' | 'cooking' | 'ready' | 'eating' | 'leaving';
+  state: 'waiting' | 'cooking' | 'ready' | 'eating' | 'paying' | 'leaving';
   cookingProgress?: number;
   chefId?: string;
   chefName?: string;
   serverId?: string;
   serverName?: string;
   eatingTimer?: number;
+  maxEatingTimer?: number;
+  calculatedTip?: number;
 }
 
 export interface GameSaveState {
@@ -379,7 +386,8 @@ export interface GameSaveState {
   money: number;
   reputation: number;
   player: PlayerStats;
-  inventory: Record<IngredientId, number>;
+  inventory: Partial<Record<IngredientId, number>>; // Kho nguyên liệu của quán đang kích hoạt
+  restaurantInventories?: Partial<Record<RestaurantTypeId, Partial<Record<IngredientId, number>>>>; // Kho riêng biệt cho từng thương hiệu quán
   unlockedRecipes: RecipeId[];
   purchasedUpgrades: Record<string, number>;
   hiredEmployees: string[];
@@ -402,11 +410,38 @@ export interface GameSaveState {
   deliveryOrders?: DeliveryOrder[];
   totalDeliveriesCompleted?: number;
 
-  // V0.6: Hệ thống Chuỗi Chi Nhánh Đa Ẩm Thực
+  // V0.6: Hệ thống Chuỗi Chi Nhánh Đa Ẩm Thực & Môi Trường Mô Phỏng
   activeRestaurantId?: RestaurantTypeId;
   unlockedRestaurants?: RestaurantTypeId[];
   branchLevels?: Record<RestaurantTypeId, number>;
   hasChosenStarter?: boolean;
+  weather?: 'sunny' | 'rainy' | 'breezy';
+  marketSpecial?: {
+    ingredientId: IngredientId;
+    discountPercent: number;
+    newsText: string;
+  } | null;
 }
+
+// ============================================================================
+// HỆ THỐNG BIẾN CỐ BẤT NGỜ ĐỜI THỰC (SURPRISE INCIDENTS & POPUPS)
+// ============================================================================
+
+export type IncidentType = 'penalty' | 'reward';
+
+export interface SurpriseIncident {
+  id: string;
+  type: IncidentType;
+  icon: string;              // Emoji kết hợp, ví dụ "⚖️ ❌", "🚔 ⚠️", "💵 🎉", "🐱 🥩"
+  title: string;             // Tiêu đề in hoa giật gân, ví dụ "VU KHỐNG - TỐ CÁO SAI SỰ THẬT!"
+  story: string;             // Đoạn trích câu chuyện tình huống đời thường
+  behaviorLabel: string;     // Dòng "Hành vi / Tình huống / Cơ duyên"
+  moneyChange: number;       // Số tiền trừ (âm) hoặc cộng (dương) (VND)
+  reputationChange: number;  // Số điểm sao / uy tín thay đổi (âm hoặc dương)
+  reputationNote: string;    // Dòng ghi chú sao: "Bị giảm điểm sao (-2 đánh giá 1 sao...)"
+  footerNote?: string;       // Ghi chú dưới cùng trong ngoặc đơn
+  actionButtonText: string;  // Nhãn nút bấm: "Chấp hành & Tiếp tục", "Hoan hỉ & Tiếp tục", v.v.
+}
+
 
 

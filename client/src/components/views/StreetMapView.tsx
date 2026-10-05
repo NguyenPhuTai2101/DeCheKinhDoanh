@@ -14,6 +14,7 @@ import { BusinessStageId, RestaurantTypeId, Employee } from '../../../../shared/
 import { STAGE_VISUALS } from '../../utils/stageVisuals';
 import { ChibiAvatar } from '../chibi/ChibiAvatar';
 import { soundManager } from '../../utils/soundManager';
+import { getDishImage, RESTAURANT_BANNER_IMAGES, getBuildingImage } from '../../utils/dishAssets';
 import confetti from 'canvas-confetti';
 import {
   Utensils,
@@ -36,6 +37,7 @@ export const StreetMapView: React.FC = () => {
     activeOrders,
     setCurrentView,
     serveDishOrder,
+    collectPayment,
     openModal,
     switchActiveRestaurant,
     purchaseUpgrade,
@@ -190,147 +192,86 @@ export const StreetMapView: React.FC = () => {
     }
   };
 
-  // Render từng mặt tiền quán ẩm thực (Compact & Chân Thực)
-  const renderStorefrontLot = (restKey: RestaurantTypeId, width = 280) => {
+  // Render từng mặt tiền quán ẩm thực (Hình ảnh 2D Chân Thực & Sống Động)
+  const renderStorefrontLot = (restKey: RestaurantTypeId, width = 300) => {
     const rest = RESTAURANT_TYPES[restKey];
     if (!rest) return null;
     const isUnlocked = gameState.unlockedRestaurants?.includes(restKey);
     const isActive = activeRestId === restKey;
     const assignedStaff = getStaffForRest(restKey);
     const isAutomated = assignedStaff.length > 0;
+    const buildingImg = getBuildingImage(restKey);
 
     // TRƯỜNG HỢP 1: QUÁN ĐANG ĐỨNG BẾP CHÍNH (ACTIVE)
     if (isActive) {
       return (
         <div
           id={`lot-${restKey}`}
-          style={{
-            width: `${width}px`,
-            backgroundColor: stageVisual.storefront.facadeBg,
-            borderColor: stageVisual.storefront.facadeBorder,
-          }}
-          className={`h-56 border-3 rounded-t-2xl relative flex flex-col justify-between p-2 shadow-md shrink-0 transition-all ${
-            stageVisual.storefront.hasNeonGlow ? 'ring-2 ring-amber-300 shadow-amber-200/50' : ''
-          }`}
+          style={{ width: `${width}px` }}
+          className="h-64 border-3 border-[#FF8EA3] rounded-t-3xl relative flex flex-col justify-between p-2.5 shadow-xl shrink-0 transition-all overflow-hidden group bg-slate-900 ring-2 ring-pink-300"
         >
-          {/* Mái hiên theo cấp bậc quán */}
-          <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
-            <div className={`h-4 w-full flex overflow-hidden shadow-2xs ${stageVisual.storefront.roofRounds}`}>
-              {Array.from({ length: 16 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-1 h-full"
-                  style={{
-                    backgroundColor:
-                      i % 2 === 0
-                        ? stageVisual.storefront.roofColors[0]
-                        : stageVisual.storefront.roofColors[1],
-                  }}
-                />
-              ))}
+          {/* Nền ảnh 2D mặt tiền nhà chân thực sắc nét */}
+          {buildingImg && (
+            <div className="absolute inset-0 z-0">
+              <img
+                src={buildingImg}
+                alt={rest.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/60 pointer-events-none" />
             </div>
+          )}
 
-            {/* Huy hiệu Trụ Sở Chính */}
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border border-amber-500 whitespace-nowrap z-10 animate-pulse">
-              <span>👑</span>
-              <span>TRỤ SỞ ĐỨNG BẾP</span>
-            </div>
-          </div>
-
-          {/* Biển hiệu quán chính */}
-          <div
-            className="rounded-xl p-1.5 flex items-center justify-between border shadow-2xs"
-            style={{
-              backgroundColor: stageVisual.storefront.signboardBg,
-              borderColor: stageVisual.storefront.signboardBorder,
-            }}
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xl animate-bounce-short shrink-0">{rest.icon}</span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <h3
-                    className="font-black text-xs leading-tight truncate"
-                    style={{ color: stageVisual.storefront.signboardTextColor }}
-                  >
-                    {rest.name}
-                  </h3>
-                </div>
-                <div className="text-[8.5px] font-bold text-rose-600 flex items-center gap-1 truncate">
-                  <span>{currentStage.name}</span>
-                  <span>·</span>
-                  <span>⭐ {gameState.reputation}</span>
-                </div>
-              </div>
+          {/* Huy hiệu Trụ Sở Chính & Nút Vào Bếp */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="bg-amber-400 text-amber-950 font-black px-2.5 py-0.5 rounded-full text-[9px] shadow-sm flex items-center gap-1 border border-amber-300">
+              <span className="text-[10px] animate-spin">👑</span>
+              <span>TRỤ SỞ CHÍNH</span>
             </div>
 
             <button
               onClick={safeClick(() => setCurrentView('shop'))}
-              className="px-2 py-1 bg-white hover:bg-rose-50 border border-rose-300 rounded-lg text-[10px] font-black text-rose-700 shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0"
+              className="px-3 py-1 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-[10.5px] font-black shadow-md active:scale-95 transition-all flex items-center gap-1 border border-rose-300 cursor-pointer"
             >
-              <Utensils className="w-2.5 h-2.5" />
+              <Utensils className="w-3 h-3" />
               <span>Vào Bếp 🍳</span>
             </button>
           </div>
 
-          {/* Quầy bếp & Nhân sự quán chính */}
-          <div
-            onClick={safeClick(() => setCurrentView('shop'))}
-            className="bg-white/95 rounded-xl border p-1.5 flex items-center justify-between cursor-pointer hover:brightness-105 transition-all shadow-xs group"
-            style={{ borderColor: stageVisual.storefront.signboardBorder }}
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div
-                className="w-11 h-13 rounded-lg border flex flex-col justify-around items-center p-0.5 shadow-inner shrink-0 relative"
-                style={{
-                  backgroundColor: stageVisual.storefront.tagBg,
-                  borderColor: stageVisual.storefront.signboardBorder,
-                }}
-              >
-                <span className="text-lg animate-bounce-short">{rest.equipmentIcon}</span>
-                <span className="text-[6.5px] font-black px-0.5 rounded text-amber-900 bg-amber-200/80 truncate max-w-[40px]">
-                  {rest.shortName}
-                </span>
-                {/* Khói nghi ngút */}
-                <span className="absolute -top-1.5 -right-1 text-[9px] animate-pulse">♨️</span>
-              </div>
-
+          {/* Biển hiệu & Nhân sự đứng trước cửa quán */}
+          <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl p-2 border border-pink-200 shadow-md">
+            <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <div className="text-[10px] font-black text-slate-800 flex items-center gap-1 truncate">
-                  <span className="truncate">{rest.equipmentName}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">{rest.icon}</span>
+                  <h3 className="font-black text-xs text-slate-900 truncate">
+                    {rest.name}
+                  </h3>
                 </div>
-                <div className="text-[8.5px] text-slate-500 font-medium truncate max-w-[120px]">
-                  {rest.tagline}
-                </div>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[7px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 rounded-md font-bold">
-                    🟢 Đang đứng bếp
-                  </span>
+                <div className="text-[8.5px] text-rose-600 font-extrabold truncate mt-0.5">
+                  {currentStage.name} · ⭐ {gameState.reputation} điểm
                 </div>
               </div>
-            </div>
 
-            {/* Nhân sự đang đứng bếp */}
-            <div className="flex items-center -space-x-1 shrink-0 pl-1">
-              <div className="relative" title="Chủ quán">
-                <ChibiAvatar type="player" emotion="happy" size={32} />
-                <span className="absolute -bottom-0.5 -right-0.5 bg-amber-500 text-white text-[6px] font-black px-0.5 rounded-full">
-                  Bếp
-                </span>
-              </div>
-              {assignedStaff.slice(0, 2).map((staff) => (
-                <div key={staff.id} className="relative" title={`${staff.name} (${staff.role})`}>
-                  <ChibiAvatar type={staff.id} emotion="happy" size={28} />
-                  <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full">
-                    {staff.role === 'cook' ? 'Nấu' : 'Bưng'}
+              {/* Nhân sự đứng trước quán */}
+              <div className="flex items-center -space-x-1 shrink-0 pl-1">
+                <div className="relative" title="Chủ quán">
+                  <ChibiAvatar type="player" emotion="happy" size={30} />
+                  <span className="absolute -bottom-0.5 -right-0.5 bg-amber-500 text-white text-[6px] font-black px-0.5 rounded-full shadow-2xs">
+                    Bếp
                   </span>
                 </div>
-              ))}
+                {assignedStaff.slice(0, 2).map((staff) => (
+                  <div key={staff.id} className="relative" title={`${staff.name} (${staff.role})`}>
+                    <ChibiAvatar type={staff.id} emotion="happy" size={28} />
+                    <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full shadow-2xs">
+                      {staff.role === 'cook' ? 'Nấu' : 'Bưng'}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-
-          {/* Dải thảm chân tiệm */}
-          <div className="h-1 w-full bg-amber-400 rounded-b-md opacity-80" />
         </div>
       );
     }
@@ -344,151 +285,86 @@ export const StreetMapView: React.FC = () => {
       return (
         <div
           id={`lot-${restKey}`}
-          style={{
-            width: `${width}px`,
-            backgroundColor: rest.accentColor,
-            borderColor: rest.themeColor,
-          }}
-          className="h-56 border-3 rounded-t-2xl relative flex flex-col justify-between p-2 shadow-md shrink-0 transition-all hover:brightness-102"
+          style={{ width: `${width}px` }}
+          className="h-64 border-3 border-emerald-400 rounded-t-3xl relative flex flex-col justify-between p-2.5 shadow-xl shrink-0 transition-all overflow-hidden group bg-slate-900"
         >
-          {/* Mái hiên thương hiệu chi nhánh */}
-          <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
-            <div className="h-4 w-full flex overflow-hidden shadow-2xs rounded-t-xl">
-              {Array.from({ length: 16 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-1 h-full"
-                  style={{
-                    backgroundColor: i % 2 === 0 ? rest.themeColor : '#FFFFFF',
-                  }}
-                />
-              ))}
+          {/* Nền ảnh 2D mặt tiền nhà chi nhánh */}
+          {buildingImg && (
+            <div className="absolute inset-0 z-0">
+              <img
+                src={buildingImg}
+                alt={rest.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/60 pointer-events-none" />
             </div>
+          )}
 
-            {/* Huy hiệu Chi Nhánh */}
+          {/* Huy hiệu Chi Nhánh & Nút Đổi Quán */}
+          <div className="relative z-10 flex items-center justify-between">
             <div
-              className={`absolute -top-3 left-1/2 -translate-x-1/2 font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border whitespace-nowrap z-10 ${
+              className={`font-black px-2.5 py-0.5 rounded-full text-[9px] shadow-sm flex items-center gap-1 border ${
                 isAutomated
                   ? 'bg-emerald-600 text-white border-emerald-400'
-                  : 'bg-amber-500 text-white border-amber-600 animate-pulse'
+                  : 'bg-amber-500 text-white border-amber-400 animate-pulse'
               }`}
             >
               <span>{isAutomated ? '🟢' : '⚠️'}</span>
               <span>
                 {isAutomated
-                  ? `TỰ ĐỘNG BÁN (${assignedStaff.length} NV · Cấp ${branchLvl})`
+                  ? `TỰ ĐỘNG BÁN (Cấp ${branchLvl})`
                   : 'CẦN NHÂN VIÊN'}
               </span>
-            </div>
-          </div>
-
-          {/* Biển hiệu chi nhánh */}
-          <div
-            className="rounded-xl p-1.5 flex items-center justify-between border bg-white/95 shadow-2xs"
-            style={{ borderColor: rest.themeColor }}
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xl animate-bounce-short shrink-0">{rest.icon}</span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <h3 className="font-black text-xs text-slate-900 leading-tight truncate">
-                    {rest.name}
-                  </h3>
-                  <span className="text-[7.5px] bg-amber-100 text-amber-900 border border-amber-300 px-1 rounded font-black shrink-0">
-                    Cấp {branchLvl}
-                  </span>
-                </div>
-                <div className="text-[8px] font-bold text-emerald-800 flex items-center gap-1 truncate">
-                  <Award className="w-2.5 h-2.5 text-emerald-600" />
-                  <span>{branchTier.currentTier.name}</span>
-                </div>
-              </div>
             </div>
 
             <button
               onClick={safeClick(() => handleSwitchToBranch(restKey))}
-              className="px-2 py-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-[9.5px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0"
+              className="px-2.5 py-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-[10px] font-black shadow-md active:scale-95 transition-all flex items-center gap-1 border border-amber-300 cursor-pointer"
               title={`Chuyển sang quản lý ${rest.shortName}`}
             >
               <span>Đổi Quán 🔀</span>
             </button>
           </div>
 
-          {/* Quầy thiết bị & Trạng thái hoạt động */}
-          <div
-            className="bg-white/95 rounded-xl border p-1.5 flex items-center justify-between shadow-2xs relative"
-            style={{ borderColor: rest.themeColor }}
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div
-                className="w-11 h-13 rounded-lg border flex flex-col justify-around items-center p-0.5 shadow-inner shrink-0 relative"
-                style={{ backgroundColor: rest.accentColor, borderColor: rest.themeColor }}
-              >
-                <span className="text-lg animate-bounce-short">{rest.equipmentIcon}</span>
-                <span className="text-[6.5px] font-black px-0.5 rounded text-slate-800 bg-white/80 truncate max-w-[40px]">
-                  {rest.shortName}
-                </span>
-                {isAutomated && (
-                  <span className="absolute -top-1.5 -right-1 text-[9px] animate-pulse">♨️</span>
-                )}
-              </div>
-
+          {/* Biển hiệu & Nhân sự chi nhánh */}
+          <div className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl p-2 border border-emerald-200 shadow-md">
+            <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <div className="text-[10px] font-black text-slate-800 truncate">
-                  {rest.equipmentName}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">{rest.icon}</span>
+                  <h3 className="font-black text-xs text-slate-900 truncate">
+                    {rest.name}
+                  </h3>
                 </div>
-                <div className="text-[8px] text-slate-500 italic truncate max-w-[120px]">
-                  "{rest.tagline}"
+                <div className="text-[8.5px] text-emerald-800 font-extrabold truncate mt-0.5 flex items-center gap-1">
+                  <Award className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>{branchTier.currentTier.name}</span>
                 </div>
-
-                {isAutomated ? (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-[7.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 rounded-md font-bold flex items-center gap-0.5">
-                      <Coins className="w-2 h-2 text-amber-500" />
-                      <span>Thu lời tự động</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-[7.5px] bg-amber-100 text-amber-900 border border-amber-300 px-1 rounded-md font-bold">
-                      ⚠️ Tạm ngưng (cần NV)
-                    </span>
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* Nhân sự chi nhánh */}
-            <div className="flex flex-col items-center shrink-0 pl-1">
-              {isAutomated ? (
-                <div className="flex items-center -space-x-1.5">
-                  {assignedStaff.slice(0, 2).map((staff) => (
+              {/* Nhân sự chi nhánh */}
+              <div className="flex items-center -space-x-1 shrink-0 pl-1">
+                {isAutomated ? (
+                  assignedStaff.slice(0, 2).map((staff) => (
                     <div key={staff.id} className="relative" title={`${staff.name} (${staff.role})`}>
                       <ChibiAvatar type={staff.id} emotion="happy" size={28} />
-                      <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full">
+                      <span className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white text-[6px] font-black px-0.5 rounded-full shadow-2xs">
                         {staff.role === 'cook' ? '♨️' : '🏃'}
                       </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  onClick={safeClick(() => openModal('employees'))}
-                  className="px-1.5 py-1 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-lg text-[8px] font-black flex flex-col items-center leading-tight active:scale-95 transition-all"
-                  title="Giao nhân viên phụ trách"
-                >
-                  <Users className="w-3 h-3 text-amber-700" />
-                  <span>+ Giao NV</span>
-                </button>
-              )}
+                  ))
+                ) : (
+                  <button
+                    onClick={safeClick(() => openModal('employees'))}
+                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-lg text-[8px] font-black flex items-center gap-0.5"
+                  >
+                    <Users className="w-2.5 h-2.5 text-amber-700" />
+                    <span>+ Giao NV</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Dải chân tiệm */}
-          <div
-            className="h-1 w-full rounded-b-md opacity-80"
-            style={{ backgroundColor: rest.themeColor }}
-          />
         </div>
       );
     }
@@ -498,101 +374,54 @@ export const StreetMapView: React.FC = () => {
       <div
         id={`lot-${restKey}`}
         style={{ width: `${width}px` }}
-        className="h-56 border-3 border-dashed border-amber-400 bg-gradient-to-b from-[#FFFBEB] to-[#FEF3C7] rounded-t-2xl relative flex flex-col justify-between p-2 shadow-sm shrink-0 transition-all opacity-95"
+        className="h-64 border-3 border-amber-400 rounded-t-3xl relative flex flex-col justify-between p-2.5 shadow-xl shrink-0 transition-all overflow-hidden group bg-amber-950/20"
       >
-        {/* Rào chắn công trình quy hoạch */}
-        <div className="relative -mt-2 -mx-2 mb-1 shrink-0">
-          <div className="h-4 w-full flex overflow-hidden shadow-2xs rounded-t-xl">
-            {Array.from({ length: 16 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 h-full"
-                style={{
-                  backgroundColor: i % 2 === 0 ? '#F59E0B' : '#78350F',
-                }}
-              />
-            ))}
+        {/* Nền ảnh 2D mặt tiền nhà với hiệu ứng quy hoạch / blueprint */}
+        {buildingImg && (
+          <div className="absolute inset-0 z-0">
+            <img
+              src={buildingImg}
+              alt={rest.name}
+              className="w-full h-full object-cover opacity-65 sepia-[0.35] group-hover:scale-105 transition-transform duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-amber-950/40 to-black/60 pointer-events-none" />
           </div>
+        )}
 
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-600 text-white font-black px-2 py-0.2 rounded-full text-[8px] shadow-xs flex items-center gap-0.5 border border-amber-500 whitespace-nowrap z-10">
+        {/* Rào chắn công trình quy hoạch */}
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="bg-amber-600 text-white font-black px-2.5 py-0.5 rounded-full text-[9px] shadow-sm flex items-center gap-1 border border-amber-400">
             <span>🏗️</span>
             <span>MẶT BẰNG QUY HOẠCH</span>
-          </div>
-        </div>
-
-        {/* Biển báo dự án sắp mở */}
-        <div className="rounded-xl p-1.5 flex items-center justify-between border border-amber-300 bg-white/95 shadow-2xs">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-xl shrink-0 opacity-70">{rest.icon}</span>
-            <div className="min-w-0">
-              <h3 className="font-black text-xs text-slate-800 leading-tight truncate">
-                Dự Án: {rest.name}
-              </h3>
-              <div className="text-[8px] font-bold text-amber-800 flex items-center gap-1 truncate">
-                <span className="text-rose-600 font-extrabold">
-                  {rest.unlockCost.toLocaleString('vi-VN')} đ
-                </span>
-                <span>·</span>
-                <span className="text-amber-700">{rest.requiredReputation}⭐</span>
-                {(rest.requiredStaffCount || 0) > 0 && (
-                  <>
-                    <span>·</span>
-                    <span
-                      className={
-                        gameState.hiredEmployees.length >= (rest.requiredStaffCount || 0)
-                          ? 'text-emerald-700 font-extrabold'
-                          : 'text-rose-600 font-extrabold'
-                      }
-                    >
-                      {rest.requiredStaffCount} NV
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
 
           <button
             onClick={safeClick(() => openModal('franchise'))}
-            className={`px-2 py-1 text-white rounded-lg text-[9.5px] font-black shadow-2xs active:scale-95 transition-all flex items-center gap-0.5 shrink-0 ${
+            className={`px-3 py-1 text-white rounded-xl text-[10px] font-black shadow-md active:scale-95 transition-all flex items-center gap-1 ${
               gameState.money >= rest.unlockCost &&
               gameState.reputation >= rest.requiredReputation &&
               gameState.hiredEmployees.length >= (rest.requiredStaffCount || 0)
-                ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse'
-                : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600'
+                ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse border border-emerald-400'
+                : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 border border-amber-400'
             }`}
-            title="Mở chi nhánh mới này"
           >
-            <Sparkles className="w-2.5 h-2.5" />
+            <Sparkles className="w-3 h-3" />
             <span>Mở Quán 🚀</span>
           </button>
         </div>
 
-        {/* Khu vực chuẩn bị mặt bằng */}
+        {/* Thông tin điều kiện mở chi nhánh */}
         <div
           onClick={safeClick(() => openModal('franchise'))}
-          className="bg-white/80 rounded-xl border border-dashed border-amber-300 p-1.5 flex items-center justify-between cursor-pointer hover:bg-white transition-all shadow-2xs"
-          title="Chạm để xem điều kiện mở chi nhánh"
+          className="relative z-10 bg-white/95 backdrop-blur-xs rounded-2xl p-2 border border-amber-300 shadow-md cursor-pointer hover:bg-white transition-all"
         >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="w-11 h-13 rounded-lg border border-dashed border-amber-400 bg-amber-50 flex flex-col justify-around items-center p-0.5 shrink-0">
-              <span className="text-lg opacity-60">{rest.equipmentIcon}</span>
-              <span className="text-[6.5px] font-black text-amber-900 bg-amber-200/60 px-0.5 rounded truncate">
-                Sắp Nhập
-              </span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-base">{rest.icon}</span>
+              <h3 className="font-black text-xs text-slate-800 truncate">
+                Dự Án: {rest.name}
+              </h3>
             </div>
-
-            <div className="min-w-0">
-              <div className="text-[9.5px] font-black text-slate-800 truncate">
-                Thiết bị: {rest.equipmentName}
-              </div>
-              <div className="text-[8px] text-slate-600 font-medium line-clamp-2 mt-0.5">
-                {rest.starterDescription}
-              </div>
-            </div>
-          </div>
-
-          <div className="text-right shrink-0 pl-1">
             <span
               className={`text-[8px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap border ${
                 gameState.money >= rest.unlockCost && gameState.reputation >= rest.requiredReputation
@@ -605,10 +434,13 @@ export const StreetMapView: React.FC = () => {
                 : 'TÍCH VỐN ⏳'}
             </span>
           </div>
-        </div>
 
-        {/* Chân mặt bằng */}
-        <div className="h-1 w-full bg-amber-400 rounded-b-md opacity-60" />
+          <div className="text-[8.5px] text-slate-600 flex items-center justify-between font-bold border-t border-slate-100 pt-1">
+            <span className="text-rose-600 font-extrabold">{rest.unlockCost.toLocaleString('vi-VN')} đ</span>
+            <span>⭐ {rest.requiredReputation}</span>
+            <span>{rest.requiredStaffCount || 0} NV</span>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1083,7 +915,9 @@ export const StreetMapView: React.FC = () => {
                       {order && (
                         <span
                           className={`text-[7.5px] font-bold px-1 py-0.2 rounded-full ${
-                            order.state === 'ready'
+                            order.state === 'paying'
+                              ? 'bg-amber-400 text-amber-950 font-black animate-bounce'
+                              : order.state === 'ready'
                               ? 'bg-emerald-100 text-emerald-700 animate-pulse font-black'
                               : order.state === 'eating'
                               ? 'bg-amber-100 text-amber-700 font-bold'
@@ -1092,7 +926,9 @@ export const StreetMapView: React.FC = () => {
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {order.state === 'ready'
+                          {order.state === 'paying'
+                            ? '🪙 Tính Tiền'
+                            : order.state === 'ready'
                             ? '✨ Có Món'
                             : order.state === 'eating'
                             ? '😋 Đang Ăn'
@@ -1113,6 +949,8 @@ export const StreetMapView: React.FC = () => {
                               emotion={
                                 order.state === 'eating'
                                   ? 'eating'
+                                  : order.state === 'paying'
+                                  ? 'happy'
                                   : order.state === 'ready'
                                   ? 'love'
                                   : patiencePercent > 0.4
@@ -1129,8 +967,21 @@ export const StreetMapView: React.FC = () => {
                           </div>
 
                           <div className="flex flex-col items-center">
-                            <div className="text-sm animate-bounce-short leading-none" title={recipe?.name}>
-                              {recipe?.icon || currentRest.icon}
+                            <div
+                              className="w-5.5 h-5.5 rounded-full overflow-hidden border border-[#F7D7BA] shadow-2xs mb-0.5 bg-white flex items-center justify-center shrink-0 animate-bounce-short"
+                              title={recipe?.name}
+                            >
+                              {getDishImage(order.recipeId) ? (
+                                <img
+                                  src={getDishImage(order.recipeId)}
+                                  alt={recipe?.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-xs leading-none">
+                                  {recipe?.icon || currentRest.icon}
+                                </span>
+                              )}
                             </div>
                             <div
                               style={{
@@ -1167,17 +1018,41 @@ export const StreetMapView: React.FC = () => {
                     </div>
 
                     {/* Nút bưng món nhanh ngay ngoài phố */}
-                    {order && order.state === 'ready' ? (
+                    {order && order.state === 'paying' ? (
+                      <button
+                        onClick={safeClick(() => {
+                          soundManager.playCoin();
+                          confetti({
+                            particleCount: 30,
+                            spread: 50,
+                            origin: { y: 0.7 },
+                          });
+                          collectPayment(order.id);
+                        })}
+                        className="mt-1 w-full py-0.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-105 text-amber-950 rounded-md text-[8.5px] font-black flex items-center justify-center gap-0.5 animate-bounce-short shadow-2xs border border-amber-300"
+                      >
+                        <span>🪙 THU TIỀN</span>
+                      </button>
+                    ) : order && order.state === 'ready' ? (
                       <button
                         onClick={safeClick(() => handleServeOnStreet(order.id))}
                         className="mt-1 w-full py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md text-[8.5px] font-black flex items-center justify-center gap-0.5 animate-bounce-short shadow-2xs"
                       >
                         <Sparkles className="w-2.5 h-2.5" />
-                        <span>BƯNG MÓN 💰</span>
+                        <span>BƯNG MÓN 🍽️</span>
                       </button>
+                    ) : order && order.state === 'eating' ? (
+                      <div className="mt-0.5 text-center text-[7.5px] text-emerald-700 font-bold truncate">
+                        😋 Đang ăn (còn {Math.ceil(order.eatingTimer || 0)}s)
+                      </div>
                     ) : order ? (
                       <div className="mt-0.5 text-center text-[7.5px] text-slate-600 font-bold truncate">
-                        {recipe?.name}
+                        <span>{recipe?.name}</span>
+                        {order.customTag && (
+                          <span className="block text-[6.5px] text-[#E91E63] font-black truncate">
+                            🏷️ {order.customTag}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-0.5 text-center text-[7px] text-slate-400 italic">

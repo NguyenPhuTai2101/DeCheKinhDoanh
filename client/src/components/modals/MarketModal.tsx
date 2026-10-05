@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { IngredientId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
+import { IngredientIcon } from '../common/IngredientIcon';
 import { X, ShoppingBag, Plus, Minus, Package, CheckCircle2, Filter } from 'lucide-react';
 
 export const MarketModal: React.FC = () => {
@@ -22,10 +23,20 @@ export const MarketModal: React.FC = () => {
     }));
   };
 
+  const getIngredientUnitPrice = (ingId: IngredientId) => {
+    const ing = INGREDIENTS[ingId];
+    if (!ing) return 0;
+    if (gameState.marketSpecial && gameState.marketSpecial.ingredientId === ingId) {
+      const discount = gameState.marketSpecial.discountPercent;
+      return Math.round(ing.cost * (100 - discount) / 100);
+    }
+    return ing.cost;
+  };
+
   const totalItemsInCart = Object.values(cart).reduce((a, b) => a + b, 0);
   const totalCost = Object.entries(cart).reduce((sum, [key, qty]) => {
-    const ing = INGREDIENTS[key as IngredientId];
-    return sum + (ing ? ing.cost * qty : 0);
+    const unitPrice = getIngredientUnitPrice(key as IngredientId);
+    return sum + unitPrice * qty;
   }, 0);
 
   const currentStorageUsed = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
@@ -86,6 +97,19 @@ export const MarketModal: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Banner Khuyến Mãi Giờ Vàng Chợ Đầu Mối */}
+        {gameState.marketSpecial && (
+          <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 text-white px-3 sm:px-4 py-2 flex items-center justify-between text-xs font-black shadow-xs shrink-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-base animate-bounce-short">🔥</span>
+              <span className="truncate">{gameState.marketSpecial.newsText}</span>
+            </div>
+            <span className="bg-white text-rose-600 text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ml-2 shadow-2xs">
+              Giảm -{gameState.marketSpecial.discountPercent}%
+            </span>
+          </div>
+        )}
 
         {/* Thanh trạng thái kho & tiền */}
         <div className="bg-[#FFF7ED] px-4 py-2 border-b border-[#F7D7BA] flex items-center justify-between text-[11px] font-bold shrink-0">
@@ -176,22 +200,48 @@ export const MarketModal: React.FC = () => {
             const stock = gameState.inventory[ing.id] || 0;
             const inCart = cart[ing.id] || 0;
 
+            const isSpecial = gameState.marketSpecial?.ingredientId === ing.id;
+            const unitPrice = getIngredientUnitPrice(ing.id);
+
             return (
               <div
                 key={ing.id}
-                className="bg-white border-2 border-[#F2E8E5] rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 hover:border-[#FFD6E5] transition-all"
+                className={`bg-white border-2 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 transition-all ${
+                  isSpecial
+                    ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200'
+                    : 'border-[#F2E8E5] hover:border-[#FFD6E5]'
+                }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-2xl sm:text-3xl bg-[#FFF1F6] p-1.5 sm:p-2 rounded-xl border border-[#FFD6E5] shrink-0">
-                    {ing.icon}
-                  </span>
+                  <div className="w-12 h-12 bg-[#FFF1F6] rounded-2xl border border-[#FFD6E5] flex items-center justify-center shrink-0 shadow-inner relative">
+                    <IngredientIcon id={ing.id} size={34} fallbackIcon={ing.icon} />
+                    {isSpecial && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[7px] font-black px-1 rounded-full shadow-2xs">
+                        🔥 SỈ
+                      </span>
+                    )}
+                  </div>
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-xs sm:text-sm text-[#7C5C55] truncate">
                       {ing.name}
                     </h4>
-                    <div className="text-xs font-black text-[#F7A8C4]">
-                      {ing.cost.toLocaleString('vi-VN')} đ
-                    </div>
+                    {isSpecial ? (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-black text-rose-600">
+                          {unitPrice.toLocaleString('vi-VN')} đ
+                        </span>
+                        <span className="text-[10px] text-slate-400 line-through">
+                          {ing.cost.toLocaleString('vi-VN')} đ
+                        </span>
+                        <span className="bg-rose-500 text-white text-[8px] font-black px-1 rounded-full">
+                          -{gameState.marketSpecial?.discountPercent}%
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-black text-[#F7A8C4]">
+                        {ing.cost.toLocaleString('vi-VN')} đ
+                      </div>
+                    )}
                     <div className="text-[10px] text-[#9C7C75]">
                       Hiện có: <span className="font-bold text-[#7C5C55]">{stock}</span>
                     </div>

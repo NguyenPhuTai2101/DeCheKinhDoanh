@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { EMPLOYEES, RESTAURANT_TYPES } from '../../../../shared/gameData';
-import { RestaurantTypeId } from '../../../../shared/types';
+import { EMPLOYEES, RESTAURANT_TYPES, BUSINESS_STAGES } from '../../../../shared/gameData';
+import { RestaurantTypeId, EmployeeRole } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import {
   X,
@@ -10,11 +10,10 @@ import {
   GraduationCap,
   Award,
   Heart,
-  TrendingDown,
   UserMinus,
-  Sparkles,
-  Zap,
   Building2,
+  ShoppingBag,
+  Sparkles,
 } from 'lucide-react';
 
 export const EmployeesModal: React.FC = () => {
@@ -27,17 +26,33 @@ export const EmployeesModal: React.FC = () => {
     promoteEmployee,
     giveBonusEmployee,
     assignEmployeeToRestaurant,
+    dispatchShopperRun,
   } = useGameStore();
 
   const [activeTab, setActiveTab] = useState<'hired' | 'recruit'>('hired');
+  const [roleFilter, setRoleFilter] = useState<'all' | EmployeeRole>('all');
 
-  const hiredList = gameState.hiredEmployees.map((id) => {
-    return gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id)!;
-  }).filter(Boolean);
+  const currentStage = BUSINESS_STAGES[gameState.businessStage || 'cart'] || BUSINESS_STAGES.cart;
+  const maxStaff = currentStage.maxStaff ?? 2;
+  const isStaffCapReached = gameState.hiredEmployees.length >= maxStaff;
+
+  const hiredList = gameState.hiredEmployees
+    .map((id) => gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id)!)
+    .filter(Boolean);
 
   const candidateList = EMPLOYEES.filter(
     (e) => !gameState.hiredEmployees.includes(e.id)
   );
+
+  const filteredHiredList =
+    roleFilter === 'all'
+      ? hiredList
+      : hiredList.filter((e) => e.role === roleFilter);
+
+  const filteredCandidateList =
+    roleFilter === 'all'
+      ? candidateList
+      : candidateList.filter((e) => e.role === roleFilter);
 
   const handleHire = (empId: string) => {
     soundManager.playClick();
@@ -68,17 +83,20 @@ export const EmployeesModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFD6E5] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFCCD9] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88vh] animate-slide-up">
         {/* Header Modal */}
-        <div className="bg-[#FFF1F6] px-4 sm:px-6 py-3 border-b-2 border-[#FFD6E5] flex items-center justify-between shrink-0">
+        <div className="bg-[#FFF5F8] px-4 sm:px-6 py-3 border-b-2 border-[#FFCCD9] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">👥</span>
+            <span className="text-2xl animate-bounce-short">👥</span>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-[#7C5C55]">
-                Quản Lý Nhân Sự & Đội Ngũ
+              <h2 className="text-base sm:text-lg font-black text-[#5C3A33] flex items-center gap-1.5">
+                <span>Quản Lý Nhân Sự & Đội Ngũ</span>
+                <span className={`text-xs px-2 py-0.2 rounded-full font-black ${isStaffCapReached ? 'bg-amber-600 text-white' : 'bg-[#FF6584] text-white'}`}>
+                  {hiredList.length}/{maxStaff} Nhân Sự ({currentStage.name})
+                </span>
               </h2>
-              <p className="text-[11px] text-[#9C7C75]">
-                Đào tạo, thăng tiến và chăm sóc tâm trạng cho nhân viên của tiệm
+              <p className="text-[11px] text-[#8C6258]">
+                Tuyển phụ bếp, người bưng món và chuyên viên đi chợ sỉ tiếp tế cho tiệm
               </p>
             </div>
           </div>
@@ -87,23 +105,23 @@ export const EmployeesModal: React.FC = () => {
               soundManager.playClick();
               closeModal();
             }}
-            className="w-8 h-8 rounded-full bg-white border border-[#FFD6E5] flex items-center justify-center text-[#7C5C55] hover:bg-rose-100 transition-all active:scale-90"
+            className="w-8 h-8 rounded-full bg-white border border-[#FFCCD9] flex items-center justify-center text-[#5C3A33] hover:bg-rose-100 transition-all active:scale-90 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab chuyển đổi */}
-        <div className="flex items-center bg-[#FFF7ED] border-b border-[#F7D7BA] px-3 py-1.5 gap-2 shrink-0">
+        {/* Tab chuyển đổi: Đang làm việc vs Tuyển mới */}
+        <div className="flex items-center bg-[#FFF9FA] border-b border-[#FFEBF0] px-3 py-1.5 gap-2 shrink-0">
           <button
             onClick={() => {
               soundManager.playClick();
               setActiveTab('hired');
             }}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'hired'
-                ? 'bg-[#F7A8C4] text-white shadow-sm'
-                : 'bg-white text-[#7C5C55] border border-[#F7D7BA]'
+                ? 'bg-[#FF6584] text-white shadow-xs'
+                : 'bg-white text-[#5C3A33] border border-[#FFCCD9] hover:bg-[#FFF0F5]'
             }`}
           >
             <HeartHandshake className="w-3.5 h-3.5" />
@@ -115,10 +133,10 @@ export const EmployeesModal: React.FC = () => {
               soundManager.playClick();
               setActiveTab('recruit');
             }}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'recruit'
-                ? 'bg-[#F7A8C4] text-white shadow-sm'
-                : 'bg-white text-[#7C5C55] border border-[#F7D7BA]'
+                ? 'bg-[#FF6584] text-white shadow-xs'
+                : 'bg-white text-[#5C3A33] border border-[#FFCCD9] hover:bg-[#FFF0F5]'
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
@@ -126,50 +144,114 @@ export const EmployeesModal: React.FC = () => {
           </button>
         </div>
 
+        {/* Bộ lọc Vị Trí / Vai Trò (Roles Filter) */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border-b border-[#FFEBF0] overflow-x-auto no-scrollbar shrink-0">
+          <span className="text-[10px] font-black text-[#8C6258] shrink-0">Vai trò:</span>
+          {(
+            [
+              { id: 'all', label: 'Tất cả' },
+              { id: 'cook', label: '👨‍🍳 Đầu Bếp' },
+              { id: 'server', label: '🏃 Phục Vụ' },
+              { id: 'shopper', label: '🛵 Đi Chợ Sỉ ⭐' },
+              { id: 'manager', label: '👩‍💼 Quản Lý' },
+            ] as const
+          ).map((rf) => (
+            <button
+              key={rf.id}
+              onClick={() => {
+                soundManager.playClick();
+                setRoleFilter(rf.id as any);
+              }}
+              className={`px-2.5 py-0.8 rounded-lg text-[10.5px] font-black transition-all shrink-0 cursor-pointer ${
+                roleFilter === rf.id
+                  ? rf.id === 'shopper'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs'
+                    : 'bg-[#FF8EA3] text-white shadow-xs'
+                  : rf.id === 'shopper'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-[#FFF5F8] text-[#7C5046] border border-[#FFCCD9] hover:bg-white'
+              }`}
+            >
+              {rf.label}
+            </button>
+          ))}
+        </div>
+
         {/* Danh sách nhân viên */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 flex flex-col gap-3">
           {activeTab === 'hired' ? (
-            hiredList.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#9C7C75] bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA] flex flex-col items-center gap-2">
+            filteredHiredList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#8C6258] bg-[#FFF9FA] rounded-2xl border-2 border-dashed border-[#FFCCD9] flex flex-col items-center gap-2">
                 <span className="text-3xl">☕</span>
-                <p className="font-bold">Chưa có nhân viên nào trong đội ngũ.</p>
-                <p>Hãy chuyển sang tab "Ứng Viên Tuyển Mới" để tuyển phụ bếp và người bưng món nhé!</p>
+                <p className="font-bold">Chưa có nhân viên nào phù hợp bộ lọc.</p>
+                <p>Hãy chuyển sang tab "Ứng Viên Tuyển Mới" để tuyển thêm nhân sự nhé!</p>
               </div>
             ) : (
-              hiredList.map((emp) => {
+              filteredHiredList.map((emp) => {
                 const mood = emp.mood ?? 90;
                 const stress = emp.stress ?? 15;
+                const isShopper = emp.role === 'shopper';
 
                 return (
                   <div
                     key={emp.id}
-                    className="bg-white border-2 border-[#F2E8E5] rounded-2xl p-3.5 flex flex-col gap-3 hover:border-[#FFD6E5] transition-all shadow-sm"
+                    className={`bg-white border-2 rounded-2xl p-3 sm:p-3.5 flex flex-col gap-2.5 transition-all shadow-xs ${
+                      isShopper
+                        ? 'border-emerald-300 bg-gradient-to-b from-[#F0FDF4]/50 to-white'
+                        : 'border-[#FFCCD9] hover:border-[#FF8EA3]'
+                    }`}
                   >
-                    {/* Hàng 1: Avatar, Tên, Cấp bậc, Tính cách */}
+                    {/* Hàng 1: Avatar, Tên, Cấp bậc, Vai trò */}
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl bg-[#FFF1F6] p-2 rounded-2xl border border-[#FFD6E5]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-3xl bg-[#FFF5F8] p-2 rounded-2xl border-2 border-[#FFCCD9] shrink-0">
                           {emp.avatar}
                         </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="font-black text-sm text-[#7C5C55]">{emp.name}</h4>
-                            <span className="text-[10px] bg-[#FFD6E5] text-[#7C5C55] font-extrabold px-2 py-0.2 rounded-full uppercase">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-black text-sm text-[#5C3A33] truncate">{emp.name}</h4>
+                            <span
+                              className={`text-[9.5px] font-black px-2 py-0.2 rounded-full border ${
+                                isShopper
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : emp.role === 'cook'
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                  : emp.role === 'server'
+                                  ? 'bg-pink-100 text-pink-800 border-pink-300'
+                                  : 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                              }`}
+                            >
+                              {isShopper
+                                ? '🛵 Đi Chợ Sỉ'
+                                : emp.role === 'cook'
+                                ? '👨‍🍳 Đầu Bếp'
+                                : emp.role === 'server'
+                                ? '🏃 Phục Vụ'
+                                : '👩‍💼 Quản Lý'}
+                            </span>
+                            <span className="text-[9px] bg-slate-100 text-slate-600 font-extrabold px-1.5 py-0.2 rounded-full uppercase">
                               {emp.careerTier}
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#9C7C75] mt-0.5 font-medium">
+                          <p className="text-[10.5px] text-[#8C6258] mt-0.5 line-clamp-1">
                             {emp.personalityDesc}
                           </p>
-                          <div className="text-[11px] font-black text-[#F7A8C4] mt-0.5">
-                            Lương: {emp.salaryPerDay.toLocaleString('vi-VN')} đ / ngày · Tốc độ: {emp.speed}x
+                          <div className="text-[10.5px] font-black text-[#E91E63] mt-0.5 flex items-center gap-2">
+                            <span>Lương: {emp.salaryPerDay.toLocaleString('vi-VN')} đ/ngày</span>
+                            <span>·</span>
+                            <span>Tốc độ: {emp.speed}x</span>
+                            {isShopper && (
+                              <span className="text-emerald-700 font-black">
+                                · Giảm {emp.marketSkill || 75}% giá sỉ
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleFire(emp.id)}
-                        className="text-[10px] text-rose-400 hover:text-rose-600 font-bold p-1 hover:bg-rose-50 rounded-lg flex items-center gap-0.5 shrink-0"
+                        className="text-[10px] text-rose-500 hover:text-rose-700 font-bold p-1 hover:bg-rose-50 rounded-lg flex items-center gap-0.5 shrink-0 cursor-pointer"
                         title="Cho nghỉ việc"
                       >
                         <UserMinus className="w-3.5 h-3.5" />
@@ -178,10 +260,10 @@ export const EmployeesModal: React.FC = () => {
                     </div>
 
                     {/* Phân công trực quán / Chi nhánh */}
-                    <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-xl text-xs">
-                      <span className="font-extrabold text-[#7C5C55] flex items-center gap-1.5 text-[11px]">
-                        <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Phân công quán:</span>
+                    <div className="flex items-center justify-between bg-[#FFF9FA] border border-[#FFEBF0] px-3 py-1 rounded-xl text-xs">
+                      <span className="font-extrabold text-[#7C5046] flex items-center gap-1.5 text-[10.5px]">
+                        <Building2 className="w-3.5 h-3.5 text-pink-600" />
+                        <span>Trực quán:</span>
                       </span>
                       <select
                         value={emp.assignedRestaurantId || 'banh_mi'}
@@ -189,7 +271,7 @@ export const EmployeesModal: React.FC = () => {
                           soundManager.playClick();
                           assignEmployeeToRestaurant(emp.id, e.target.value as RestaurantTypeId);
                         }}
-                        className="bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-[11px] font-black text-amber-950 shadow-2xs outline-none cursor-pointer"
+                        className="bg-white border border-[#FFCCD9] rounded-lg px-2 py-0.5 text-[10.5px] font-black text-[#5C3A33] shadow-2xs outline-none cursor-pointer"
                       >
                         {(gameState.unlockedRestaurants || ['banh_mi']).map((rId) => {
                           const r = RESTAURANT_TYPES[rId];
@@ -203,9 +285,9 @@ export const EmployeesModal: React.FC = () => {
                     </div>
 
                     {/* Hàng 2: Thanh Tâm trạng (Mood) & Độ căng thẳng (Stress) */}
-                    <div className="grid grid-cols-2 gap-2 bg-[#FFF7ED]/60 p-2.5 rounded-xl border border-[#F7D7BA] text-[10px] font-bold text-[#7C5C55]">
+                    <div className="grid grid-cols-2 gap-2 bg-[#FFF5F8]/60 p-2 rounded-xl border border-[#FFCCD9] text-[9.5px] font-bold text-[#5C3A33]">
                       <div>
-                        <div className="flex justify-between mb-1">
+                        <div className="flex justify-between mb-0.5">
                           <span>💖 Tâm trạng:</span>
                           <span className="font-black">{mood}%</span>
                         </div>
@@ -218,8 +300,8 @@ export const EmployeesModal: React.FC = () => {
                       </div>
 
                       <div>
-                        <div className="flex justify-between mb-1">
-                          <span>⚡ Căng thẳng (Stress):</span>
+                        <div className="flex justify-between mb-0.5">
+                          <span>⚡ Căng thẳng:</span>
                           <span className={`font-black ${stress > 60 ? 'text-rose-600' : ''}`}>
                             {stress}%
                           </span>
@@ -235,19 +317,33 @@ export const EmployeesModal: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Hàng 3: Các nút hành động phát triển nhân sự */}
-                    <div className="flex items-center gap-2 pt-1 border-t border-[#F2E8E5] flex-wrap">
+                    {/* Hàng 3: Các nút hành động phát triển nhân sự + Nút đi chợ tức thì nếu là Shopper */}
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-[#FFEBF0] flex-wrap">
+                      {isShopper && (
+                        <button
+                          onClick={() => {
+                            soundManager.playClick();
+                            dispatchShopperRun(emp.id);
+                          }}
+                          className="flex-1 min-w-[120px] py-1.5 px-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-105 text-white rounded-xl text-[10px] font-black border border-emerald-400 flex items-center justify-center gap-1 active:scale-95 shadow-xs cursor-pointer"
+                          title="Lập tức đi chợ gom nguyên liệu còn thiếu về kho với giá chiết khấu"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5 fill-current" />
+                          <span>Đi Chợ Ngay 🛵</span>
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleTrain(emp.id)}
-                        className="flex-1 min-w-[100px] py-1.5 px-2 bg-[#FFF1F6] hover:bg-[#FFD6E5] text-[#7C5C55] rounded-xl text-[10px] font-black border border-[#F7A8C4] flex items-center justify-center gap-1 active:scale-95"
+                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-[#FFF5F8] hover:bg-[#FFE4EC] text-[#5C3A33] rounded-xl text-[10px] font-black border border-[#FFCCD9] flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                       >
-                        <GraduationCap className="w-3.5 h-3.5 text-[#F7A8C4]" />
+                        <GraduationCap className="w-3.5 h-3.5 text-[#FF6584]" />
                         <span>Đào Tạo (25k)</span>
                       </button>
 
                       <button
                         onClick={() => handlePromote(emp.id)}
-                        className="flex-1 min-w-[100px] py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-[10px] font-black border border-amber-300 flex items-center justify-center gap-1 active:scale-95"
+                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-[10px] font-black border border-amber-300 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                       >
                         <Award className="w-3.5 h-3.5 text-amber-600" />
                         <span>Thăng Chức</span>
@@ -255,58 +351,138 @@ export const EmployeesModal: React.FC = () => {
 
                       <button
                         onClick={() => handleBonus(emp.id)}
-                        className="flex-1 min-w-[100px] py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-black border border-emerald-300 flex items-center justify-center gap-1 active:scale-95"
+                        className="flex-1 min-w-[90px] py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-black border border-emerald-300 flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                       >
                         <Heart className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500" />
-                        <span>Thưởng Nóng (20k)</span>
+                        <span>Thưởng (20k)</span>
                       </button>
                     </div>
                   </div>
                 );
               })
             )
+          ) : filteredCandidateList.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#8C6258] bg-[#FFF9FA] rounded-2xl border-2 border-dashed border-[#FFCCD9]">
+              🎉 Đã tuyển hết ứng viên trong danh mục này!
+            </div>
           ) : (
-            candidateList.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#9C7C75] bg-[#FFF9F2] rounded-2xl border-2 border-dashed border-[#F7D7BA]">
-                🎉 Bạn đã tuyển mộ tất cả ứng viên tài năng hiện có!
-              </div>
-            ) : (
-              candidateList.map((cand) => (
+            <>
+              {isStaffCapReached && (
+                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 mb-1">
+                  <span className="text-base">⚠️</span>
+                  <span>
+                    Đã đạt giới hạn tối đa ({maxStaff} nhân sự) của cấp bậc [{currentStage.name}]. Hãy thăng tiến sự nghiệp để mở rộng quy mô tuyển dụng!
+                  </span>
+                </div>
+              )}
+              {filteredCandidateList.map((cand) => {
+                const hiringCost = cand.hiringCost || 0;
+                const canAfford = gameState.money >= hiringCost;
+                const canHire = canAfford && !isStaffCapReached;
+                const isShopper = cand.role === 'shopper';
+
+              return (
                 <div
                   key={cand.id}
-                  className="bg-white border-2 border-[#F2E8E5] rounded-2xl p-3.5 flex items-center justify-between gap-3 hover:border-[#FFD6E5] transition-all shadow-sm"
+                  className={`bg-white border-2 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all shadow-xs ${
+                    isShopper
+                      ? 'border-emerald-300 bg-gradient-to-br from-[#F0FDF4]/60 via-white to-[#FDF4FF]/30'
+                      : 'border-[#FFCCD9] hover:border-[#FF8EA3]'
+                  }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-3xl bg-[#FFF1F6] p-2 rounded-2xl border border-[#FFD6E5] shrink-0">
+                  <div className="flex items-start gap-3 min-w-0 w-full sm:w-auto">
+                    <span className="text-3xl bg-[#FFF5F8] p-2 rounded-2xl border-2 border-[#FFCCD9] shrink-0">
                       {cand.avatar}
                     </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="font-black text-sm text-[#7C5C55]">{cand.name}</h4>
-                        <span className="text-[10px] bg-[#FFD6E5] text-[#7C5C55] font-bold px-2 py-0.2 rounded-full">
-                          {cand.role === 'cook' ? 'Phụ Bếp' : cand.role === 'manager' ? 'Quản Lý' : 'Phục Vụ'}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-black text-sm text-[#5C3A33]">{cand.name}</h4>
+                        <span
+                          className={`text-[9.5px] font-black px-2 py-0.2 rounded-full border ${
+                            isShopper
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1'
+                              : cand.role === 'cook'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : cand.role === 'server'
+                              ? 'bg-pink-100 text-pink-800 border-pink-300'
+                              : 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                          }`}
+                        >
+                          {isShopper ? (
+                            <>
+                              <span>🛵 Đi Chợ Sỉ</span>
+                              <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
+                            </>
+                          ) : cand.role === 'cook' ? (
+                            '👨‍🍳 Đầu Bếp'
+                          ) : cand.role === 'server' ? (
+                            '🏃 Phục Vụ'
+                          ) : (
+                            '👩‍💼 Quản Lý'
+                          )}
                         </span>
+                        {isShopper && (
+                          <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300 font-black px-1.5 py-0.2 rounded-full">
+                            Tự Động Hoá ⚡
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-[#9C7C75] mt-0.5 truncate">{cand.personalityDesc}</p>
-                      <div className="text-[11px] font-black text-[#F7A8C4] mt-1">
-                        Lương đề xuất: {cand.salaryPerDay.toLocaleString('vi-VN')} đ / ngày
+
+                      <p className="text-[11px] text-[#8C6258] mt-0.5 line-clamp-2">
+                        {cand.description}
+                      </p>
+
+                      <div className="flex items-center gap-3 mt-1 text-[11px] font-black flex-wrap">
+                        <span className="text-[#E91E63]">
+                          Phí tuyển dụng: {hiringCost > 0 ? `${hiringCost.toLocaleString('vi-VN')} đ` : 'Miễn phí'}
+                        </span>
+                        <span className="text-[#8C6258]">·</span>
+                        <span className="text-[#8C6258]">
+                          Lương: {cand.salaryPerDay.toLocaleString('vi-VN')} đ/ngày
+                        </span>
+                        {isShopper && (
+                          <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md border border-emerald-200">
+                            Chiết khấu sỉ: -{cand.marketSkill || 75}%
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleHire(cand.id)}
-                    className="px-4 py-2 bg-[#F7A8C4] hover:bg-[#f28bb1] text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1 shrink-0 active:scale-95"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>Tuyển Dụng</span>
-                  </button>
+                    <div className="w-full sm:w-auto shrink-0 flex justify-end">
+                    <button
+                      onClick={() => handleHire(cand.id)}
+                      disabled={!canHire}
+                      className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer ${
+                        canHire
+                          ? isShopper
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-105 text-white border border-emerald-400'
+                            : 'bg-gradient-to-r from-[#FF6584] to-[#FFA07A] hover:brightness-105 text-white border border-white/60'
+                          : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
+                      }`}
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>
+                        {isStaffCapReached
+                          ? `Đạt Giới Hạn (${maxStaff} NV)`
+                          : canAfford
+                          ? hiringCost > 0
+                            ? `Tuyển Dụng (${hiringCost.toLocaleString('vi-VN')}đ)`
+                            : 'Tuyển Dụng (Free)'
+                          : `Thiếu ${(hiringCost - gameState.money).toLocaleString('vi-VN')}đ`}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              ))
-            )
+              );
+            })}
+          </>
           )}
         </div>
       </div>
     </div>
   );
 };
+
+export default EmployeesModal;
+

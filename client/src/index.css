@@ -78,6 +78,11 @@
   50% { transform: translateY(-4px); }
 }
 
+@keyframes bounceShort {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
 .animate-coin-pop {
   animation: coinPop 0.8s ease-out forwards;
 }
@@ -88,6 +93,10 @@
 
 .animate-bubble-wiggle {
   animation: bubbleWiggle 2s infinite ease-in-out;
+}
+
+.animate-bounce-short {
+  animation: bounceShort 1.6s infinite ease-in-out;
 }
 
 /* Custom rounded button style */

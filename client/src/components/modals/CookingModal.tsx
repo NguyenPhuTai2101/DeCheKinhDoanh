@@ -3,6 +3,8 @@ import { useGameStore } from '../../store/gameStore';
 import { RECIPES, INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { RecipeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
+import { getDishImage } from '../../utils/dishAssets';
+import { IngredientIcon } from '../common/IngredientIcon';
 import {
   X,
   BookOpen,
@@ -184,8 +186,16 @@ export const CookingModal: React.FC = () => {
                 {/* Dòng 1: Icon, Tên món, Giá bán & Lợi nhuận */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 border border-amber-200 flex items-center justify-center text-2xl shrink-0 shadow-inner">
-                      {r.icon}
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 border border-amber-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                      {getDishImage(r.id) ? (
+                        <img
+                          src={getDishImage(r.id)}
+                          alt={r.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl">{r.icon}</span>
+                      )}
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-black text-sm sm:text-base text-[#7C5C55] truncate">
@@ -248,7 +258,7 @@ export const CookingModal: React.FC = () => {
                               : 'bg-rose-50 text-rose-900 border-rose-300'
                           }`}
                         >
-                          <span>{ing?.icon || '📦'}</span>
+                          <IngredientIcon id={ingId} size={16} fallbackIcon={ing?.icon} />
                           <span>{ing?.name || ingId}</span>
                           <span
                             className={`text-[10px] font-extrabold px-1 py-0.2 rounded-md ml-0.5 ${

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { RESTAURANT_TYPES, RECIPES, getBranchTierInfo } from '../../../../shared/gameData';
+import { RESTAURANT_TYPES, RECIPES, getBranchTierInfo, BUSINESS_STAGES } from '../../../../shared/gameData';
 import { RestaurantTypeId } from '../../../../shared/types';
 import { soundManager } from '../../utils/soundManager';
 import confetti from 'canvas-confetti';
@@ -32,6 +32,9 @@ export const FranchiseModal: React.FC = () => {
   const unlockedList = gameState.unlockedRestaurants || ['banh_mi'];
   const restaurants = Object.values(RESTAURANT_TYPES);
   const branchLevels: Record<string, number> = gameState.branchLevels || {};
+  const currentStage = BUSINESS_STAGES[gameState.businessStage || 'cart'] || BUSINESS_STAGES.cart;
+  const maxRestaurants = currentStage.maxRestaurants ?? 1;
+  const isBranchCapReached = unlockedList.length >= maxRestaurants;
 
   const handleSwitch = (id: RestaurantTypeId) => {
     soundManager.playClick();
@@ -93,18 +96,18 @@ export const FranchiseModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Thống kê chuỗi chi nhánh */}
+        {/* Thống kê chuỗi chi nhánh & giới hạn theo sự nghiệp */}
         <div className="bg-amber-100/60 px-4 py-2 border-b border-amber-200 flex items-center justify-between text-xs shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <span className="font-extrabold text-amber-950 flex items-center gap-1">
-              <span>🏪 Đã mở:</span>
-              <span className="text-rose-600 font-black">
-                {unlockedList.length}/{restaurants.length} Thương hiệu
+              <span>🏪 Chi nhánh:</span>
+              <span className={isBranchCapReached ? "text-amber-900 font-black" : "text-emerald-700 font-black"}>
+                {unlockedList.length}/{maxRestaurants} Quán ({currentStage.name})
               </span>
             </span>
             <span className="text-amber-800 font-bold flex items-center gap-1">
               <span>👥 Nhân sự:</span>
-              <span className="text-emerald-700 font-black">{gameState.hiredEmployees.length} NV</span>
+              <span className="text-emerald-700 font-black">{gameState.hiredEmployees.length}/{currentStage.maxStaff ?? 2} NV</span>
             </span>
           </div>
 
@@ -124,7 +127,7 @@ export const FranchiseModal: React.FC = () => {
             const hasStaffReq = gameState.hiredEmployees.length >= staffReq;
             const canAffordMoney = gameState.money >= rest.unlockCost;
             const canAffordRep = gameState.reputation >= rest.requiredReputation;
-            const canUnlock = !isUnlocked && canAffordMoney && canAffordRep && hasStaffReq;
+            const canUnlock = !isUnlocked && canAffordMoney && canAffordRep && hasStaffReq && !isBranchCapReached;
 
             const branchStaff = gameState.hiredEmployees.filter(
               (id) => (gameState.employeeDetails[id]?.assignedRestaurantId || 'banh_mi') === rest.id
@@ -304,19 +307,29 @@ export const FranchiseModal: React.FC = () => {
 
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[9.5px] text-slate-500 italic">
-                        {canUnlock ? '✨ Bạn đã đủ điều kiện khai trương!' : '⏳ Cần tích lũy thêm vốn, uy tín và tuyển nhân sự'}
+                        {isBranchCapReached
+                          ? `🔒 Đạt giới hạn ${maxRestaurants} quán ở cấp ${currentStage.name}. Hãy thăng tiến sự nghiệp!`
+                          : canUnlock
+                          ? '✨ Bạn đã đủ điều kiện khai trương!'
+                          : '⏳ Cần tích lũy thêm vốn, uy tín và tuyển nhân sự'}
                       </span>
                       <button
                         onClick={() => handleUnlock(rest.id)}
                         disabled={!canUnlock}
                         className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow-xs transition-all ${
                           canUnlock
-                            ? 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white animate-bounce-short active:scale-95'
+                            ? 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white animate-bounce-short active:scale-95 cursor-pointer'
                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                         }`}
                       >
                         <Sparkles className="w-3 h-3" />
-                        <span>{canUnlock ? 'Mở Chi Nhánh 🚀' : 'Chưa Đủ Điều Kiện'}</span>
+                        <span>
+                          {isBranchCapReached
+                            ? 'Giới Hạn Cấp Bậc'
+                            : canUnlock
+                            ? 'Mở Chi Nhánh 🚀'
+                            : 'Chưa Đủ Điều Kiện'}
+                        </span>
                       </button>
                     </div>
                   </div>

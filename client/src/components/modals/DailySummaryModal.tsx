@@ -34,6 +34,13 @@ export const DailySummaryModal: React.FC = () => {
     }
   }, [netProfit]);
 
+  const weather = gameState.weather || 'sunny';
+  const weatherInfo = {
+    sunny: { icon: '☀️', name: 'Nắng Ráo', desc: 'Đồ uống mát lạnh được khách chuộng, tip tăng thêm +20%' },
+    rainy: { icon: '🌧️', name: 'Mưa Rào', desc: 'Khách ngồi lại chậm nhưng đơn ship mang đi tăng vọt!' },
+    breezy: { icon: '🍃', name: 'Gió Mát Lành', desc: 'Khách thoải mái, kiên nhẫn hơn và hào phóng thưởng tip +25%' },
+  }[weather];
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFD6E5] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh] animate-slide-up">
@@ -60,6 +67,22 @@ export const DailySummaryModal: React.FC = () => {
 
         {/* Nội dung thống kê */}
         <div className="p-6 flex flex-col gap-4">
+          {/* Thời tiết & Khí hậu hôm nay */}
+          <div className="bg-[#FFF5F8] p-3 rounded-2xl border border-[#FFCCD9] flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">{weatherInfo.icon}</span>
+              <div>
+                <div className="font-black text-[#5C3A33]">
+                  Khí hậu hôm nay: <span className="text-[#FF6584]">{weatherInfo.name}</span>
+                </div>
+                <div className="text-[10.5px] text-[#8C6258]">{weatherInfo.desc}</div>
+              </div>
+            </div>
+            <span className="px-2 py-1 bg-white rounded-xl text-[10px] font-black text-[#5C3A33] border border-[#FFD0DE] shadow-2xs shrink-0">
+              Đặc trưng
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {/* Doanh thu */}
             <div className="bg-[#FFF7ED] p-3.5 rounded-2xl border border-[#F7D7BA] flex flex-col">

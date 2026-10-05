@@ -1856,6 +1856,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'hardworking',
     personalityDesc: 'Chăm chỉ, cần mẫn, luôn hoàn thành nhiệm vụ trước thời hạn.',
     salaryPerDay: 45000,
+    hiringCost: 100000,
     speed: 1.25,
     cookingSkill: 40,
     serviceSkill: 85,
@@ -1875,6 +1876,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'friendly',
     personalityDesc: 'Thân thiện, tỉ mỉ, nấu ăn bằng cả trái tim và tình yêu ẩm thực.',
     salaryPerDay: 65000,
+    hiringCost: 250000,
     speed: 1.1,
     cookingSkill: 92,
     serviceSkill: 50,
@@ -1894,6 +1896,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'creative',
     personalityDesc: 'Sáng tạo, thích đổi mới công thức, giúp món ăn đậm vị hơn (+15% tiền tip).',
     salaryPerDay: 50000,
+    hiringCost: 150000,
     speed: 1.15,
     cookingSkill: 75,
     serviceSkill: 60,
@@ -1913,6 +1916,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'ambitious',
     personalityDesc: 'Cầu tiến, có óc tổ chức, giúp cả tiệm giảm 25% độ căng thẳng.',
     salaryPerDay: 75000,
+    hiringCost: 350000,
     speed: 1.3,
     cookingSkill: 65,
     serviceSkill: 90,
@@ -1932,6 +1936,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'extrovert',
     personalityDesc: 'Hoạt bát, vui vẻ, nụ cười tỏa nắng thu hút thêm 15% lượng khách.',
     salaryPerDay: 40000,
+    hiringCost: 120000,
     speed: 1.2,
     cookingSkill: 35,
     serviceSkill: 88,
@@ -1951,6 +1956,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'friendly',
     personalityDesc: 'Bếp trưởng món nước, ninh nước lèo thanh ngọt chuẩn vị truyền thống.',
     salaryPerDay: 60000,
+    hiringCost: 280000,
     speed: 1.2,
     cookingSkill: 95,
     serviceSkill: 55,
@@ -1970,6 +1976,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'hardworking',
     personalityDesc: 'Vua chảo gang & lò nướng than hồng, giữ nhiệt thịt chín mềm xèo xèo.',
     salaryPerDay: 62000,
+    hiringCost: 300000,
     speed: 1.25,
     cookingSkill: 90,
     serviceSkill: 50,
@@ -1978,7 +1985,7 @@ export const EMPLOYEES: Employee[] = [
     loyalty: 85,
     experience: 320,
     hired: false,
-    description: 'Bếp nướng & xào chảo điêu luyện (Bò né, Cơm tấm), tăng 10% giá trị món.',
+    description: 'Bếp nướng & xảo chảo điêu luyện (Bò né, Cơm tấm), tăng 10% giá trị món.',
   },
   {
     id: 'emp_ngoc',
@@ -1989,6 +1996,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'extrovert',
     personalityDesc: 'Bước chân thoăn thoắt, bưng 2 mâm một lúc không rơi một giọt nước dùng.',
     salaryPerDay: 42000,
+    hiringCost: 180000,
     speed: 1.35,
     cookingSkill: 40,
     serviceSkill: 90,
@@ -2008,6 +2016,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'ambitious',
     personalityDesc: 'Chuyên gia vận hành chuỗi F&B, tối ưu chi phí và bùng nổ doanh số chi nhánh.',
     salaryPerDay: 85000,
+    hiringCost: 500000,
     speed: 1.3,
     cookingSkill: 70,
     serviceSkill: 95,
@@ -2027,6 +2036,7 @@ export const EMPLOYEES: Employee[] = [
     personality: 'creative',
     personalityDesc: 'Thao tác cắt thái như múa dao, tốc độ ra món nhanh nhất xóm vỉa hè.',
     salaryPerDay: 52000,
+    hiringCost: 200000,
     speed: 1.4,
     cookingSkill: 80,
     serviceSkill: 45,
@@ -2036,6 +2046,70 @@ export const EMPLOYEES: Employee[] = [
     experience: 160,
     hired: false,
     description: 'Đầu bếp siêu tốc độ, nấu món cực nhanh giúp khách không phải chờ đợi.',
+  },
+  // --- CÁC NHÂN VIÊN ĐI CHỢ SỈ / TIẾP LIỆU (SHOPPERS) - GIÁ THUÊ MẮC, ĐẦU TƯ TỰ ĐỘNG HOÁ ---
+  {
+    id: 'emp_coba',
+    name: 'Cô Ba Đi Chợ',
+    role: 'shopper',
+    careerTier: 'junior',
+    avatar: '🛵',
+    personality: 'hardworking',
+    personalityDesc: 'Chạy chiếc xe Cub chở sọt mây, chuyên săn lùng nguyên liệu tươi ngon giá hời tại chợ sớm.',
+    salaryPerDay: 85000,
+    hiringCost: 1500000, // 1.500.000đ - Giá thuê cao cấp, mở khoá tự động hoá
+    speed: 1.3,
+    cookingSkill: 40,
+    serviceSkill: 75,
+    marketSkill: 75, // Giảm 10% giá sỉ
+    mood: 92,
+    stress: 12,
+    loyalty: 85,
+    experience: 200,
+    hired: false,
+    description: '🛵 Tự động chạy đi chợ mua bổ sung khi kho dưới 5 món. Tiết kiệm 10% tiền mua sỉ!',
+  },
+  {
+    id: 'emp_chubay',
+    name: 'Chú Bảy Đầu Mối',
+    role: 'shopper',
+    careerTier: 'senior',
+    avatar: '🚚',
+    personality: 'ambitious',
+    personalityDesc: 'Khét tiếng mối lái chợ đầu mối nông sản Bình Điền - Thủ Đức, nguồn hàng dồi dào bạt ngàn.',
+    salaryPerDay: 160000,
+    hiringCost: 5000000, // 5.000.000đ - Giá thuê cao cấp!
+    speed: 1.5,
+    cookingSkill: 50,
+    serviceSkill: 80,
+    marketSkill: 88, // Giảm 20% giá sỉ
+    mood: 90,
+    stress: 16,
+    loyalty: 88,
+    experience: 450,
+    hired: false,
+    description: '🚚 Tự động nhập hàng số lượng lớn với giá sỉ rẻ hơn 20%. Đảm bảo kho không bao giờ cạn!',
+  },
+  {
+    id: 'emp_bactam',
+    name: 'Bác Tám Kho Vận',
+    role: 'shopper',
+    careerTier: 'store_manager',
+    avatar: '🚛',
+    personality: 'creative',
+    personalityDesc: 'Vua vận tải lạnh chuỗi cung ứng thực phẩm, nhập thẳng tận nông trại hữu cơ chuẩn xuất khẩu.',
+    salaryPerDay: 300000,
+    hiringCost: 15000000, // 15.000.000đ - Cực kỳ đắt, đỉnh cao cung ứng tự động hoá!
+    speed: 1.75,
+    cookingSkill: 60,
+    serviceSkill: 90,
+    marketSkill: 98, // Giảm 30% giá sỉ
+    mood: 95,
+    stress: 10,
+    loyalty: 95,
+    experience: 800,
+    hired: false,
+    description: '🚛 Tự động kiểm kho & gom đầy 100% dung lượng kho với giá gốc giảm 30%! Phục vụ toàn chuỗi chi nhánh.',
   },
 ];
 
@@ -2157,7 +2231,9 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     customerRateMs: 5500,
     cost: 0,
     requiredReputation: 0,
-    description: 'Chỉ vỏn vẹn chiếc xe đẩy nhỏ nép bên vỉa hè, nhưng thơm nức mũi mùi pate bơ.',
+    maxRestaurants: 1, // Tối đa 1 quán khởi sự
+    maxStaff: 2, // Tối đa 2 nhân viên (Chủ + 1 phụ tá)
+    description: 'Chỉ vỏn vẹn chiếc xe đẩy nhỏ nép bên vỉa hè, bán 1 quán duy nhất và tự thân vận động.',
   },
   corner: {
     id: 'corner',
@@ -2166,9 +2242,11 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     icon: '🌳',
     maxTables: 3,
     customerRateMs: 4500,
-    cost: 150000,
-    requiredReputation: 25,
-    description: 'Khách ngồi râm mát dưới bóng cây, tán gẫu chuyện thế thái nhân tình.',
+    cost: 250000,
+    requiredReputation: 45,
+    maxRestaurants: 1, // Vẫn 1 quán nhưng mở rộng chỗ ngồi
+    maxStaff: 4, // Tối đa 4 nhân viên (Mở khóa tuyển nhân viên đi chợ)
+    description: 'Bàn ghế kê râm mát dưới bóng cây, mở rộng thêm bàn ăn và tuyển chuyên viên đi chợ sỉ.',
   },
   awning: {
     id: 'awning',
@@ -2177,9 +2255,11 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     icon: '🏮',
     maxTables: 4,
     customerRateMs: 3800,
-    cost: 350000,
-    requiredReputation: 60,
-    description: 'Có mái hiên di động che kín, đón lượng khách đông đúc giờ cao điểm.',
+    cost: 1500000,
+    requiredReputation: 120,
+    maxRestaurants: 2, // ⭐ CHÍNH THỨC MỞ KHÓA CHI NHÁNH THỨ 2!
+    maxStaff: 7, // Tối đa 7 nhân viên phục vụ 2 quán
+    description: 'Mái hiên di động che mưa nắng, thương hiệu uy tín chính thức được mở thêm Chi Nhánh thứ 2!',
   },
   eatery: {
     id: 'eatery',
@@ -2188,9 +2268,11 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     icon: '🏪',
     maxTables: 5,
     customerRateMs: 3000,
-    cost: 800000,
-    requiredReputation: 120,
-    description: 'Thương hiệu nức tiếng gần xa, ai ghé ngang qua cũng phải trầm trồ khen ngợi.',
+    cost: 6000000,
+    requiredReputation: 350,
+    maxRestaurants: 4, // ⭐ MỞ KHÓA CHI NHÁNH THỨ 3 & 4!
+    maxStaff: 12, // Tối đa 12 nhân viên
+    description: 'Mặt tiền phố lớn đông đúc, mở rộng lên đến 4 chi nhánh đa ngành ẩm thực.',
   },
   empire: {
     id: 'empire',
@@ -2199,9 +2281,11 @@ export const BUSINESS_STAGES: Record<string, import('./types').BusinessStage> = 
     icon: '👑',
     maxTables: 6,
     customerRateMs: 2400,
-    cost: 2000000,
-    requiredReputation: 250,
-    description: 'Đỉnh cao của sự nghiệp ẩm thực vỉa hè, doanh thu tiền triệu mỗi ngày!',
+    cost: 25000000,
+    requiredReputation: 850,
+    maxRestaurants: 5, // ⭐ MỞ TRỌN BỘ 5 CHI NHÁNH TOÀN NĂNG!
+    maxStaff: 20, // Tối đa 20 nhân viên
+    description: 'Đỉnh cao đế chế ẩm thực quốc dân! Mở trọn vẹn cả 5 chuỗi thương hiệu khắp thành phố.',
   },
 };
 
@@ -2685,6 +2769,28 @@ export const STREET_EVENTS: import('./types').StreetEvent[] = [
   },
 ];
 
+/**
+ * Trả về danh sách kho khởi nghiệp (10 đơn vị mỗi loại) CHỈ gồm các nguyên liệu của thương hiệu quán đó
+ */
+export function getStarterInventoryForRestaurant(restaurantId: RestaurantTypeId): Partial<Record<IngredientId, number>> {
+  const rest = RESTAURANT_TYPES[restaurantId];
+  const inv: Partial<Record<IngredientId, number>> = {};
+  if (!rest) return inv;
+
+  for (const ingId of rest.allowedIngredientIds) {
+    inv[ingId] = 10;
+  }
+  return inv;
+}
+
+/**
+ * Trả về danh sách công thức ban đầu của quán
+ */
+export function getStarterRecipesForRestaurant(restaurantId: RestaurantTypeId): RecipeId[] {
+  const rest = RESTAURANT_TYPES[restaurantId];
+  return rest ? [...rest.primaryRecipeIds] : ['banh_mi_trung', 'banh_mi_thit', 'cafe_sua', 'tra_dao'];
+}
+
 export const INITIAL_GAME_STATE: GameSaveState = {
   version: '0.4.0',
   playerId: 'player_default',
@@ -2711,26 +2817,20 @@ export const INITIAL_GAME_STATE: GameSaveState = {
     milk: 10,
     condensed_milk: 10,
     coffee: 10,
-    // Phở
-    pho_noodle: 10,
-    beef: 10,
-    beef_broth: 10,
-    quay: 10,
-    spring_onion: 10,
-    // Bún
-    bun_noodle: 10,
-    crab_paste: 10,
-    bun_broth: 10,
-    tofu: 10,
-    tomato: 10,
-    // Bò Né / Beefsteak
-    butter: 10,
-    potato: 10,
-    pepper_sauce: 10,
-    // Cơm Tấm
-    broken_rice: 10,
-    pork_rib: 10,
-    scallion_oil: 10,
+  },
+  restaurantInventories: {
+    banh_mi: {
+      bread: 10,
+      egg: 10,
+      pork: 10,
+      cucumber: 10,
+      pate: 10,
+      herb: 10,
+      tea: 10,
+      milk: 10,
+      condensed_milk: 10,
+      coffee: 10,
+    },
   },
   unlockedRecipes: [
     'banh_mi_trung',
@@ -2740,15 +2840,6 @@ export const INITIAL_GAME_STATE: GameSaveState = {
     'tra_sua',
     'cafe_sua',
     'tra_dao',
-    'pho_tai',
-    'pho_nam',
-    'pho_dac_biet',
-    'bun_bo_hue',
-    'bun_rieu_cua',
-    'bo_ne_op_la',
-    'beefsteak_sot_tieu',
-    'com_tam_suon',
-    'com_tam_suon_bi_cha',
   ],
   purchasedUpgrades: {},
   hiredEmployees: [],
@@ -2819,6 +2910,8 @@ export const INITIAL_GAME_STATE: GameSaveState = {
     com_tam: 1,
   },
   hasChosenStarter: false,
+  weather: 'sunny',
+  marketSpecial: null,
 };
 
 

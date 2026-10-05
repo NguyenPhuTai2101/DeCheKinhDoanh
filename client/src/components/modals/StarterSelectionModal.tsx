@@ -22,6 +22,7 @@ export const StarterSelectionModal: React.FC = () => {
       colors: ['#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#8B5CF6'],
     });
     chooseStarterRestaurant(selectedId);
+    closeModal();
   };
 
   return (

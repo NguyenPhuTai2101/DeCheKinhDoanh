@@ -15,7 +15,9 @@ import {
   DeliveryOrder,
   ActiveOrder,
   RestaurantTypeId,
+  SurpriseIncident,
 } from '../../../shared/types';
+import { getRandomSurpriseIncident } from '../../../shared/simulationConfig';
 import {
   INITIAL_GAME_STATE,
   INGREDIENTS,
@@ -36,6 +38,8 @@ import {
   getStageUpgradeTierInfo,
   calculateStorageCapacity,
   calculateMaxTables,
+  getStarterInventoryForRestaurant,
+  getStarterRecipesForRestaurant,
 } from '../../../shared/gameData';
 
 const LOCAL_STORAGE_KEY = 'cozy_empire_save_v4';
@@ -116,12 +120,17 @@ export interface GameStoreState {
   employeeActionStatus: Record<string, string>;
   showFlashScreen: boolean;
 
+  // V0.6: Biến cố bất ngờ đời thực (Surprise Incident Pop-up)
+  activeIncident: SurpriseIncident | null;
+  hasIncidentTriggeredToday: boolean;
+
   // Actions cơ bản
   setShowFlashScreen: (show: boolean) => void;
   setEmployeeActionStatus: (status: Record<string, string>) => void;
   setCurrentView: (view: 'shop' | 'street') => void;
   setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
   serveDishOrder: (orderId: string) => boolean;
+  collectPayment: (orderId: string) => boolean;
   setShopOpen: (open: boolean) => void;
   setTimeSpeed: (speed: number) => void;
   openModal: (modal: ModalType) => void;
@@ -147,6 +156,7 @@ export interface GameStoreState {
   giveBonusEmployee: (employeeId: string, amount: number) => boolean;
   assignEmployeeToRestaurant: (employeeId: string, restaurantId: RestaurantTypeId) => void;
   addBranchRevenue: (restaurantId: RestaurantTypeId, amount: number, dishName: string) => void;
+  dispatchShopperRun: (employeeId?: string) => boolean;
   
   // V0.3: Trang trí & Themes
   updateShopName: (name: string) => void;
@@ -166,6 +176,10 @@ export interface GameStoreState {
   resolveStreetEventChoice: (choiceIndex: number) => void;
   closeStreetEventOutcome: () => void;
   upgradeBusinessStage: () => boolean;
+
+  // V0.6: Xử lý biến cố bất ngờ đời thực (Surprise Incident Pop-up)
+  triggerSurpriseIncident: (incident?: SurpriseIncident) => void;
+  resolveSurpriseIncident: () => void;
 
   // V0.4: Giao hàng mang đi & Hàng xóm ghé bàn
   spawnDeliveryOrder: () => void;
@@ -217,6 +231,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   activeOrders: [],
   employeeActionStatus: {},
   showFlashScreen: true,
+  activeIncident: null,
+  hasIncidentTriggeredToday: false,
 
   setShowFlashScreen: (show) => set({ showFlashScreen: show }),
 
@@ -259,18 +275,45 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       get().serveNeighborGuest(order.neighborId);
     }
 
+    if (order.customTag) {
+      // Khách gọi món có yêu cầu riêng hài lòng tip thêm
+      tip += Math.round(recipe.basePrice * 0.15 * Math.max(0.5, patiencePercent));
+    }
+
+    const eatDuration = 10; // 10 giây ngồi ăn uống thưởng thức tại bàn
+
     set((state) => ({
       activeOrders: state.activeOrders.map((o) =>
-        o.id === orderId ? { ...o, state: 'eating' } : o
+        o.id === orderId
+          ? {
+              ...o,
+              state: 'eating',
+              eatingTimer: eatDuration,
+              maxEatingTimer: eatDuration,
+              calculatedTip: tip,
+            }
+          : o
       ),
     }));
 
-    setTimeout(() => {
-      get().finishServing(order.tableIndex, recipe.basePrice, tip);
-      set((state) => ({
-        activeOrders: state.activeOrders.filter((o) => o.id !== orderId),
-      }));
-    }, 1800);
+    get().showToast(`😋 Khách Bàn ${order.tableIndex} đang ăn ${recipe.name}${order.customTag ? ` [${order.customTag}]` : ''}!`);
+    return true;
+  },
+
+  collectPayment: (orderId) => {
+    const { activeOrders } = get();
+    const order = activeOrders.find((o) => o.id === orderId);
+    if (!order) return false;
+
+    const recipe = RECIPES[order.recipeId];
+    if (!recipe) return false;
+
+    const tip = order.calculatedTip ?? 0;
+    get().finishServing(order.tableIndex, recipe.basePrice, tip);
+
+    set((state) => ({
+      activeOrders: state.activeOrders.filter((o) => o.id !== orderId),
+    }));
 
     return true;
   },
@@ -388,14 +431,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       updatedInventory[ingId] = (updatedInventory[ingId] || 0) + qty;
     }
 
-    set((state) => ({
-      dailyCost: state.dailyCost + totalCost,
-      gameState: {
-        ...state.gameState,
-        money: state.gameState.money - totalCost,
-        inventory: updatedInventory,
-      },
-    }));
+    set((state) => {
+      const activeRestId = state.gameState.activeRestaurantId || 'banh_mi';
+      return {
+        dailyCost: state.dailyCost + totalCost,
+        gameState: {
+          ...state.gameState,
+          money: state.gameState.money - totalCost,
+          inventory: updatedInventory,
+          restaurantInventories: {
+            ...(state.gameState.restaurantInventories || {}),
+            [activeRestId]: updatedInventory,
+          },
+        },
+      };
+    });
 
     get().showToast(`✅ Đã mua nguyên liệu (-${totalCost.toLocaleString('vi-VN')} đ)`);
     get().saveLocal();
@@ -418,16 +468,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     const newInventory = { ...gameState.inventory };
     for (const ingId of recipe.requiredIngredients) {
-      newInventory[ingId] -= 1;
+      newInventory[ingId] = Math.max(0, (newInventory[ingId] || 0) - 1);
     }
 
     const newExp = gameState.player.cookingExp + recipe.expGain;
     const newLevel = Math.floor(newExp / 100) + 1;
+    const activeRestId = gameState.activeRestaurantId || 'banh_mi';
 
     set({
       gameState: {
         ...gameState,
         inventory: newInventory,
+        restaurantInventories: {
+          ...(gameState.restaurantInventories || {}),
+          [activeRestId]: newInventory,
+        },
         player: {
           ...gameState.player,
           cookingExp: newExp,
@@ -531,6 +586,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return false;
     }
 
+    const currentStage = BUSINESS_STAGES[gameState.businessStage || 'cart'];
+    const maxStaff = currentStage?.maxStaff ?? 2;
+    if (gameState.hiredEmployees.length >= maxStaff) {
+      get().showToast(`⚠️ Cấp bậc [${currentStage?.name || 'Hiện tại'}] chỉ cho phép quản lý tối đa ${maxStaff} nhân viên! Hãy thăng tiến sự nghiệp để mở rộng đội ngũ.`);
+      return false;
+    }
+
+    const cost = defaultEmp.hiringCost || 0;
+    if (gameState.money < cost) {
+      get().showToast(`❌ Không đủ tiền! Cần ${cost.toLocaleString('vi-VN')}đ để ký hợp đồng tuyển dụng ${defaultEmp.name}!`);
+      return false;
+    }
+
     const empDetail: Employee = {
       ...defaultEmp,
       hired: true,
@@ -543,6 +611,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({
       gameState: {
         ...gameState,
+        money: gameState.money - cost,
         hiredEmployees: [...gameState.hiredEmployees, employeeId],
         employeeDetails: {
           ...gameState.employeeDetails,
@@ -551,7 +620,96 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       },
     });
 
-    get().showToast(`👩‍🍳 Đã chào đón ${defaultEmp.name} gia nhập tiệm!`);
+    if (cost > 0) {
+      get().showToast(`🎉 Đã ký hợp đồng với ${defaultEmp.name}! (-${cost.toLocaleString('vi-VN')}đ)`);
+    } else {
+      get().showToast(`👩‍🍳 Đã chào đón ${defaultEmp.name} gia nhập tiệm!`);
+    }
+    get().saveLocal();
+    return true;
+  },
+
+  // V0.6: Lệnh cho nhân viên đi chợ chạy mua hàng ngay lập tức
+  dispatchShopperRun: (employeeId) => {
+    const { gameState } = get();
+    const hiredShoppers = gameState.hiredEmployees
+      .map((id) => gameState.employeeDetails[id] || EMPLOYEES.find((e) => e.id === id))
+      .filter((e) => e?.role === 'shopper') as Employee[];
+
+    if (hiredShoppers.length === 0) {
+      get().showToast('⚠️ Bạn chưa tuyển nhân viên đi chợ! Hãy vào Quản Lý Nhân Sự để tuyển Cô Ba hoặc Chú Bảy.');
+      return false;
+    }
+
+    const shopper = (employeeId ? hiredShoppers.find((e) => e.id === employeeId) : hiredShoppers[0]) || hiredShoppers[0];
+    const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+    const currentRest = RESTAURANT_TYPES[currentRestId];
+    const neededIngs = currentRest?.allowedIngredientIds || [];
+
+    const simStageId = gameState.businessStage || 'cart';
+    const simStageUpgrades = gameState.stageUpgrades?.[simStageId] || gameState.purchasedUpgrades || {};
+    const capacity = calculateStorageCapacity(simStageId, simStageUpgrades);
+    const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
+    const freeSpace = capacity - currentStock;
+
+    if (freeSpace <= 0) {
+      get().showToast(`📦 Kho hàng đã đầy (${currentStock}/${capacity})! Hãy nâng cấp sức chứa kho.`);
+      return false;
+    }
+
+    // Tỉ lệ giảm giá theo kỹ năng mặc cả của người đi chợ (10% - 30%)
+    const discountRate = Math.min(0.35, ((shopper.marketSkill || 75) - 50) * 0.006 + 0.1);
+    const itemsToBuy: Record<string, number> = {};
+    let totalItems = 0;
+    let rawTotalCost = 0;
+
+    // Ưu tiên mua các nguyên liệu có số lượng tồn kho thấp nhất
+    const sortedIngs = [...neededIngs].sort(
+      (a, b) => (gameState.inventory[a] || 0) - (gameState.inventory[b] || 0)
+    );
+
+    const perItemTarget = Math.max(10, Math.floor(freeSpace / Math.max(1, sortedIngs.length)));
+
+    for (const ingId of sortedIngs) {
+      if (totalItems >= freeSpace) break;
+      const ing = INGREDIENTS[ingId];
+      if (!ing) continue;
+      const buyQty = Math.min(perItemTarget, freeSpace - totalItems);
+      if (buyQty > 0) {
+        itemsToBuy[ingId] = buyQty;
+        totalItems += buyQty;
+        rawTotalCost += ing.cost * buyQty;
+      }
+    }
+
+    if (totalItems === 0) {
+      get().showToast('📦 Kho hàng đã dồi dào, chưa cần tiếp tế!');
+      return false;
+    }
+
+    const finalCost = Math.round(rawTotalCost * (1 - discountRate));
+    if (gameState.money < finalCost) {
+      get().showToast(`❌ Không đủ tiền! Chuyến đi chợ này cần ${finalCost.toLocaleString('vi-VN')}đ.`);
+      return false;
+    }
+
+    const updatedInventory = { ...gameState.inventory };
+    for (const [id, qty] of Object.entries(itemsToBuy)) {
+      const k = id as IngredientId;
+      updatedInventory[k] = (updatedInventory[k] || 0) + qty;
+    }
+
+    set({
+      gameState: {
+        ...gameState,
+        money: gameState.money - finalCost,
+        inventory: updatedInventory,
+      },
+    });
+
+    get().showToast(
+      `🛵 ${shopper.name} đã đi chợ gom +${totalItems} nguyên liệu về kho! (-${finalCost.toLocaleString('vi-VN')}đ, tiết kiệm ${Math.round(discountRate * 100)}%)`
+    );
     get().saveLocal();
     return true;
   },
@@ -1194,7 +1352,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     // Trừ nguyên liệu
     const newInventory = { ...gameState.inventory };
     for (const ingId of recipe.requiredIngredients) {
-      newInventory[ingId] -= order.quantity;
+      newInventory[ingId] = Math.max(0, (newInventory[ingId] || 0) - order.quantity);
     }
 
     const totalEarned = order.rewardMoney + order.rewardTip;
@@ -1311,6 +1469,52 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ lastEventOutcome: null, activeModal: null });
   },
 
+  triggerSurpriseIncident: (incident) => {
+    const chosen = incident || getRandomSurpriseIncident();
+    set({ activeIncident: chosen, hasIncidentTriggeredToday: true });
+  },
+
+  resolveSurpriseIncident: () => {
+    const { activeIncident, gameState } = get();
+    if (!activeIncident) return;
+
+    const moneyDiff = activeIncident.moneyChange;
+    const repDiff = activeIncident.reputationChange;
+
+    const newMoney = Math.max(0, gameState.money + moneyDiff);
+    const newReputation = Math.max(0, Math.min(100, (gameState.reputation || 50) + repDiff * 4));
+
+    set((state) => ({
+      activeIncident: null,
+      dailyRevenue: moneyDiff > 0 ? state.dailyRevenue + moneyDiff : state.dailyRevenue,
+      dailyCost: moneyDiff < 0 ? state.dailyCost + Math.abs(moneyDiff) : state.dailyCost,
+      gameState: {
+        ...state.gameState,
+        money: newMoney,
+        reputation: newReputation,
+      },
+    }));
+
+    const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 : 200;
+    const centerY = typeof window !== 'undefined' ? window.innerHeight / 2 : 300;
+
+    if (moneyDiff > 0) {
+      get().addFloatingFeedback(`+${moneyDiff.toLocaleString('vi-VN')} đ`, 'money', centerX, centerY - 30);
+      get().showToast(`🎉 Đã nhận +${moneyDiff.toLocaleString('vi-VN')} đ vào két sắt quán!`);
+    } else if (moneyDiff < 0) {
+      get().addFloatingFeedback(`${moneyDiff.toLocaleString('vi-VN')} đ`, 'warning', centerX, centerY - 30);
+      get().showToast(`⚠️ Đã trừ ${moneyDiff.toLocaleString('vi-VN')} đ chi phí sự cố!`);
+    }
+
+    if (repDiff > 0) {
+      get().addFloatingFeedback(`+${repDiff} ⭐`, 'star', centerX + 30, centerY);
+    } else if (repDiff < 0) {
+      get().addFloatingFeedback(`${repDiff} ⭐`, 'warning', centerX + 30, centerY);
+    }
+
+    get().saveLocal();
+  },
+
   upgradeBusinessStage: () => {
     const { gameState } = get();
     const stageOrder: BusinessStageId[] = ['cart', 'corner', 'awning', 'eatery', 'empire'];
@@ -1364,11 +1568,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const restaurant = RESTAURANT_TYPES[restaurantId];
     if (!restaurant) return;
 
+    const starterInventory = getStarterInventoryForRestaurant(restaurantId);
+    const starterRecipes = getStarterRecipesForRestaurant(restaurantId);
+
     set((state) => {
       const currentUnlocked = state.gameState.unlockedRestaurants || [];
       const updatedUnlocked = currentUnlocked.includes(restaurantId)
         ? currentUnlocked
         : [...currentUnlocked, restaurantId];
+
+      const updatedRestaurantInventories = {
+        ...(state.gameState.restaurantInventories || {}),
+        [restaurantId]: starterInventory,
+      };
 
       return {
         showFlashScreen: false,
@@ -1378,6 +1590,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           unlockedRestaurants: updatedUnlocked,
           hasChosenStarter: true,
           shopName: restaurant.name,
+          inventory: starterInventory,
+          restaurantInventories: updatedRestaurantInventories,
+          unlockedRecipes: starterRecipes,
         },
         activeOrders: [],
       };
@@ -1391,14 +1606,39 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const { gameState } = get();
     if (!restaurant || !gameState.unlockedRestaurants?.includes(restaurantId)) return;
 
-    set((state) => ({
-      gameState: {
-        ...state.gameState,
-        activeRestaurantId: restaurantId,
-        shopName: restaurant.name,
-      },
-      activeOrders: [], // Xóa bàn chờ cũ để khách mới kéo vào gọi món của quán mới
-    }));
+    const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+
+    set((state) => {
+      // 1. Lưu kho của quán đang kích hoạt
+      const updatedRestaurantInventories = {
+        ...(state.gameState.restaurantInventories || {}),
+        [currentRestId]: { ...state.gameState.inventory },
+      };
+
+      // 2. Lấy kho riêng của quán được chuyển tới
+      const targetInventory =
+        updatedRestaurantInventories[restaurantId] ||
+        getStarterInventoryForRestaurant(restaurantId);
+      updatedRestaurantInventories[restaurantId] = targetInventory;
+
+      // 3. Mở khóa thêm các công thức cơ bản của quán này nếu chưa có
+      const starterRecipes = getStarterRecipesForRestaurant(restaurantId);
+      const updatedUnlockedRecipes = Array.from(
+        new Set([...state.gameState.unlockedRecipes, ...starterRecipes])
+      );
+
+      return {
+        gameState: {
+          ...state.gameState,
+          activeRestaurantId: restaurantId,
+          shopName: restaurant.name,
+          inventory: targetInventory,
+          restaurantInventories: updatedRestaurantInventories,
+          unlockedRecipes: updatedUnlockedRecipes,
+        },
+        activeOrders: [], // Xóa bàn chờ cũ để khách mới kéo vào gọi món của quán mới
+      };
+    });
     get().saveLocal();
     get().showToast(`Đã chuyển tới quản lý: ${restaurant.name} ${restaurant.icon}`);
   },
@@ -1429,6 +1669,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     const currentUnlocked = gameState.unlockedRestaurants || ['banh_mi'];
+    const currentStage = BUSINESS_STAGES[gameState.businessStage || 'cart'];
+    const maxBranches = currentStage?.maxRestaurants ?? 1;
+
+    if (currentUnlocked.length >= maxBranches) {
+      get().showToast(`⚠️ Cấp bậc [${currentStage?.name || 'Hiện tại'}] chỉ cho phép vận hành tối đa ${maxBranches} quán! Nâng cấp sự nghiệp kinh doanh để mở thêm chi nhánh.`);
+      return false;
+    }
+
     const currentBranchLevels = gameState.branchLevels || {
       banh_mi: 1,
       pho: 1,
@@ -1437,20 +1685,39 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       com_tam: 1,
     };
 
-    set((state) => ({
-      gameState: {
-        ...state.gameState,
-        money: state.gameState.money - restaurant.unlockCost,
-        unlockedRestaurants: [...currentUnlocked, restaurantId],
-        branchLevels: {
-          ...currentBranchLevels,
-          [restaurantId]: 1,
+    const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+    const branchStarterInv = getStarterInventoryForRestaurant(restaurantId);
+    const starterRecipes = getStarterRecipesForRestaurant(restaurantId);
+
+    set((state) => {
+      const updatedRestaurantInventories = {
+        ...(state.gameState.restaurantInventories || {}),
+        [currentRestId]: { ...state.gameState.inventory },
+        [restaurantId]: branchStarterInv,
+      };
+
+      const updatedUnlockedRecipes = Array.from(
+        new Set([...state.gameState.unlockedRecipes, ...starterRecipes])
+      );
+
+      return {
+        gameState: {
+          ...state.gameState,
+          money: state.gameState.money - restaurant.unlockCost,
+          unlockedRestaurants: [...currentUnlocked, restaurantId],
+          branchLevels: {
+            ...currentBranchLevels,
+            [restaurantId]: 1,
+          },
+          activeRestaurantId: restaurantId,
+          shopName: restaurant.name,
+          inventory: branchStarterInv,
+          restaurantInventories: updatedRestaurantInventories,
+          unlockedRecipes: updatedUnlockedRecipes,
         },
-        activeRestaurantId: restaurantId,
-        shopName: restaurant.name,
-      },
-      activeOrders: [],
-    }));
+        activeOrders: [],
+      };
+    });
 
     get().saveLocal();
     get().showToast(`Tưng bừng khai trương chi nhánh mới: ${restaurant.name}! 🎊`);
@@ -1568,6 +1835,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       reputationChange: dailyCustomersServed - dailyCustomersLost * 2,
     };
 
+    // Chu kỳ thời tiết ngẫu nhiên: Nắng (50%), Mưa (30%), Gió mát (20%)
+    const weatherRoll = Math.random();
+    const nextWeather: 'sunny' | 'rainy' | 'breezy' =
+      weatherRoll < 0.5 ? 'sunny' : weatherRoll < 0.8 ? 'rainy' : 'breezy';
+
+    // Sự kiện đặc biệt chợ đầu mối giảm giá mỗi ngày
+    const marketSpecialCandidates: { ingredientId: IngredientId; discountPercent: number; newsText: string }[] = [
+      { ingredientId: 'egg', discountPercent: 30, newsText: 'Trang trại xả kho trứng gà tươi sạch loại 1 (-30%)' },
+      { ingredientId: 'bread', discountPercent: 25, newsText: 'Lò bánh mì đầu ngõ trợ giá sáng sớm (-25%)' },
+      { ingredientId: 'pork', discountPercent: 20, newsText: 'Chợ đầu mối thịt heo tươi ngon mở bán trợ giá (-20%)' },
+      { ingredientId: 'beef', discountPercent: 35, newsText: 'Nông trại bắp bò Úc nhập khẩu khuyến mãi sâu (-35%)' },
+      { ingredientId: 'pho_noodle', discountPercent: 30, newsText: 'Làng nghề bánh phở tươi tráng nóng xả kho (-30%)' },
+      { ingredientId: 'tea', discountPercent: 30, newsText: 'Đồi chè Bảo Lộc thu hoạch rộ chè tươi (-30%)' },
+      { ingredientId: 'coffee', discountPercent: 25, newsText: 'Đại lý hạt Robusta Ban Mê xả hàng niên vụ mới (-25%)' },
+      { ingredientId: 'cucumber', discountPercent: 40, newsText: 'Vựa rau củ sạch Đà Lạt xả kho dưa leo (-40%)' },
+      { ingredientId: 'broken_rice', discountPercent: 25, newsText: 'Vựa gạo miền Tây chuyển hàng gạo tấm thơm (-25%)' },
+      { ingredientId: 'butter', discountPercent: 30, newsText: 'Bơ lạt thơm béo nhập khẩu trợ giá làm bò né (-30%)' },
+    ];
+    const pickedSpecial = marketSpecialCandidates[Math.floor(Math.random() * marketSpecialCandidates.length)];
+
     const nextDayState: GameSaveState = {
       ...gameState,
       day: gameState.day + 1,
@@ -1577,6 +1864,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         ...gameState.player,
         energy: gameState.player.maxEnergy, // Hồi phục 100% năng lượng
       },
+      weather: nextWeather,
+      marketSpecial: pickedSpecial,
       employeeDetails: updatedEmployees,
       historySummaries: [summary, ...gameState.historySummaries],
       currentEvent: null,
@@ -1588,6 +1877,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       isShopOpen: false,
       isDailySummaryShown: false,
       hasEventTriggeredToday: false,
+      hasIncidentTriggeredToday: false,
       dailyEventsCount: 0,
       lastEventTimeMinutes: 0,
       lastEventOutcome: null,
@@ -1599,7 +1889,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCustomersLost: 0,
     });
 
-    get().showToast(`☀️ Chào buổi sáng Ngày ${nextDayState.day}! Đã trả lương nhân viên (-${totalSalaries.toLocaleString('vi-VN')} đ).`);
+    const weatherEmoji = nextWeather === 'sunny' ? '☀️' : nextWeather === 'rainy' ? '🌧️' : '🍃';
+    get().showToast(`${weatherEmoji} Chào buổi sáng Ngày ${nextDayState.day}! Đã trả lương (-${totalSalaries.toLocaleString('vi-VN')} đ). ${pickedSpecial.newsText}`);
     get().saveLocal();
     get().syncCloud();
   },
@@ -1621,44 +1912,88 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const local = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local) as GameSaveState;
-            const stg = parsed.businessStage || 'cart';
-            const loadedStageUpgrades = parsed.stageUpgrades || {
-              cart: parsed.purchasedUpgrades || {},
-              corner: {},
-              awning: {},
-              eatery: {},
-              empire: {},
-            };
-            const currentStageUpgrades = loadedStageUpgrades[stg] || {};
-            const correctCapacity = Math.max(
-              parsed.storageCapacity || 100,
-              calculateStorageCapacity(stg, currentStageUpgrades)
-            );
+        const stg = parsed.businessStage || 'cart';
+        const loadedStageUpgrades = parsed.stageUpgrades || {
+          cart: parsed.purchasedUpgrades || {},
+          corner: {},
+          awning: {},
+          eatery: {},
+          empire: {},
+        };
+        const currentStageUpgrades = loadedStageUpgrades[stg] || {};
+        const correctCapacity = Math.max(
+          parsed.storageCapacity || 100,
+          calculateStorageCapacity(stg, currentStageUpgrades)
+        );
 
-            set({
-              gameState: {
-                ...INITIAL_GAME_STATE,
-                ...parsed,
-                businessStage: stg,
-                stageUpgrades: loadedStageUpgrades,
-                storageCapacity: correctCapacity,
-                ownedThemes: parsed.ownedThemes || ['sakura_pink'],
-                ownedDecorations: parsed.ownedDecorations || [],
-                equippedDecorations: parsed.equippedDecorations || [],
-                employeeDetails: parsed.employeeDetails || {},
-                shopName: parsed.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
-                neighbors: {
-                  ...INITIAL_GAME_STATE.neighbors,
-                  ...(parsed.neighbors || {}),
-                },
-                lotteryHistory: parsed.lotteryHistory || [],
-                activeLotteryTicket: parsed.activeLotteryTicket || null,
-                activeRestaurantId: parsed.activeRestaurantId || 'banh_mi',
-                unlockedRestaurants: parsed.unlockedRestaurants || ['banh_mi'],
-                hasChosenStarter: parsed.hasChosenStarter ?? false,
-              },
-            });
+        const activeRestId = parsed.activeRestaurantId || 'banh_mi';
+        const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
+
+        // Phân tách & làm sạch kho riêng cho từng thương hiệu quán
+        let restInvs = parsed.restaurantInventories || {};
+        let currentInv = { ...(parsed.inventory || {}) };
+
+        // Kiểm tra xem kho hiện tại có lẫn nguyên liệu của quán khác không
+        const foreignIngs = Object.keys(currentInv).filter(
+          (id) => !currentRest.allowedIngredientIds.includes(id as IngredientId)
+        );
+
+        if (foreignIngs.length > 0 || !restInvs[activeRestId]) {
+          const cleanCurrentInv: Partial<Record<IngredientId, number>> = {};
+          for (const id of currentRest.allowedIngredientIds) {
+            cleanCurrentInv[id] = currentInv[id] ?? 10;
           }
+
+          const updatedRestInvs: Partial<Record<RestaurantTypeId, Partial<Record<IngredientId, number>>>> = {
+            ...restInvs,
+            [activeRestId]: cleanCurrentInv,
+          };
+
+          const unlocked = parsed.unlockedRestaurants || [activeRestId];
+          for (const rId of unlocked) {
+            if (!updatedRestInvs[rId]) {
+              updatedRestInvs[rId] = getStarterInventoryForRestaurant(rId);
+            }
+          }
+
+          currentInv = cleanCurrentInv;
+          restInvs = updatedRestInvs;
+        }
+
+        const starterRecipes = getStarterRecipesForRestaurant(activeRestId);
+        const unlockedRecipes = parsed.unlockedRecipes?.length
+          ? Array.from(new Set([...parsed.unlockedRecipes, ...starterRecipes]))
+          : starterRecipes;
+
+        set({
+          gameState: {
+            ...INITIAL_GAME_STATE,
+            ...parsed,
+            businessStage: stg,
+            stageUpgrades: loadedStageUpgrades,
+            storageCapacity: correctCapacity,
+            inventory: currentInv,
+            restaurantInventories: restInvs,
+            unlockedRecipes: unlockedRecipes,
+            ownedThemes: parsed.ownedThemes || ['sakura_pink'],
+            ownedDecorations: parsed.ownedDecorations || [],
+            equippedDecorations: parsed.equippedDecorations || [],
+            employeeDetails: parsed.employeeDetails || {},
+            shopName: parsed.shopName || currentRest.name,
+            neighbors: {
+              ...INITIAL_GAME_STATE.neighbors,
+              ...(parsed.neighbors || {}),
+            },
+            lotteryHistory: parsed.lotteryHistory || [],
+            activeLotteryTicket: parsed.activeLotteryTicket || null,
+            activeRestaurantId: activeRestId,
+            unlockedRestaurants: parsed.unlockedRestaurants || [activeRestId],
+            hasChosenStarter: parsed.hasChosenStarter ?? false,
+            weather: parsed.weather || 'sunny',
+            marketSpecial: parsed.marketSpecial || null,
+          },
+        });
+      }
 
           const res = await fetch('/api/save/player_default');
           if (res.ok) {
@@ -1684,6 +2019,43 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                   calculateStorageCapacity(cloudStg, cloudCurrentUpgrades)
                 );
 
+                const cloudActiveRestId = cloudState.activeRestaurantId || 'banh_mi';
+                const cloudCurrentRest = RESTAURANT_TYPES[cloudActiveRestId] || RESTAURANT_TYPES.banh_mi;
+
+                let cloudRestInvs = cloudState.restaurantInventories || {};
+                let cloudCurrentInv = { ...(cloudState.inventory || {}) };
+
+                const cloudForeignIngs = Object.keys(cloudCurrentInv).filter(
+                  (id) => !cloudCurrentRest.allowedIngredientIds.includes(id as IngredientId)
+                );
+
+                if (cloudForeignIngs.length > 0 || !cloudRestInvs[cloudActiveRestId]) {
+                  const cleanCloudInv: Partial<Record<IngredientId, number>> = {};
+                  for (const id of cloudCurrentRest.allowedIngredientIds) {
+                    cleanCloudInv[id] = cloudCurrentInv[id] ?? 10;
+                  }
+
+                  const updatedCloudRestInvs: Partial<Record<RestaurantTypeId, Partial<Record<IngredientId, number>>>> = {
+                    ...cloudRestInvs,
+                    [cloudActiveRestId]: cleanCloudInv,
+                  };
+
+                  const unlocked = cloudState.unlockedRestaurants || [cloudActiveRestId];
+                  for (const rId of unlocked) {
+                    if (!updatedCloudRestInvs[rId]) {
+                      updatedCloudRestInvs[rId] = getStarterInventoryForRestaurant(rId);
+                    }
+                  }
+
+                  cloudCurrentInv = cleanCloudInv;
+                  cloudRestInvs = updatedCloudRestInvs;
+                }
+
+                const cloudStarterRecipes = getStarterRecipesForRestaurant(cloudActiveRestId);
+                const cloudUnlockedRecipes = cloudState.unlockedRecipes?.length
+                  ? Array.from(new Set([...cloudState.unlockedRecipes, ...cloudStarterRecipes]))
+                  : cloudStarterRecipes;
+
                 set({
                   gameState: {
                     ...INITIAL_GAME_STATE,
@@ -1691,20 +2063,25 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
                     businessStage: cloudStg,
                     stageUpgrades: cloudStageUpgrades,
                     storageCapacity: cloudCapacity,
+                    inventory: cloudCurrentInv,
+                    restaurantInventories: cloudRestInvs,
+                    unlockedRecipes: cloudUnlockedRecipes,
                     ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
                     ownedDecorations: cloudState.ownedDecorations || [],
                     equippedDecorations: cloudState.equippedDecorations || [],
                     employeeDetails: cloudState.employeeDetails || {},
-                    shopName: cloudState.shopName || 'Tiệm Bánh Mì Vỉa Hè Ba Miền 🥖',
+                    shopName: cloudState.shopName || cloudCurrentRest.name,
                     neighbors: {
                       ...INITIAL_GAME_STATE.neighbors,
                       ...(cloudState.neighbors || {}),
                     },
                     lotteryHistory: cloudState.lotteryHistory || [],
                     activeLotteryTicket: cloudState.activeLotteryTicket || null,
-                    activeRestaurantId: cloudState.activeRestaurantId || 'banh_mi',
-                    unlockedRestaurants: cloudState.unlockedRestaurants || ['banh_mi'],
+                    activeRestaurantId: cloudActiveRestId,
+                    unlockedRestaurants: cloudState.unlockedRestaurants || [cloudActiveRestId],
                     hasChosenStarter: cloudState.hasChosenStarter ?? false,
+                    weather: cloudState.weather || 'sunny',
+                    marketSpecial: cloudState.marketSpecial || null,
                   },
                 });
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
@@ -1740,6 +2117,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCustomersLost: 0,
       activeModal: null,
       hasEventTriggeredToday: false,
+      hasIncidentTriggeredToday: false,
       dailyEventsCount: 0,
       lastEventTimeMinutes: 0,
       lastEventOutcome: null,

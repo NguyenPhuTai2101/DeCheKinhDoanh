@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const MenuMoreDrawer: React.FC = () => {
-  const { closeModal, openModal, gameState, deliveryOrders } = useGameStore();
+  const { closeModal, openModal, gameState, deliveryOrders, triggerSurpriseIncident } = useGameStore();
 
   const handleSelectModal = (modal: ModalType) => {
     soundManager.playClick();
@@ -249,6 +249,34 @@ export const MenuMoreDrawer: React.FC = () => {
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-red-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              {/* Tình Huống Bất Ngờ Đời Thực */}
+              <button
+                onClick={() => {
+                  soundManager.playClick();
+                  closeModal();
+                  triggerSurpriseIncident();
+                }}
+                className="flex items-center justify-between p-2.5 bg-gradient-to-r from-rose-50 to-pink-50 rounded-2xl border border-pink-300 hover:border-pink-500 shadow-2xs active:scale-98 transition-all group sm:col-span-2 cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-pink-500 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                    ⚡
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-black text-rose-950 flex items-center gap-1.5">
+                      <span>Biến Cố Bất Ngờ (Đời Thực)</span>
+                      <span className="text-[8.5px] bg-pink-500 text-white font-extrabold px-1.5 py-0.2 rounded-full">
+                        MỚI
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-rose-700/80">
+                      Trật tự đô thị, mèo chôm thịt, Việt kiều boa sộp, tố oan khách...
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-pink-500 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
           </div>

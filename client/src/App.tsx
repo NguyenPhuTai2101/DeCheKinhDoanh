@@ -18,6 +18,7 @@ import { LotteryDrawModal } from './components/modals/LotteryDrawModal';
 import { StarterSelectionModal } from './components/modals/StarterSelectionModal';
 import { FranchiseModal } from './components/modals/FranchiseModal';
 import { MenuMoreDrawer } from './components/modals/MenuMoreDrawer';
+import { IncidentModal } from './components/modals/IncidentModal';
 import { FlashScreen } from './components/views/FlashScreen';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
@@ -26,6 +27,7 @@ import { useGameSimulation } from './hooks/useGameSimulation';
 export const App: React.FC = () => {
   const {
     activeModal,
+    activeIncident,
     currentView,
     loadGame,
     saveLocal,
@@ -47,9 +49,9 @@ export const App: React.FC = () => {
   }, [loadGame, saveLocal]);
 
   return (
-    <div className="w-full h-[100dvh] bg-[#FFF1F6] flex justify-center items-center overflow-hidden">
+    <div className="w-full h-[100dvh] bg-gradient-to-b from-[#FFF0F5] to-[#FFE6EE] flex justify-center items-center overflow-hidden">
       {/* Container chuẩn phong cách Mobile-First (Đế Chế Vỉa Hè & Tiệm Trà Nhỏ) */}
-      <div className="w-full max-w-md sm:max-w-lg h-full bg-[#FAF5EE] sm:shadow-2xl sm:border-x-2 border-[#FFD6E5] flex flex-col justify-between overflow-hidden relative">
+      <div className="w-full max-w-md sm:max-w-[430px] h-full sm:h-[96dvh] bg-[#FAF5EE] sm:shadow-[0_15px_50px_rgba(255,101,132,0.22)] sm:border-2 sm:border-[#FFCCD9] sm:rounded-3xl flex flex-col justify-between overflow-hidden relative">
         {showFlashScreen ? (
           <FlashScreen />
         ) : (
@@ -81,6 +83,9 @@ export const App: React.FC = () => {
             {activeModal === 'delivery' && <DeliveryModal />}
             {activeModal === 'lotteryDraw' && <LotteryDrawModal />}
             {activeModal === 'menuMore' && <MenuMoreDrawer />}
+
+            {/* 4.1. Pop-up Biến Cố Bất Ngờ Đời Thực (Surprise Incidents) */}
+            {activeIncident && <IncidentModal />}
           </>
         )}
 
