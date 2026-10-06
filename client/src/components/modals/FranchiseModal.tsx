@@ -76,8 +76,8 @@ export const FranchiseModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in select-none">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-300 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh]">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in select-none">
+      <div role="dialog" aria-modal="true" aria-label="Franchise" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-300 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh]">
         {/* Header Modal */}
         <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 px-4 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-2.5">
@@ -91,7 +91,7 @@ export const FranchiseModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -316,7 +316,7 @@ export const FranchiseModal: React.FC = () => {
                         <Users className="w-3 h-3 text-indigo-600 shrink-0" />
                         <span>Nhân sự trực ({branchStaff.length} người):</span>
                         {branchStaff.length === 0 ? (
-                          <span className="text-amber-700 italic font-medium">Chưa có ai (đang chạy thời vụ 50%)</span>
+                          <span className="text-amber-700 italic font-medium">Chưa có bếp hoặc quản lý · tạm ngừng bán</span>
                         ) : (
                           <span className="font-extrabold text-slate-800">
                             {branchStaff.map((e) => e?.name).join(', ')}

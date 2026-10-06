@@ -1,4 +1,5 @@
 import React from 'react';
+import { IngredientIcon } from '../common/IngredientIcon';
 import { useGameStore } from '../../store/gameStore';
 import { RECIPES, INGREDIENTS, RESTAURANT_TYPES } from '../../../../shared/gameData';
 import { soundManager } from '../../utils/soundManager';
@@ -17,6 +18,7 @@ export const DeliveryModal: React.FC = () => {
 
   const currentRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[currentRestId] || RESTAURANT_TYPES.banh_mi;
+  const unlocked = gameState.businessStage !== 'cart' || gameState.player.cookingLevel >= 2;
 
   // Lọc chỉ giữ đơn thuộc quán hiện tại
   const matchingOrders = deliveryOrders.filter((order) =>
@@ -35,7 +37,7 @@ export const DeliveryModal: React.FC = () => {
   const handleDeliver = (orderId: string) => {
     const success = fulfillDeliveryOrder(orderId);
     if (success) {
-      soundManager.playCoin();
+      soundManager.playClick();
       confetti({
         particleCount: 35,
         spread: 50,
@@ -51,8 +53,8 @@ export const DeliveryModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-sky-400 w-full max-w-xl overflow-hidden shadow-2xl flex flex-col h-[85dvh] sm:h-auto sm:max-h-[82vh] animate-slide-up">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div role="dialog" aria-modal="true" aria-label="Delivery" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-sky-400 w-full max-w-xl overflow-hidden shadow-2xl flex flex-col h-[85dvh] sm:h-auto sm:max-h-[82vh] animate-slide-up">
         {/* Header */}
         <div className="bg-sky-50 px-5 py-3.5 border-b-2 border-sky-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -69,7 +71,7 @@ export const DeliveryModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -95,16 +97,18 @@ export const DeliveryModal: React.FC = () => {
           </div>
 
           <button
+            disabled={!unlocked || !useGameStore.getState().isShopOpen || matchingOrders.length > 0}
             onClick={handleCallOrder}
             className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
           >
             <PhoneCall className="w-3.5 h-3.5" />
-            <span>Gọi Thêm Đơn</span>
+            <span>Kiểm tra đơn mới</span>
           </button>
         </div>
 
         {/* Danh sách đơn giao hàng */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {!unlocked && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-bold text-[#87615e]">Giao hàng mở khi tay nghề đạt cấp 2 hoặc quán lên Góc Phố. Luyện làm món tại bàn trước nhé!</p>}
           {matchingOrders.length === 0 ? (
             <div className="py-12 bg-white rounded-2xl border-2 border-dashed border-sky-200 text-center space-y-2">
               <span className="text-3xl">📭</span>
@@ -112,7 +116,7 @@ export const DeliveryModal: React.FC = () => {
                 Hiện chưa có đơn đặt mang về nào cho {currentRest.name}!
               </p>
               <p className="text-[11px] text-sky-700 max-w-xs mx-auto">
-                Bấm nút [Gọi Thêm Đơn] phía trên hoặc chờ các công ty xung quanh gọi điện thoại đặt hàng nhé!
+                Mở cửa để nhận đơn. Đơn dùng chung bếp với khách tại bàn; bạn chỉ nhận tiền sau khi giao xong.
               </p>
             </div>
           ) : (
@@ -129,7 +133,7 @@ export const DeliveryModal: React.FC = () => {
                 }
               }
 
-              const totalEarned = order.rewardMoney + order.rewardTip;
+              const totalEarned = order.rewardMoney + order.rewardTip - (order.shippingFee || Math.round(order.rewardMoney * 0.1));
 
               return (
                 <div
@@ -161,6 +165,8 @@ export const DeliveryModal: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap gap-2 text-xs font-bold"><span>⏱ Còn {Math.ceil(order.timeRemainingSeconds)}s</span><span>{order.status === 'pending' ? 'Chờ nhận' : order.status === 'cooking' ? `Đang nấu · ${Math.ceil(order.workRemainingSeconds || 0)}s · ${order.chefName}` : order.status === 'ready' ? 'Đã đóng gói · chờ bàn giao' : `Đang giao · ${Math.ceil(order.workRemainingSeconds || 0)}s`}</span></div>
+                  <p className="text-xs text-[#87615e]">Đóng cửa sổ để tiếp tục thời gian. Phí ship 10% giá món; nguyên liệu đã dùng sẽ không hoàn lại khi hủy.</p>
                   {/* Danh sách nguyên liệu cần để giao */}
                   <div className="bg-[#FAF5EE] p-2.5 rounded-xl border border-sky-100 text-xs">
                     <div className="text-[10px] font-bold text-[#9C7C75] mb-1">
@@ -182,7 +188,7 @@ export const DeliveryModal: React.FC = () => {
                                 : 'bg-rose-50 text-rose-700 border-rose-200'
                             }`}
                           >
-                            {ing?.icon} {ing?.name}: {available}/{needed}
+                            <IngredientIcon id={ingId} size={20}/> {ing?.name}: {available}/{needed}
                           </span>
                         );
                       })}
@@ -193,11 +199,11 @@ export const DeliveryModal: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleDeliver(order.id)}
-                      disabled={!hasStock}
+                      disabled={!useGameStore.getState().isShopOpen || (order.status === 'pending' && !hasStock) || ['cooking','delivering'].includes(order.status)}
                       className="flex-1 py-2 bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 disabled:opacity-40 text-white font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                     >
                       <Bike className="w-4 h-4" />
-                      <span>{hasStock ? 'Bàn Giao Cho Chú Năm Đi Ship' : 'Thiếu Nguyên Liệu (Đi Chợ)'}</span>
+                      <span>{order.status === 'pending' ? (hasStock ? 'Nhận đơn & chế biến' : 'Thiếu nguyên liệu · Đi chợ') : order.status === 'ready' ? 'Bàn giao cho Chú Năm' : order.status === 'cooking' ? 'Bếp đang chế biến…' : 'Chú Năm đang giao…'}</span>
                     </button>
 
                     <button

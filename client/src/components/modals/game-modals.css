@@ -1,0 +1,22 @@
+.game-modal-backdrop{background:rgba(71,39,48,.44)!important;backdrop-filter:blur(6px)}
+.game-modal-panel{width:100%;max-width:520px!important;background:#fffaf6!important;border-color:#f4bdce!important;color:#643b3d;box-shadow:0 12px 50px #562b3930!important}
+.game-modal-panel>div:first-child{background:#fff0f5!important;color:#643b3d!important;border-color:#f4bdce!important;gap:12px}
+.game-modal-panel>div:first-child h2{font-size:18px;line-height:1.3;display:flex;flex-wrap:wrap;gap:6px;color:#643b3d!important;text-shadow:none}
+.game-modal-panel>div:first-child p{font-size:12px;color:#87615e!important;line-height:1.5}
+.game-modal-panel>div:first-child>div{min-width:0;flex:1}
+.game-modal-panel>div:first-child>button{flex-shrink:0;background:#fffafc!important;color:#87615e!important;min-width:36px;min-height:36px}
+.game-modal-panel button:focus-visible{outline:3px solid #a745d3;outline-offset:2px}
+.game-modal-panel button:disabled{opacity:.45;cursor:not-allowed}
+.game-modal-panel [class*="text-[8"],.game-modal-panel [class*="text-[9"],.game-modal-panel [class*="text-[10"]{font-size:11px;line-height:1.45}
+.game-modal-panel [class*="text-[11"]{line-height:1.5}
+.game-modal-panel button{touch-action:manipulation}
+.bm-brand b{max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bm-brand{min-width:0!important}.bm-brand-copy{display:flex;flex:1;min-width:0;flex-direction:column;align-items:flex-start}.bm-brand-copy b{width:100%;max-width:none;font-size:12px;line-height:1.2}.bm-brand-copy small{font-size:10px;line-height:1.4;color:#c4406b}.bm-shop-icon svg{width:20px!important}
+.bm-operations{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11px}
+.bm-operations>span{display:flex;align-items:center;gap:4px;flex:1;white-space:nowrap;font-weight:800}
+.bm-operations meter{width:35px;height:10px}
+.bm-operations button{border:1px solid #f4bdce;border-radius:10px;padding:5px 7px;background:#fffafc;font-weight:800}
+.bm-low-energy{margin:5px 0 0;font-size:12px;color:#a5334c;font-weight:800}
+.bm-operations .is-low{color:#a5334c}
+.bm-cozy{display:block;margin-top:4px;color:#687b4d;font-size:11px}
+@media(max-width:360px){.game-modal-panel>div:first-child{padding:12px}.game-modal-panel h2{font-size:16px!important}.bm-operations{font-size:10px}.bm-brand b{max-width:52px}}

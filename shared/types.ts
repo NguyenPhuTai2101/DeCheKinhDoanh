@@ -7,6 +7,10 @@ export type IngredientId =
   | 'pate'
   | 'cucumber'
   | 'herb'
+  | 'cha_lua'
+  | 'pickles'
+  | 'chili'
+  | 'mayo'
   | 'tea'
   | 'milk'
   | 'condensed_milk'
@@ -276,6 +280,7 @@ export interface DailyFinance {
 }
 
 export interface BranchDailyFinance {
+  deliveryFees?: number;
   restaurantId: RestaurantTypeId;
   revenue: number;
   cogs: number;
@@ -460,7 +465,12 @@ export interface DeliveryOrder {
   rewardTip: number;
   timeRemainingSeconds: number;
   maxTimeSeconds: number;
-  status: 'pending' | 'ready' | 'delivering';
+  status: 'pending' | 'cooking' | 'ready' | 'delivering';
+  workRemainingSeconds?: number;
+  chefId?: string;
+  chefName?: string;
+  cogs?: number;
+  shippingFee?: number;
 }
 
 export type DishMatchGrade = 'perfect' | 'minor' | 'wrong' | 'allergy';
@@ -473,9 +483,11 @@ export interface ActiveOrder {
   dialogue?: string;
   customTag?: string; // Ghi chú order ngắn: "Không hành", "2 trứng", "Nhiều bánh phở", "Nước béo"...
   removedIngredients?: IngredientId[]; // Nguyên liệu khách yêu cầu bỏ (ví dụ: không hành/rau)
+  allergyIngredients?: IngredientId[];
   extraIngredients?: IngredientId[]; // Nguyên liệu khách yêu cầu thêm (ví dụ: thêm trứng)
   orderNotes?: string[]; // Danh sách yêu cầu chi tiết của khách
   preparedIngredients?: IngredientId[]; // Nguyên liệu người chơi hoặc đầu bếp đã nạp vào đĩa
+  cogsBooked?: boolean;
   matchGrade?: DishMatchGrade; // Kết quả đánh giá độ khớp (perfect, minor, wrong, allergy)
   matchFeedback?: string; // Lời phản hồi trực tiếp của khách khi ăn
   recipeId: RecipeId;
@@ -493,6 +505,26 @@ export interface ActiveOrder {
 }
 
 export interface GameSaveState {
+  operatingSnapshot?: {
+    activeOrders: ActiveOrder[];
+    isShopOpen: boolean;
+    dailyCost: number;
+    dailyCustomersServed: number;
+    dailyCustomersLost: number;
+    lossReasons?: { inventory: number; capacity: number; demand: number };
+    dailyEventsCount: number;
+    lastEventTimeMinutes: number;
+    isLotteryDrawnToday: boolean;
+    hasIncidentTriggeredToday: boolean;
+    activeIncident: SurpriseIncident | null;
+  };
+  cashJournal?: Array<{ day: number; minute: number; label: string; amount: number; balance: number }>;
+  soundMuted?: boolean;
+  lastDeliveryRequestMinute?: number;
+  incidentHistory?: string[];
+  streetEventHistory?: string[];
+  loanRepaymentPerDay?: number;
+  settledDay?: number;
   version: string;
   playerId: string;
   shopName: string;

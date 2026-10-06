@@ -8,6 +8,10 @@ import {
 } from '../types';
 import { RECIPES, INGREDIENTS } from '../gameData';
 
+export function getOrderIngredients(order: Pick<ActiveOrder, 'recipeId' | 'removedIngredients' | 'extraIngredients'>): IngredientId[] {
+  return (RECIPES[order.recipeId]?.requiredIngredients || []).filter(id => !order.removedIngredients?.includes(id)).concat(order.extraIngredients || []);
+}
+
 export interface OrderCustomizationSpec {
   customTag?: string;
   removedIngredients: IngredientId[];
@@ -243,7 +247,7 @@ export function evaluateDishMatch(params: {
   const violatedRemoved = removed.some((id) => (preparedCounts[id] || 0) > 0);
   if (violatedRemoved) {
     return {
-      matchGrade: 'allergy',
+      matchGrade: order.allergyIngredients?.some(id => (preparedCounts[id] || 0) > 0) ? 'allergy' : 'wrong',
       feedback: `Ơ kìa! Mình đã dặn kỹ là "${order.orderNotes?.[0] || 'không ăn món này'}" mà quán vẫn bỏ vào! 💔`,
       tipMultiplier: 0,
       ratingImpact: -5,
@@ -273,7 +277,9 @@ export function evaluateDishMatch(params: {
   }
 
   // Thiếu 1 nguyên liệu phụ (rau thơm, dưa leo...)
-  if (missingCount <= 1) {
+  const garnish = new Set(['herb','cucumber','spring_onion','chili','pickles','mayo']);
+  const missingMain = baseReqs.some(id => !removed.includes(id) && !garnish.has(id) && (preparedCounts[id] || 0) < baseReqs.filter(value => value === id).length);
+  if (missingCount <= 1 && !missingMain) {
     return {
       matchGrade: 'minor',
       feedback: 'Món ăn cũng ngon miệng, nhưng hình như hơi thiếu chút đỉnh so với mình dặn á~ ⭐',

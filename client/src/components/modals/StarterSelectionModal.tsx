@@ -26,8 +26,8 @@ export const StarterSelectionModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in select-none">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-400 w-full max-w-xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto sm:max-h-[90vh]">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in select-none">
+      <div role="dialog" aria-modal="true" aria-label="StarterSelection" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-amber-400 w-full max-w-xl overflow-hidden shadow-2xl flex flex-col h-[92dvh] sm:h-auto sm:max-h-[90vh]">
         {/* Header Flashscreen */}
         <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 p-4 text-white text-center shrink-0 relative shadow-md">
           <div className="inline-block bg-white/20 backdrop-blur-xs px-3 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase mb-1">

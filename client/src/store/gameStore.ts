@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import { getOperatingStatement, getLiquidationOffer, describeCashMovement, withBranchOperation } from '../../../shared/economy/operating';
+import { migrateSave, restoreOperatingState } from './persistence';
+import { getRecipeLearningCost } from '../../../shared/progression/recipes';
+import { chooseContextualIncident } from '../../../shared/simulation/incidents';
 import {
   GameSaveState,
   IngredientId,
@@ -48,7 +52,9 @@ import {
   calculateDailySpoilage,
   generateMorningBriefing,
 } from '../../../shared/economy/finance';
-import { evaluateDishMatch } from '../../../shared/simulation/orders';
+import { calculateCookEfficiency } from '../../../shared/simulation/employees';
+import { calculateCookSpeedBoost } from '../../../shared/gameData';
+import { evaluateDishMatch, getOrderIngredients } from '../../../shared/simulation/orders';
 import {
   INITIAL_GAME_STATE,
   INGREDIENTS,
@@ -70,6 +76,7 @@ import {
   calculateStorageCapacity,
   calculateMaxTables,
   calculateDeliveryBonus,
+  calculateReputationBonus,
   getStarterInventoryForRestaurant,
   getStarterRecipesForRestaurant,
 } from '../../../shared/gameData';
@@ -120,6 +127,8 @@ export interface GameStoreState {
   dailyCost: number;
   dailyCustomersServed: number;
   dailyCustomersLost: number;
+  lossReasons: { inventory: number; capacity: number; demand: number };
+  recordLostCustomer: (reason: 'inventory' | 'capacity' | 'demand') => void;
   isDailySummaryShown: boolean;
   
   // V0.4: Sự kiện & Xổ số & Giao hàng runtime
@@ -162,6 +171,7 @@ export interface GameStoreState {
   setEmployeeActionStatus: (status: Record<string, string>) => void;
   setCurrentView: (view: 'shop' | 'street') => void;
   setActiveOrders: (orders: ActiveOrder[] | ((prev: ActiveOrder[]) => ActiveOrder[])) => void;
+  commitKitchenChanges: (inventory: GameSaveState['inventory'], cogs: number, shoppingCost: number) => void;
   serveDishOrder: (orderId: string) => boolean;
   collectPayment: (orderId: string) => boolean;
   setShopOpen: (open: boolean) => void;
@@ -176,7 +186,7 @@ export interface GameStoreState {
   tickTime: (deltaMinutes: number) => void;
   consumeEnergy: (amount: number) => boolean;
   buyIngredients: (items: Record<IngredientId, number>, totalCost: number) => boolean;
-  completeCooking: (recipeId: RecipeId, tableIndex: number, preparedIngredients?: IngredientId[]) => boolean;
+  completeCooking: (recipeId: RecipeId, tableIndex: number, preparedIngredients?: IngredientId[], timed?: boolean) => boolean;
   finishServing: (tableIndex: number, revenue: number, tip: number, order?: ActiveOrder) => void;
   handleCustomerLeaveAngry: (tableIndex: number) => void;
   purchaseUpgrade: (upgradeId: string) => boolean;
@@ -218,11 +228,12 @@ export interface GameStoreState {
 
   // V0.6: Xử lý biến cố bất ngờ đời thực (Surprise Incident Pop-up)
   triggerSurpriseIncident: (incident?: SurpriseIncident) => void;
-  resolveSurpriseIncident: () => void;
+  resolveSurpriseIncident: (response?: 'accept' | 'mitigate') => void;
 
   // V0.4: Giao hàng mang đi & Hàng xóm ghé bàn
   spawnDeliveryOrder: () => void;
   fulfillDeliveryOrder: (orderId: string) => boolean;
+  tickDeliveries: (seconds: number) => void;
   cancelDeliveryOrder: (orderId: string) => void;
   serveNeighborGuest: (neighborId: NeighborId) => void;
 
@@ -235,22 +246,35 @@ export interface GameStoreState {
   // V2: Menu Catalog, Định giá Món Ăn & Vận Hành Kinh Tế
   setDishPrice: (restaurantId: RestaurantTypeId, recipeId: RecipeId, price: number) => void;
   toggleActiveRecipe: (restaurantId: RestaurantTypeId, recipeId: RecipeId) => boolean;
+  learnRecipe: (restaurantId: RestaurantTypeId, recipeId: RecipeId) => boolean;
   setShopperPolicy: (policy: Partial<ShopperPolicy>) => void;
-  recordBranchSales: (restaurantId: RestaurantTypeId, revenue: number, cogs: number, dishName: string) => void;
+  recordBranchSales: (restaurantId: RestaurantTypeId, revenue: number, cogs: number, dishName: string, recipeId?: RecipeId, quantity?: number) => void;
 
   // Day Cycle
   endDayAndSleep: () => void;
+  forceCloseStoreTonight: () => void;
   
   // Save & Sync
   saveLocal: () => void;
   loadGame: () => Promise<void>;
-  syncCloud: () => Promise<void>;
+  syncCloud: () => Promise<boolean>;
   resetGame: () => void;
 }
 
 
 
-export const useGameStore = create<GameStoreState>((set, get) => ({
+export const useGameStore = create<GameStoreState>((baseSet, get) => {
+  const set = (update: Partial<GameStoreState> | ((state: GameStoreState) => Partial<GameStoreState>)) => baseSet(state => {
+    const patch = typeof update === 'function' ? update(state) : update;
+    if (patch.gameState && patch.gameState.money !== state.gameState.money && !('timeSpeed' in patch)) {
+      const next = patch.gameState;
+      const journal = next.day < state.gameState.day ? [] : state.gameState.cashJournal || [];
+      return { ...patch, gameState: { ...next, cashJournal: [...journal, { day: next.day, minute: next.gameTimeMinutes,
+        label: describeCashMovement(state.gameState, next), amount: next.money - state.gameState.money, balance: next.money }].slice(-300) } };
+    }
+    return patch;
+  });
+  return {
   gameState: INITIAL_GAME_STATE,
   isShopOpen: false,
   timeSpeed: 1,
@@ -262,6 +286,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   dailyCost: 0,
   dailyCustomersServed: 0,
   dailyCustomersLost: 0,
+  lossReasons: { inventory:0, capacity:0, demand:0 },
   isDailySummaryShown: false,
   hasEventTriggeredToday: false,
   dailyEventsCount: 0,
@@ -303,10 +328,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
   },
 
+  commitKitchenChanges: (inventory, cogs, shoppingCost) => set(current => ({
+    dailyCost: current.dailyCost + shoppingCost,
+    gameState: { ...current.gameState, money: current.gameState.money - shoppingCost, inventory,
+      branchFinances: withBranchOperation(current.gameState,current.gameState.activeRestaurantId || 'banh_mi',0,cogs),
+      restaurantInventories: { ...current.gameState.restaurantInventories, [current.gameState.activeRestaurantId || 'banh_mi']: inventory },
+      dailyFinance: { ...createInitialDailyFinance(), ...current.gameState.dailyFinance, cogs: (current.gameState.dailyFinance?.cogs || 0) + cogs } },
+  })),
+
+  recordLostCustomer: reason => set(current => ({ dailyCustomersLost: current.dailyCustomersLost + 1,
+    lossReasons: { ...current.lossReasons, [reason]: current.lossReasons[reason] + 1 } })),
+
   serveDishOrder: (orderId) => {
     const { activeOrders } = get();
     const order = activeOrders.find((o) => o.id === orderId);
-    if (!order) return false;
+    if (!order || order.state !== 'ready') return false;
 
     const recipe = RECIPES[order.recipeId];
     if (!recipe) return false;
@@ -317,7 +353,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     if (order.neighborId) {
       tip += Math.round(recipe.basePrice * 0.2);
-      get().serveNeighborGuest(order.neighborId);
     }
 
     if (order.customTag) {
@@ -348,7 +383,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   collectPayment: (orderId) => {
     const { activeOrders, gameState } = get();
     const order = activeOrders.find((o) => o.id === orderId);
-    if (!order) return false;
+    if (!order || order.state !== 'paying') return false;
 
     const recipe = RECIPES[order.recipeId];
     if (!recipe) return false;
@@ -371,7 +406,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().showToast(open ? '🥖 Quán vỉa hè mở cửa đón bà con!' : '🌙 Đã tạm dọn bàn ghế nghỉ ngơi!');
   },
 
-  setTimeSpeed: (speed) => set({ timeSpeed: speed }),
+  setTimeSpeed: (speed) => { if (Number.isFinite(speed)) set({ timeSpeed:Math.min(2,Math.max(0,Math.round(speed))) }); },
 
   openModal: (modal) => set({ activeModal: modal }),
   closeModal: () => set({ activeModal: null, selectedTableForCooking: null }),
@@ -402,44 +437,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   tickTime: (deltaMinutes) => {
-    const { gameState, isShopOpen, isDailySummaryShown, hasEventTriggeredToday, isLotteryDrawnToday } = get();
-    if (!isShopOpen || isDailySummaryShown) return;
-
-    const newTime = gameState.gameTimeMinutes + deltaMinutes;
-
-    // Kích hoạt sự kiện đường phố ngẫu nhiên theo nhịp điệu (cách nhau ít nhất 150 phút game)
-    const timeSinceLastEvent = newTime - get().lastEventTimeMinutes;
-    if (get().dailyEventsCount < 3 && timeSinceLastEvent >= 150 && Math.random() < 0.2) {
-      get().triggerStreetEvent();
-    }
-
-    // Tự động xổ số lúc 16:30 (990 phút) nếu đã mua vé
-    if (!isLotteryDrawnToday && newTime >= 990 && gameState.activeLotteryTicket) {
-      get().checkLotteryDraw();
-    }
-
-    // Giờ đóng cửa: 22:00 = 1320 phút
-    if (newTime >= 1320 && !isDailySummaryShown) {
-      set({
-        isShopOpen: false,
-        isDailySummaryShown: true,
-        activeModal: 'dailySummary',
-        gameState: {
-          ...gameState,
-          dayPhase: 'night_audit',
-          gameTimeMinutes: 1320,
-        },
-      });
-      get().showToast('🌙 Đã đến 22:00! Đã kết thúc ca bán và chuyển sang Bảng Kết Toán.');
-      get().saveLocal();
-    } else {
-      set({
-        gameState: {
-          ...gameState,
-          gameTimeMinutes: newTime,
-        },
-      });
-    }
+    const state = get();
+    if (!state.isShopOpen || state.isDailySummaryShown || !Number.isFinite(deltaMinutes) || deltaMinutes <= 0) return;
+    const newTime = Math.min(1320, state.gameState.gameTimeMinutes + deltaMinutes);
+    set(current => ({ gameState: { ...current.gameState, gameTimeMinutes: newTime } }));
+    if (newTime >= 1320) { get().forceCloseStoreTonight(); return; }
+    if (!get().isLotteryDrawnToday && newTime >= 990 && get().gameState.activeLotteryTicket) get().checkLotteryDraw();
+    if (!get().activeModal && !get().activeIncident && get().dailyEventsCount < 3 && newTime - get().lastEventTimeMinutes >= 150 && Math.random() < 0.2) get().triggerStreetEvent();
   },
 
   consumeEnergy: (amount) => {
@@ -462,6 +466,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   buyIngredients: (items, totalCost) => {
     const { gameState } = get();
+    if (!Object.keys(items).length || Object.entries(items).some(([id, count]) => !INGREDIENTS[id as IngredientId] || !Number.isInteger(count) || count <= 0)) return false;
+    const calculatedCost = Object.entries(items).reduce((sum, [id,count]) => sum + count * getIngredientCurrentPrice(id as IngredientId, gameState.marketPrices, gameState.marketSpecial), 0);
+    if (!Number.isFinite(totalCost) || totalCost !== calculatedCost) return false;
     if (gameState.money < totalCost) {
       get().showToast('❌ Không đủ tiền để mua thêm nguyên liệu!');
       return false;
@@ -501,13 +508,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return true;
   },
 
-  completeCooking: (recipeId, tableIndex, preparedIngredients) => {
+  completeCooking: (recipeId, tableIndex, preparedIngredients, timed = false) => {
     const { gameState, consumeEnergy, activeOrders } = get();
     const recipe = RECIPES[recipeId];
     if (!recipe) return false;
 
     // Tìm order đang chờ tại bàn này
     const targetOrder = activeOrders.find((o) => o.tableIndex === tableIndex);
+    if (targetOrder && (targetOrder.state !== 'waiting' || targetOrder.recipeId !== recipeId)) return false;
+    if (get().deliveryOrders.some(o => o.status === 'cooking' && !o.chefId) || activeOrders.some(o => o.state === 'cooking' && o.chefName === 'Bạn')) {
+      get().showToast('Bạn đang chế biến món khác. Hoàn tất trước khi nhận món mới.');
+      return false;
+    }
+    if (timed && (!targetOrder || targetOrder.state !== 'waiting' || targetOrder.recipeId !== recipeId)) return false;
 
     // Xác định nguyên liệu thực tế cần trừ khỏi kho:
     const ingredientsToUse = (preparedIngredients && preparedIngredients.length > 0)
@@ -560,8 +573,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       if (o.tableIndex === tableIndex) {
         return {
           ...o,
-          state: 'ready' as const,
+          state: timed ? 'cooking' as const : 'ready' as const,
+          ...(timed ? { chefId: undefined, chefName: 'Bạn', cookingProgress: 0 } : {}),
           preparedIngredients: ingredientsToUse,
+          cogsBooked: true,
           matchGrade: matchResult.matchGrade,
           matchFeedback: matchResult.feedback,
         };
@@ -573,6 +588,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...gameState,
         inventory: newInventory,
+        branchFinances: withBranchOperation(gameState,gameState.activeRestaurantId || 'banh_mi',0,ingredientsToUse.reduce((sum, id) => sum + getIngredientCurrentPrice(id, gameState.marketPrices), 0)),
+        dailyFinance: { ...createInitialDailyFinance(), ...gameState.dailyFinance, cogs: (gameState.dailyFinance?.cogs || 0) + ingredientsToUse.reduce((sum, id) => sum + getIngredientCurrentPrice(id, gameState.marketPrices), 0) },
         restaurantInventories: {
           ...(gameState.restaurantInventories || {}),
           [activeRestId]: newInventory,
@@ -605,7 +622,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const currentRestId = gameState.activeRestaurantId || 'banh_mi';
 
     // 1. Tính toán COGS thực tế theo giá thị trường hôm nay
-    const dishCOGS = recipeId ? calculateDishCOGS(recipeId, gameState.marketPrices) : Math.round(revenue * 0.4);
+    const dishCOGS = order?.preparedIngredients ? order.preparedIngredients.reduce((sum, id) => sum + getIngredientCurrentPrice(id, gameState.marketPrices), 0) : recipeId ? calculateDishCOGS(recipeId, gameState.marketPrices) : Math.round(revenue * 0.4);
 
     // 2. Tính toán độ hài lòng của khách (Satisfaction: 0 - 100) & sao đánh giá (1 - 5)
     let reviewOutcome = {
@@ -658,6 +675,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       }
     }
 
+    // Ambience rewards good service; it never cancels penalties for poor service.
+    const stageId = gameState.businessStage || 'cart';
+    const levels = gameState.stageUpgrades?.[stageId] ?? (gameState.stageUpgrades ? {} : gameState.purchasedUpgrades);
+    const reputationBonus = calculateReputationBonus(stageId, levels, gameState.stageUpgrades);
+    if (reviewOutcome.fameChange > 0) {
+      const extra = reviewOutcome.fameChange * reputationBonus;
+      reviewOutcome.fameChange += Math.floor(extra) + (Math.random() < extra % 1 ? 1 : 0);
+    }
+    if (order?.typeId === 'office_worker' && (gameState.neighbors.chi_lan?.level || 1) >= 2) tip = Math.round(tip * 1.25);
+    reviewOutcome.stars = Math.max(1, Math.min(5, Math.ceil(reviewOutcome.satisfaction / 20))) as 1 | 2 | 3 | 4 | 5;
     const totalEarned = revenue + tip;
 
     // 3. Cập nhật Rating mượt mà (Weighted Moving Average)
@@ -674,9 +701,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const updatedFinance: DailyFinance = {
       ...currentFinance,
       revenue: currentFinance.revenue + totalEarned,
-      cogs: currentFinance.cogs + dishCOGS,
-      grossProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + dishCOGS),
-      netProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + dishCOGS) - currentFinance.payroll - currentFinance.rent - currentFinance.utilities,
+      tips: (currentFinance.tips || 0) + tip,
+      cogs: currentFinance.cogs + (order?.cogsBooked ? 0 : dishCOGS),
+      grossProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + (order?.cogsBooked ? 0 : dishCOGS)),
+      netProfit: (currentFinance.revenue + totalEarned) - (currentFinance.cogs + (order?.cogsBooked ? 0 : dishCOGS)) - currentFinance.payroll - currentFinance.rent - currentFinance.utilities,
     };
 
     const currentBranchFinances = gameState.branchFinances || {};
@@ -684,10 +712,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const updatedBranchFin: BranchDailyFinance = {
       ...branchFin,
       revenue: branchFin.revenue + totalEarned,
-      cogs: branchFin.cogs + dishCOGS,
-      grossProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + dishCOGS),
+      cogs: branchFin.cogs + (order?.cogsBooked ? 0 : dishCOGS),
+      grossProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + (order?.cogsBooked ? 0 : dishCOGS)),
       customersServed: branchFin.customersServed + 1,
-      netProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + dishCOGS) - branchFin.payroll - branchFin.rent,
+      netProfit: (branchFin.revenue + totalEarned) - (branchFin.cogs + (order?.cogsBooked ? 0 : dishCOGS)) - branchFin.payroll - branchFin.rent,
     };
 
     // 6. Cập nhật Business Metrics
@@ -733,6 +761,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   handleCustomerLeaveAngry: (tableIndex) => {
     const { gameState } = get();
+    const customer = get().activeOrders.find(order => order.tableIndex === tableIndex);
+    const ingredients = customer ? getOrderIngredients(customer) : [];
+    const lackedStock = customer?.state === 'waiting' && ingredients.some(id => (gameState.inventory[id] || 0) < ingredients.filter(value => value === id).length);
+    const reason = lackedStock ? 'inventory' : 'capacity';
     // Khách tức giận bỏ về xem như đánh giá 1 sao (satisfaction 20)
     const currentRating = gameState.rating ?? 75;
     const newRating = updateShopRating(currentRating, 20);
@@ -741,6 +773,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set((state) => ({
       dailyCustomersLost: state.dailyCustomersLost + 1,
+      lossReasons: { ...state.lossReasons, [reason]: state.lossReasons[reason] + 1 },
       gameState: {
         ...state.gameState,
         reputation: newReputation,
@@ -760,9 +793,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const upgrade = stageCatalog.upgrades.find((u) => u.id === upgradeId);
     if (!upgrade) return false;
 
-    const currentStageUpgrades = gameState.stageUpgrades?.[stageId] || {};
-    const currentLvl = currentStageUpgrades[upgradeId] ?? (gameState.purchasedUpgrades[upgradeId] || 0);
+    const currentStageUpgrades = gameState.stageUpgrades?.[stageId] ?? (gameState.stageUpgrades ? {} : gameState.purchasedUpgrades || {});
+    const currentLvl = currentStageUpgrades[upgradeId] ?? (gameState.stageUpgrades ? 0 : gameState.purchasedUpgrades[upgradeId] || 0);
     const tierInfo = getStageUpgradeTierInfo(stageId, upgradeId, currentLvl);
+
+    if (upgradeId === 'extra_tables' && calculateMaxTables(stageId, currentStageUpgrades, gameState.stageUpgrades) >= 8) {
+      get().showToast('Quán đã đạt giới hạn 8 bàn phục vụ.');
+      return false;
+    }
 
     if (tierInfo.isMax) {
       get().showToast('ℹ️ Trang bị này đã đạt cấp tối đa của kỷ nguyên!');
@@ -783,13 +821,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     };
 
     // Tính toán lại dung tích kho chính xác theo sàn + tier
-    const newStorageCapacity = calculateStorageCapacity(stageId, updatedStageUpgrades[stageId]);
+    const newStorageCapacity = Math.max(gameState.storageCapacity, calculateStorageCapacity(stageId, updatedStageUpgrades[stageId], updatedStageUpgrades));
 
     set({
       gameState: {
         ...gameState,
         money: gameState.money - tierInfo.cost,
         storageCapacity: newStorageCapacity,
+        fridgeUpgradeLevel: Math.min(2, Object.values(updatedStageUpgrades).reduce((sum, levels) => sum + (levels?.cozy_storage || 0), 0)),
         purchasedUpgrades: {
           ...gameState.purchasedUpgrades,
           [upgradeId]: currentLvl + 1,
@@ -875,8 +914,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const neededIngs = currentRest?.allowedIngredientIds || [];
 
     const simStageId = gameState.businessStage || 'cart';
-    const simStageUpgrades = gameState.stageUpgrades?.[simStageId] || gameState.purchasedUpgrades || {};
-    const capacity = calculateStorageCapacity(simStageId, simStageUpgrades);
+    const simStageUpgrades = gameState.stageUpgrades?.[simStageId] ?? (gameState.stageUpgrades ? {} : gameState.purchasedUpgrades || {});
+    const capacity = calculateStorageCapacity(simStageId, simStageUpgrades, gameState.stageUpgrades);
     const currentStock = Object.values(gameState.inventory).reduce((a, b) => a + b, 0);
     const freeSpace = capacity - currentStock;
 
@@ -1064,6 +1103,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...gameState,
         money: gameState.money - amount,
+        dailyFinance: { ...createInitialDailyFinance(), ...gameState.dailyFinance, otherExpense:(gameState.dailyFinance?.otherExpense || 0) + amount },
         employeeDetails: {
           ...gameState.employeeDetails,
           [employeeId]: {
@@ -1112,15 +1152,25 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().recordBranchSales(restaurantId, amount, estimatedCOGS, dishName);
   },
 
-  recordBranchSales: (restaurantId, revenue, cogs, dishName) => {
+  recordBranchSales: (restaurantId, revenue, cogs, dishName, recipeId, quantity = 1) => {
     const rest = RESTAURANT_TYPES[restaurantId];
     const { gameState } = get();
+
+    if (!Number.isFinite(revenue) || revenue < 0 || !Number.isFinite(cogs) || cogs < 0 || quantity <= 0) return;
+    const inventory = { ...(restaurantId === gameState.activeRestaurantId ? gameState.inventory : gameState.restaurantInventories?.[restaurantId]) };
+    if (recipeId) {
+      const needs: Record<string, number> = {};
+      RECIPES[recipeId].requiredIngredients.forEach(id => { needs[id] = (needs[id] || 0) + quantity; });
+      if (Object.entries(needs).some(([id, count]) => (inventory[id as IngredientId] || 0) < count)) return;
+      Object.entries(needs).forEach(([id, count]) => { inventory[id as IngredientId] = (inventory[id as IngredientId] || 0) - count; });
+    }
 
     // Cập nhật DailyFinance
     const currentFinance: DailyFinance = gameState.dailyFinance || createInitialDailyFinance();
     const updatedFinance: DailyFinance = {
       ...currentFinance,
       revenue: currentFinance.revenue + revenue,
+      branchRevenue: (currentFinance.branchRevenue || 0) + revenue,
       cogs: currentFinance.cogs + cogs,
       grossProfit: (currentFinance.revenue + revenue) - (currentFinance.cogs + cogs),
       netProfit: (currentFinance.revenue + revenue) - (currentFinance.cogs + cogs) - currentFinance.payroll - currentFinance.rent - currentFinance.utilities,
@@ -1134,7 +1184,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       revenue: branchFin.revenue + revenue,
       cogs: branchFin.cogs + cogs,
       grossProfit: (branchFin.revenue + revenue) - (branchFin.cogs + cogs),
-      customersServed: branchFin.customersServed + 1,
+      customersServed: branchFin.customersServed + quantity,
       netProfit: (branchFin.revenue + revenue) - (branchFin.cogs + cogs) - branchFin.payroll - branchFin.rent,
     };
 
@@ -1150,15 +1200,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...metrics,
       lifetimeRevenue: metrics.lifetimeRevenue + revenue,
       lifetimeProfit: metrics.lifetimeProfit + (revenue - cogs),
-      totalCustomers: metrics.totalCustomers + 1,
+      totalCustomers: metrics.totalCustomers + quantity,
     };
 
     set((state) => ({
       dailyRevenue: state.dailyRevenue + revenue,
-      dailyCustomersServed: state.dailyCustomersServed + 1,
+      dailyCustomersServed: state.dailyCustomersServed + quantity,
       gameState: {
         ...state.gameState,
-        money: state.gameState.money + revenue,
+        money: state.gameState.money + revenue - (recipeId ? 0 : cogs),
+        ...(recipeId ? { restaurantInventories: { ...state.gameState.restaurantInventories, [restaurantId]: inventory }, ...(restaurantId === state.gameState.activeRestaurantId ? { inventory } : {}) } : {}),
         // BUG 3 FIXED: Chi nhánh chạy ngầm KHÔNG cộng Fame bừa bãi mỗi 8s!
         dailyFinance: updatedFinance,
         branchFinances: {
@@ -1174,6 +1225,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // === V2: MENU CATALOG, PRICING & POLICIES ===
   setDishPrice: (restaurantId, recipeId, price) => {
+    if (!Number.isFinite(price) || price < 1000 || !RESTAURANT_TYPES[restaurantId].primaryRecipeIds.includes(recipeId)) return;
     const { gameState } = get();
     const currentMenuSettings = gameState.menuSettings || {};
     const restSettings = currentMenuSettings[restaurantId] || {
@@ -1208,6 +1260,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const { gameState } = get();
     const rest = RESTAURANT_TYPES[restaurantId];
     if (!rest) return false;
+    if (!gameState.unlockedRecipes.includes(recipeId) || !rest.primaryRecipeIds.includes(recipeId)) { get().showToast('Cần học công thức trước khi đưa món vào thực đơn.'); return false; }
 
     const currentMenuSettings = gameState.menuSettings || {};
     const restSettings = currentMenuSettings[restaurantId] || {
@@ -1248,6 +1301,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         ? `⛔ Đã tạm ngưng bán món "${recipe?.name || recipeId}" hôm nay.`
         : `✅ Đã đưa món "${recipe?.name || recipeId}" vào thực đơn phục vụ!`
     );
+    get().saveLocal();
+    return true;
+  },
+
+  learnRecipe: (restaurantId, recipeId) => {
+    const game = get().gameState;
+    const info = getRecipeLearningCost(restaurantId, recipeId);
+    if (!info.valid || !game.unlockedRestaurants?.includes(restaurantId) || game.unlockedRecipes.includes(recipeId)) return false;
+    if (game.player.cookingLevel < info.requiredLevel || game.money < info.cost) { get().showToast(`Cần tay nghề cấp ${info.requiredLevel} và ${info.cost.toLocaleString('vi-VN')}đ để học món.`); return false; }
+    const menu = game.menuSettings?.[restaurantId] || { activeRecipes: getStarterRecipesForRestaurant(restaurantId), prices:{} };
+    set({ gameState:{ ...game, money:game.money - info.cost, unlockedRecipes:[...game.unlockedRecipes,recipeId],
+      menuSettings:{ ...game.menuSettings, [restaurantId]:{ ...menu, activeRecipes:Array.from(new Set([...menu.activeRecipes,recipeId])) } } } });
+    get().showToast(`Đã học ${RECIPES[recipeId].name} và đưa vào menu. Nhớ nhập nguyên liệu mới!`);
     get().saveLocal();
     return true;
   },
@@ -1499,6 +1565,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   buyLotteryTicket: (chosenNum, betAmount = 10000, betType = 'de') => {
+    if (!Number.isFinite(betAmount) || betAmount <= 0) return false;
     const { gameState } = get();
 
     if (gameState.money < betAmount) {
@@ -1533,6 +1600,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...gameState,
         money: gameState.money - betAmount,
+        dailyFinance: { ...createInitialDailyFinance(), ...gameState.dailyFinance, otherExpense: (gameState.dailyFinance?.otherExpense || 0) + betAmount },
         activeLotteryTicket: newTicket,
         neighbors: {
           ...gameState.neighbors,
@@ -1551,6 +1619,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   playInstantLotteryDraw: (chosenNum, betAmount = 10000, betType = 'de') => {
+    if (!Number.isFinite(betAmount) || betAmount <= 0) return;
     const { gameState } = get();
     if (gameState.money < betAmount) {
       get().showToast(`❌ Cần ${betAmount.toLocaleString('vi-VN')} đ để thử vận may!`);
@@ -1591,11 +1660,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         prizeAmount,
         userTicket: ticketNumber,
       },
-      dailyRevenue: state.dailyRevenue + prizeAmount,
-      dailyCost: state.dailyCost + betAmount,
+      dailyRevenue: state.gameState.dailyFinance?.revenue || 0,
       gameState: {
         ...state.gameState,
         money: state.gameState.money - betAmount + prizeAmount,
+        dailyFinance: { ...createInitialDailyFinance(), ...state.gameState.dailyFinance, otherIncome: (state.gameState.dailyFinance?.otherIncome || 0) + prizeAmount, otherExpense: (state.gameState.dailyFinance?.otherExpense || 0) + betAmount },
         lotteryHistory: [completedTicket, ...state.gameState.lotteryHistory].slice(0, 15),
       },
     }));
@@ -1643,10 +1712,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         prizeAmount,
         userTicket: ticket.ticketNumber,
       },
-      dailyRevenue: state.dailyRevenue + prizeAmount,
+      dailyRevenue: state.gameState.dailyFinance?.revenue || 0,
       gameState: {
         ...state.gameState,
         money: state.gameState.money + prizeAmount,
+        dailyFinance: { ...createInitialDailyFinance(), ...state.gameState.dailyFinance, otherIncome: (state.gameState.dailyFinance?.otherIncome || 0) + prizeAmount },
         activeLotteryTicket: null,
         lotteryHistory: [completedTicket, ...state.gameState.lotteryHistory].slice(0, 15),
       },
@@ -1696,7 +1766,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             level: newLevel,
             intimacyExp: newExp >= 100 && newLevel < 5 ? newExp - 100 : newExp,
             unlockedSecretIds: newSecrets,
-            lastInteractedDay: gameState.day,
+
           },
         },
       },
@@ -1706,6 +1776,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   spawnDeliveryOrder: () => {
     const { deliveryOrders, gameState } = get();
+    if (!get().isShopOpen) return;
+    if (gameState.businessStage === 'cart' && gameState.player.cookingLevel < 2) { get().showToast('Giao hàng mở khi tay nghề đạt cấp 2 hoặc quán lên cấp Góc Phố.'); return; }
+    if (gameState.lastDeliveryRequestMinute !== undefined && gameState.gameTimeMinutes - gameState.lastDeliveryRequestMinute < 30) return;
     const activeRestId = gameState.activeRestaurantId || 'banh_mi';
     const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
 
@@ -1736,10 +1809,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     // Chỉ sinh món thuộc thực đơn của quán đang kinh doanh
     const availableRecipes = (currentRest.primaryRecipeIds || []).filter((rId) =>
-      gameState.unlockedRecipes.includes(rId)
+      gameState.unlockedRecipes.includes(rId) && (gameState.menuSettings?.[activeRestId]?.activeRecipes || currentRest.primaryRecipeIds).includes(rId)
     );
     const candidateRecipes: RecipeId[] =
-      availableRecipes.length > 0 ? availableRecipes : currentRest.primaryRecipeIds;
+      availableRecipes;
+    if (!candidateRecipes.length) return;
 
     const chosenRecipeId = candidateRecipes[Math.floor(Math.random() * candidateRecipes.length)];
     const recipe = RECIPES[chosenRecipeId];
@@ -1748,11 +1822,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const qty = Math.floor(Math.random() * 2) + 2; // 2 - 3 suất
 
     const stageId = gameState.businessStage || 'cart';
-    const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
-    const deliveryBonus = calculateDeliveryBonus(stageId, stageUpgrades);
+    const stageUpgrades = gameState.stageUpgrades?.[stageId] ?? (gameState.stageUpgrades ? {} : gameState.purchasedUpgrades || {});
+    const deliveryBonus = calculateDeliveryBonus(stageId, stageUpgrades, gameState.stageUpgrades);
 
-    const baseRev = recipe.basePrice * qty;
-    const tip = Math.round(baseRev * (0.2 + deliveryBonus));
+    const baseRev = (gameState.menuSettings?.[activeRestId]?.prices?.[chosenRecipeId] ?? recipe.basePrice) * qty;
+    const tip = Math.round(baseRev * (0.2 + deliveryBonus) * ((gameState.neighbors.chu_nam?.level || 1) >= 2 ? 1.2 : 1));
 
     const newOrder: DeliveryOrder = {
       id: Math.random().toString(36).substring(2, 9),
@@ -1768,70 +1842,80 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set({
       deliveryOrders: [...validExistingOrders, newOrder],
+      gameState: { ...gameState, lastDeliveryRequestMinute:gameState.gameTimeMinutes },
     });
     get().showToast(`🛵 Có đơn ship [${recipe.name} x${qty}] mới từ ${newOrder.customerName}!`);
   },
 
   fulfillDeliveryOrder: (orderId) => {
-    const { deliveryOrders, gameState } = get();
-    const order = deliveryOrders.find((o) => o.id === orderId);
-    if (!order) return false;
-
+    const state = get();
+    const game = state.gameState;
+    const order = state.deliveryOrders.find(o => o.id === orderId);
+    if (!order || order.timeRemainingSeconds <= 0 || !state.isShopOpen) return false;
+    if (order.status === 'ready') {
+      set({ deliveryOrders: state.deliveryOrders.map(o => o.id === orderId ? { ...o, status: 'delivering', workRemainingSeconds: 12 } : o) });
+      get().saveLocal();
+      return true;
+    }
+    if (order.status !== 'pending') return false;
     const recipe = RECIPES[order.recipeId];
-    if (!recipe) return false;
-
-    // Kiểm tra nguyên liệu
-    for (const ingId of recipe.requiredIngredients) {
-      if ((gameState.inventory[ingId] || 0) < order.quantity) {
-        get().showToast(`❌ Không đủ nguyên liệu để giao ${order.quantity} suất ${recipe.name}!`);
-        return false;
-      }
-    }
-
-    // Trừ nguyên liệu
-    const newInventory = { ...gameState.inventory };
-    for (const ingId of recipe.requiredIngredients) {
-      newInventory[ingId] = Math.max(0, (newInventory[ingId] || 0) - order.quantity);
-    }
-
-    const totalEarned = order.rewardMoney + order.rewardTip;
-    const activeRestId = gameState.activeRestaurantId || 'banh_mi';
-
-    // Tăng thiện cảm Chú Năm
-    const chuNam = gameState.neighbors.chu_nam || {
-      level: 1,
-      intimacyExp: 0,
-      unlockedSecretIds: [],
-      lastInteractedDay: 0,
-    };
-
-    set((state) => ({
-      dailyRevenue: state.dailyRevenue + totalEarned,
-      deliveryOrders: state.deliveryOrders.filter((o) => o.id !== orderId),
-      gameState: {
-        ...state.gameState,
-        inventory: newInventory,
-        restaurantInventories: {
-          ...(state.gameState.restaurantInventories || {}),
-          [activeRestId]: newInventory,
-        },
-        money: state.gameState.money + totalEarned,
-        totalDeliveriesCompleted: (state.gameState.totalDeliveriesCompleted || 0) + 1,
-        reputation: state.gameState.reputation + 2,
-        neighbors: {
-          ...state.gameState.neighbors,
-          chu_nam: {
-            ...chuNam,
-            intimacyExp: chuNam.intimacyExp + 15,
-            lastInteractedDay: state.gameState.day,
-          },
-        },
-      },
-    }));
-
-    get().showToast(`🛵 Chú Năm đã giao thành công đơn hàng! (+${totalEarned.toLocaleString('vi-VN')} đ, +2 Uy tín)`);
+    const busy = new Set([...state.activeOrders.filter(o => o.state === 'cooking').map(o => o.chefId || 'player'), ...state.deliveryOrders.filter(o => o.status === 'cooking').map(o => o.chefId || 'player')]);
+    const chef = game.hiredEmployees.map(id => game.employeeDetails[id] || EMPLOYEES.find(e => e.id === id)).find(e => e && ['cook','manager'].includes(e.role) && (e.assignedRestaurantId || 'banh_mi') === (game.activeRestaurantId || 'banh_mi') && !busy.has(e.id));
+    if (!chef && busy.has('player')) { get().showToast('Bếp đang bận. Hoàn tất món hiện tại trước khi nhận đơn ship.'); return false; }
+    const needs: Partial<Record<IngredientId, number>> = {};
+    recipe.requiredIngredients.forEach(id => { needs[id] = (needs[id] || 0) + order.quantity; });
+    if (Object.entries(needs).some(([id, count]) => (game.inventory[id as IngredientId] || 0) < count!)) { get().showToast('Không đủ nguyên liệu cho toàn bộ đơn giao.'); return false; }
+    if (!chef && !get().consumeEnergy(order.quantity * 3)) return false;
+    const inventory = { ...game.inventory };
+    Object.entries(needs).forEach(([id, count]) => { inventory[id as IngredientId] = (inventory[id as IngredientId] || 0) - count!; });
+    const cogs = recipe.requiredIngredients.reduce((sum, id) => sum + getIngredientCurrentPrice(id, game.marketPrices), 0) * order.quantity;
+    const levels = game.stageUpgrades?.[game.businessStage] || game.purchasedUpgrades;
+    const speed = chef ? calculateCookEfficiency(chef).speedMultiplier : 1;
+    const work = recipe.cookingTimeMs / 1000 * order.quantity / speed / (1 + calculateCookSpeedBoost(game.businessStage, levels, game.stageUpgrades));
+    set(current => ({ deliveryOrders: current.deliveryOrders.map(o => o.id === orderId ? { ...o, status: 'cooking', chefId: chef?.id, chefName: chef?.name || 'Bạn', workRemainingSeconds: work, cogs, shippingFee: Math.round(o.rewardMoney * 0.1) } : o),
+      gameState: { ...current.gameState, inventory, restaurantInventories: { ...current.gameState.restaurantInventories, [game.activeRestaurantId || 'banh_mi']: inventory },
+        branchFinances: withBranchOperation(current.gameState,game.activeRestaurantId || 'banh_mi',0,cogs),
+        dailyFinance: { ...createInitialDailyFinance(), ...current.gameState.dailyFinance, cogs: (current.gameState.dailyFinance?.cogs || 0) + cogs } } }));
+    get().showToast('Đã nhận đơn và đưa vào bếp. Đóng cửa sổ để tiếp tục ca bán.');
     get().saveLocal();
     return true;
+  },
+
+  tickDeliveries: (seconds) => {
+    if (seconds <= 0 || !Number.isFinite(seconds) || !get().isShopOpen) return;
+    for (const original of [...get().deliveryOrders]) {
+      const state = get();
+      const order = state.deliveryOrders.find(o => o.id === original.id);
+      if (!order) continue;
+      const timeRemainingSeconds = order.timeRemainingSeconds - seconds;
+      const workRemainingSeconds = Math.max(0, (order.workRemainingSeconds || 0) - seconds);
+      if (timeRemainingSeconds <= 0) {
+        set(current => ({ deliveryOrders: current.deliveryOrders.filter(o => o.id !== order.id), dailyCustomersLost: current.dailyCustomersLost + 1,
+          gameState: { ...current.gameState, reputation: Math.max(0, current.gameState.reputation - 1), fame: Math.max(0, (current.gameState.fame ?? current.gameState.reputation) - 1) } }));
+        get().showToast(`Đơn ${order.customerName} quá hạn. Nguyên liệu đã chế biến không được hoàn lại.`);
+        continue;
+      }
+      if (order.status === 'delivering' && workRemainingSeconds <= 0) {
+        const revenue = order.rewardMoney + order.rewardTip;
+        const fee = order.shippingFee || 0;
+        set(current => ({ dailyRevenue: (current.gameState.dailyFinance?.revenue || 0) + revenue,
+          dailyCustomersServed: current.dailyCustomersServed + order.quantity,
+          deliveryOrders: current.deliveryOrders.filter(o => o.id !== order.id),
+          gameState: { ...current.gameState, money: current.gameState.money + revenue - fee,
+            branchFinances: withBranchOperation(current.gameState,current.gameState.activeRestaurantId || 'banh_mi',revenue,0,order.quantity,fee),
+            businessMetrics: { ...current.gameState.businessMetrics!, lifetimeRevenue:(current.gameState.businessMetrics?.lifetimeRevenue || 0) + revenue, lifetimeProfit:(current.gameState.businessMetrics?.lifetimeProfit || 0) + revenue - (order.cogs || 0) - fee, totalCustomers:(current.gameState.businessMetrics?.totalCustomers || 0) + order.quantity },
+            totalDeliveriesCompleted: (current.gameState.totalDeliveriesCompleted || 0) + 1,
+            reputation: current.gameState.reputation + 1, fame: (current.gameState.fame ?? current.gameState.reputation) + 1,
+            dailyFinance: { ...createInitialDailyFinance(), ...current.gameState.dailyFinance, revenue: (current.gameState.dailyFinance?.revenue || 0) + revenue,
+              tips: (current.gameState.dailyFinance?.tips || 0) + order.rewardTip, deliveryFees: (current.gameState.dailyFinance?.deliveryFees || 0) + fee } } }));
+        get().serveNeighborGuest('chu_nam');
+        get().showToast(`Giao thành công: +${(revenue - fee).toLocaleString('vi-VN')}đ sau phí ship.`);
+        get().saveLocal();
+      } else {
+        const status = order.status === 'cooking' && workRemainingSeconds <= 0 ? 'ready' as const : order.status;
+        set(current => ({ deliveryOrders: current.deliveryOrders.map(o => o.id === order.id ? { ...o, timeRemainingSeconds, workRemainingSeconds, status } : o) }));
+      }
+    }
   },
 
   cancelDeliveryOrder: (orderId) => {
@@ -1846,7 +1930,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const { gameState } = get();
     if (gameState.currentEvent) return;
 
-    const chosen = event || STREET_EVENTS[Math.floor(Math.random() * STREET_EVENTS.length)];
+    if (!event && get().dailyEventsCount >= 3) { get().showToast('Hôm nay đã đủ chuyện xóm. Ghé lại vào ngày mai nhé.'); return; }
+    const recent = gameState.streetEventHistory?.slice(-3) || [];
+    const available = STREET_EVENTS.filter(item => !recent.includes(item.id));
+    const pool = available.length ? available : STREET_EVENTS;
+    const chosen = event || pool[Math.floor(Math.random() * pool.length)];
     set((state) => ({
       hasEventTriggeredToday: true,
       dailyEventsCount: state.dailyEventsCount + 1,
@@ -1881,8 +1969,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const newEnergy = Math.max(0, Math.min(maxEnergy, currentEnergy + energy));
 
     set((state) => ({
-      dailyRevenue: state.dailyRevenue + gain,
-      dailyCost: state.dailyCost + cost,
+      dailyRevenue: state.gameState.dailyFinance?.revenue || 0,
       lastEventOutcome: {
         eventTitle: event.title,
         icon: event.icon,
@@ -1897,12 +1984,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       gameState: {
         ...state.gameState,
         money: state.gameState.money - cost + gain,
+        dailyFinance: { ...createInitialDailyFinance(), ...state.gameState.dailyFinance,
+          otherIncome: (state.gameState.dailyFinance?.otherIncome || 0) + gain,
+          eventExpenses: (state.gameState.dailyFinance?.eventExpenses || 0) + cost },
+        fame: Math.max(0, (state.gameState.fame ?? state.gameState.reputation) + rep),
         reputation: Math.max(0, state.gameState.reputation + rep),
         player: {
           ...state.gameState.player,
           energy: newEnergy,
         },
         currentEvent: null,
+        streetEventHistory: [...(state.gameState.streetEventHistory || []), event.id].slice(-20),
       },
     }));
 
@@ -1914,18 +2006,21 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   triggerSurpriseIncident: (incident) => {
-    const chosen = incident || getRandomSurpriseIncident();
+    if (!incident && get().hasIncidentTriggeredToday) { get().showToast('Hôm nay đã có một biến cố. Hãy tập trung hoàn tất ca bán.'); return; }
+    const chosen = incident || chooseContextualIncident(get().gameState, get().deliveryOrders.some(o => o.status !== 'pending'));
     set({ activeIncident: chosen, hasIncidentTriggeredToday: true });
   },
 
-  resolveSurpriseIncident: () => {
+  resolveSurpriseIncident: (response = 'accept') => {
     const { activeIncident, gameState } = get();
     if (!activeIncident) return;
 
-    const moneyDiff = activeIncident.moneyChange;
-    const repDiff = activeIncident.reputationChange;
+    const mitigating = response === 'mitigate' && activeIncident.moneyChange < 0;
+    if (mitigating && gameState.player.energy < 10) { get().showToast('Cần 10 thể lực để tự khắc phục sự cố.'); return; }
+    const moneyDiff = mitigating ? Math.round(activeIncident.moneyChange * 0.5) : activeIncident.moneyChange;
+    const repDiff = mitigating ? 0 : activeIncident.reputationChange;
 
-    const newMoney = Math.max(0, gameState.money + moneyDiff);
+    const newMoney = gameState.money + moneyDiff;
     // BUG 1 FIXED: Không giới hạn cap 100 điểm với uy tín / danh tiếng!
     const newReputation = Math.max(0, (gameState.reputation || 0) + repDiff * 4);
     const newFame = Math.max(0, (gameState.fame ?? gameState.reputation ?? 0) + repDiff * 4);
@@ -1939,11 +2034,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set((state) => ({
       activeIncident: null,
-      dailyRevenue: moneyDiff > 0 ? state.dailyRevenue + moneyDiff : state.dailyRevenue,
-      dailyCost: moneyDiff < 0 ? state.dailyCost + Math.abs(moneyDiff) : state.dailyCost,
+      dailyRevenue: state.gameState.dailyFinance?.revenue || 0,
       gameState: {
         ...state.gameState,
         money: newMoney,
+        incidentHistory: [...(gameState.incidentHistory || []), activeIncident.id].slice(-20),
+        player: { ...state.gameState.player, energy:state.gameState.player.energy - (mitigating ? 10 : 0) },
         reputation: newReputation,
         fame: newFame,
         dailyFinance: updatedFinance,
@@ -1995,10 +2091,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return false;
     }
 
-    const nextStageUpgrades = gameState.stageUpgrades?.[nextStageId] || {};
+    const upgradeHistory = gameState.stageUpgrades || { [gameState.businessStage || 'cart']: gameState.purchasedUpgrades || {} };
+    const nextStageUpgrades = upgradeHistory[nextStageId] || {};
     const newStorageCapacity = Math.max(
       gameState.storageCapacity,
-      calculateStorageCapacity(nextStageId, nextStageUpgrades)
+      calculateStorageCapacity(nextStageId, nextStageUpgrades, upgradeHistory)
     );
 
     set({
@@ -2008,7 +2105,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         businessStage: nextStageId,
         storageCapacity: newStorageCapacity,
         stageUpgrades: {
-          ...(gameState.stageUpgrades || {}),
+          ...upgradeHistory,
           [nextStageId]: nextStageUpgrades,
         },
       },
@@ -2064,6 +2161,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (!restaurant || !gameState.unlockedRestaurants?.includes(restaurantId)) return;
 
     const currentRestId = gameState.activeRestaurantId || 'banh_mi';
+    if (currentRestId === restaurantId) return;
+    if (get().activeOrders.length || get().deliveryOrders.some(o => o.status !== 'pending')) {
+      get().showToast('Hãy hoàn tất khách và đơn giao đang làm trước khi chuyển quán.');
+      return;
+    }
 
     set((state) => {
       // 1. Lưu kho của quán đang kích hoạt
@@ -2253,7 +2355,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   endDayAndSleep: () => {
-    const { gameState, dailyRevenue, dailyCost, dailyCustomersServed, dailyCustomersLost } = get();
+    if (!get().isShopOpen && !get().isDailySummaryShown && get().gameState.dayPhase !== 'night_audit') {
+      get().showToast('Hãy mở và kết thúc ca bán trước khi kết toán ngày.');
+      return;
+    }
+    if (get().gameState.settledDay === get().gameState.day) return;
+    if (get().activeOrders.length || get().isShopOpen) get().forceCloseStoreTonight();
+    if (get().gameState.activeLotteryTicket) get().checkLotteryDraw();
+    const { gameState, dailyCost, dailyCustomersServed, dailyCustomersLost } = get();
+    const statement = getOperatingStatement(gameState);
+    const dailyRevenue = statement.finance.revenue;
 
     // Nếu còn vé số chưa quay trước khi ngủ, tự động quay thưởng
     if (gameState.activeLotteryTicket) {
@@ -2272,8 +2383,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
         // Cập nhật độ stress & mood sau ngày làm việc
         const stressDelta = hasCatPainting ? 4 : 8;
-        const newStress = Math.min(100, (emp.stress || 15) + stressDelta);
-        const newMood = Math.max(10, (emp.mood || 85) - Math.floor(newStress / 10));
+        const newStress = Math.min(100, (emp.stress ?? 15) + stressDelta);
+        const newMood = Math.max(10, (emp.mood ?? 85) - Math.floor(newStress / 10));
 
         updatedEmployees[empId] = {
           ...emp,
@@ -2287,43 +2398,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
 
     // 2. Tính chi phí cố định theo Business Stage (Mặt bằng & Điện nước)
-    const stageCosts = calculateStageFixedCosts(gameState.businessStage || 'cart');
-    const rentPaid = stageCosts.rent;
-    const utilitiesPaid = stageCosts.utilities;
-
-    // 3. Tính toán Báo cáo Tài chính P&L Chuẩn Mực F&B
-    const currentFinance = gameState.dailyFinance || createInitialDailyFinance();
-    const cogsPaid = currentFinance.cogs > 0 ? currentFinance.cogs : dailyCost;
-    const grossProfit = dailyRevenue - cogsPaid;
-    const marketingPaid = currentFinance.marketing || 0;
-    const otherExpenses = currentFinance.eventExpenses + currentFinance.otherExpense;
-    const otherIncome = currentFinance.otherIncome;
-    const netProfit = grossProfit - totalSalaries - rentPaid - utilitiesPaid - marketingPaid - otherExpenses + otherIncome;
+    const rentPaid = statement.rent;
+    const utilitiesPaid = statement.utilities;
+    const currentFinance = statement.finance;
+    const cogsPaid = currentFinance.cogs;
+    const grossProfit = statement.grossProfit;
+    const marketingPaid = currentFinance.marketing;
+    const netProfit = statement.netProfit + statement.spoilage.spoilageCost;
 
     // 4. Phân tích Nút Cổ Chai (Bottleneck: Cầu - Năng lực - Kho)
     const bottleneckAnalysis = calculateBottleneck({
       servedCount: dailyCustomersServed,
       lostCount: dailyCustomersLost,
-      capacityBottleneckCount: dailyCustomersLost,
+      capacityBottleneckCount: get().lossReasons.capacity,
+      stockBottleneckCount: get().lossReasons.inventory,
+      demandBottleneckCount: get().lossReasons.demand,
       revenue: dailyRevenue,
       reputation: gameState.reputation || 0,
     });
 
     // 5. Tính toán hao hụt nguyên liệu tươi cuối ngày (Daily Spoilage)
-    const spoilage = calculateDailySpoilage({
-      inventory: gameState.inventory,
-      fridgeLevel: gameState.fridgeUpgradeLevel || 0,
-    });
+    const spoilage = statement.spoilage;
 
     // 6. Tính dự báo dòng tiền 3 ngày tới
     const projectedCashflow = calculate3DayCashflowForecast({
-      currentMoney: gameState.money - totalSalaries - rentPaid - utilitiesPaid - spoilage.spoilageCost,
+      currentMoney: statement.closingCash,
       dailyNetProfit: netProfit - spoilage.spoilageCost,
       fixedCostsPerDay: totalSalaries + rentPaid + utilitiesPaid,
     });
 
     // 7. Đánh giá 5 mức Sức khỏe Tài chính
-    const nextMoney = gameState.money - totalSalaries - rentPaid - utilitiesPaid - spoilage.spoilageCost;
+    const nextMoney = statement.closingCash;
     const nextCrisisCount = nextMoney <= 0 ? (gameState.consecutiveCrisisDays || 0) + 1 : 0;
     const health = evaluateFinancialHealth({
       currentMoney: nextMoney,
@@ -2371,7 +2476,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       averageRating: gameState.rating ?? 75,
       fameGain: Math.max(0, dailyCustomersServed - dailyCustomersLost),
       insights,
-      branchFinances: gameState.branchFinances,
+      branchFinances: statement.branchStatements,
       primaryBottleneck: bottleneckAnalysis.type,
       bottleneckAnalysis,
       projectedCashflow3Days: projectedCashflow,
@@ -2395,6 +2500,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       weather: nextWeather,
       businessStage: gameState.businessStage || 'cart',
     });
+    if (nextWeather === 'rainy' && (gameState.neighbors.chu_nam?.level || 1) >= 2) briefing.warningAlert = 'Chú Năm báo trước: ngày mai mưa, chuẩn bị bếp và nguyên liệu cho đơn giao; tránh nhận nhiều đơn cùng lúc.';
 
     // Sự kiện đặc biệt chợ đầu mối giảm giá mỗi ngày
     const marketSpecialCandidates: { ingredientId: IngredientId; discountPercent: number; newsText: string }[] = [
@@ -2419,6 +2525,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       day: gameState.day + 1,
       gameTimeMinutes: 360, // 06:00 sáng
       money: nextMoney,
+      businessMetrics: { ...gameState.businessMetrics!, lifetimeProfit:gameState.historySummaries.reduce((sum,day) => sum + day.netProfit,0) + statement.netProfit },
       player: {
         ...gameState.player,
         energy: gameState.player.maxEnergy, // Hồi phục 100% năng lượng
@@ -2427,7 +2534,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       morningBriefing: briefing,
       financialHealth: health.level,
       consecutiveCrisisDays: nextCrisisCount,
-      rollingRatings: pastRatings,
+      rollingRatings: pastRatings.slice(-14),
+      loanDebt: Math.max(0, (gameState.loanDebt || 0) - statement.debtPayment),
+      settledDay: gameState.day,
+      operatingSnapshot: undefined,
+      lastDeliveryRequestMinute: undefined,
+      restaurantInventories: statement.inventories,
       inventory: spoilage.updatedInventory,
       weather: nextWeather,
       marketPrices: nextMarketPrices,
@@ -2442,6 +2554,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set({
       gameState: nextDayState,
+      activeOrders: [],
+      deliveryOrders: [],
+      activeIncident: null,
       isShopOpen: false,
       isDailySummaryShown: false,
       hasEventTriggeredToday: false,
@@ -2455,6 +2570,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       dailyCost: 0,
       dailyCustomersServed: 0,
       dailyCustomersLost: 0,
+      lossReasons: { inventory:0, capacity:0, demand:0 },
     });
 
     const weatherEmoji = nextWeather === 'sunny' ? '☀️' : nextWeather === 'rainy' ? '🌧️' : '🍃';
@@ -2465,7 +2581,38 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().syncCloud();
   },
 
+  forceCloseStoreTonight: () => {
+    if (get().gameState.dayPhase === 'night_audit') return;
+    const { activeOrders, gameState } = get();
+    for (const order of activeOrders.filter(o => o.state === 'paying')) get().collectPayment(order.id);
+    const remaining = get().activeOrders;
+    const lostCount = remaining.length + get().deliveryOrders.filter(o => o.status !== 'pending').length;
+    const currentRating = get().gameState.rating ?? 75;
+    const newRating = lostCount > 0 ? updateShopRating(currentRating, 20) : currentRating;
+
+    set((state) => ({
+      dailyCustomersLost: state.dailyCustomersLost + lostCount,
+      lossReasons: { ...state.lossReasons, capacity:state.lossReasons.capacity + lostCount },
+      activeOrders: [],
+      deliveryOrders: [],
+      isShopOpen: false,
+      isDailySummaryShown: true,
+      activeModal: 'dailySummary',
+      gameState: {
+        ...state.gameState,
+        dayPhase: 'night_audit',
+        gameTimeMinutes: 1320,
+        reputation: Math.max(0, state.gameState.reputation - (lostCount > 0 ? 1 : 0)),
+        fame: Math.max(0, (state.gameState.fame ?? state.gameState.reputation) - (lostCount > 0 ? 1 : 0)),
+        rating: newRating,
+      },
+    }));
+    get().showToast('🧹 Đã dọn quán đóng cửa và chuyển sang Bảng Kết Toán Ngày!');
+    get().saveLocal();
+  },
+
   openStoreForDay: () => {
+    if (get().gameState.dayPhase === 'night_audit') { get().openModal('dailySummary'); return; }
     set((state) => ({
       isShopOpen: true,
       gameState: {
@@ -2478,13 +2625,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   takeEmergencyLoan: (source: 'neighbor' | 'bank') => {
     const { gameState } = get();
+    if ((gameState.loanDebt || 0) > 0) { get().showToast('Cần trả hết khoản vay hiện tại trước khi vay tiếp.'); return false; }
     const amount = source === 'neighbor' ? 1000000 : 5000000;
     const addedDebt = source === 'neighbor' ? 1000000 : 5500000;
     set({
       gameState: {
         ...gameState,
         money: gameState.money + amount,
-        loanDebt: (gameState.loanDebt || 0) + addedDebt,
+        loanDebt: addedDebt,
+        loanRepaymentPerDay: Math.ceil(addedDebt / 10),
+        dailyFinance: { ...createInitialDailyFinance(), ...gameState.dailyFinance, otherExpense: (gameState.dailyFinance?.otherExpense || 0) + addedDebt - amount },
         consecutiveCrisisDays: 0,
         financialHealth: 'deficit',
       },
@@ -2496,23 +2646,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   liquidateEquipment: () => {
     const { gameState } = get();
-    const recovered = 2000000;
-    set({
-      gameState: {
-        ...gameState,
-        money: gameState.money + recovered,
-        financialHealth: 'stress',
-        consecutiveCrisisDays: 0,
-      },
-    });
-    get().showToast(`📦 Đã thanh lý bớt đồ nghề cũ, thu hồi +${recovered.toLocaleString('vi-VN')}đ tiền mặt!`);
+    const offer = getLiquidationOffer(gameState);
+    if (!offer) { get().showToast('Không có thiết bị đã mua để thanh lý.'); return false; }
+    const levels = { ...(gameState.stageUpgrades || { [gameState.businessStage]: gameState.purchasedUpgrades }) };
+    levels[offer.stage] = { ...levels[offer.stage], [offer.id]: offer.level - 1 };
+    const current = levels[gameState.businessStage] || {};
+    if (get().activeOrders.some(o => o.tableIndex > calculateMaxTables(gameState.businessStage, current, levels))) { get().showToast('Hoàn tất các bàn đang phục vụ trước khi bán bớt thiết bị.'); return false; }
+    set({ gameState: { ...gameState, money: gameState.money + offer.value,
+      stageUpgrades: levels, purchasedUpgrades: current,
+      storageCapacity: calculateStorageCapacity(gameState.businessStage, current, levels),
+      fridgeUpgradeLevel: Math.min(2, Object.values(levels).reduce((sum, value) => sum + (value?.cozy_storage || 0), 0)),
+      financialHealth: 'stress', consecutiveCrisisDays: 0 } });
+    get().showToast(`Đã bán ${offer.title}: +${offer.value.toLocaleString('vi-VN')}đ. Hiệu quả thiết bị giảm một cấp.`);
     get().saveLocal();
     return true;
   },
 
   resetGameWithLegacy: () => {
     const { gameState } = get();
-    const pointsEarned = Math.max(15, Math.floor(gameState.day * 3));
+    if (gameState.financialHealth !== 'bankrupt') { get().showToast('Di sản chỉ được kế thừa khi hành trình đã phá sản.'); return; }
+    const pointsEarned = Math.max(1, Math.floor((gameState.businessMetrics?.lifetimeRevenue || 0) / 1000000) + (gameState.unlockedRestaurants?.length || 1) * 3);
     const totalLegacy = (gameState.legacyPoints || 0) + pointsEarned;
     const bonusStartMoney = 500000 + Math.min(2000000, totalLegacy * 25000);
 
@@ -2524,8 +2677,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         historySummaries: [],
         dayPhase: 'morning_prep',
       },
-      isShopOpen: false,
-      activeOrders: [],
+      isShopOpen: false, activeOrders: [], deliveryOrders: [], activeIncident: null,
+      dailyRevenue: 0, dailyCost: 0, dailyCustomersServed: 0, dailyCustomersLost: 0, lossReasons:{ inventory:0, capacity:0, demand:0 },
+      isDailySummaryShown: false, dailyEventsCount: 0, lastEventTimeMinutes: 0, hasIncidentTriggeredToday: false,
+      activeModal: null,
     });
     get().showToast(`🌱 Bắt đầu hành trình mới! Di sản để lại: +${pointsEarned} Điểm Di Sản (Vốn khởi đầu: ${bonusStartMoney.toLocaleString('vi-VN')}đ)`);
     get().saveLocal();
@@ -2533,255 +2688,53 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   saveLocal: () => {
     try {
-      const stateToSave = {
-        ...get().gameState,
-        deliveryOrders: get().deliveryOrders,
-        lastSavedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-    } catch (e) {
-      console.error('Không thể lưu LocalStorage:', e);
-    }
+      const state = get();
+      const game = { ...state.gameState, deliveryOrders: state.deliveryOrders, lastSavedAt: new Date().toISOString(),
+        operatingSnapshot: { activeOrders: state.activeOrders, isShopOpen: state.isShopOpen, dailyCost: state.dailyCost,
+          dailyCustomersServed: state.dailyCustomersServed, dailyCustomersLost: state.dailyCustomersLost,
+          lossReasons: state.lossReasons,
+          dailyEventsCount: state.dailyEventsCount, lastEventTimeMinutes: state.lastEventTimeMinutes,
+          isLotteryDrawnToday: state.isLotteryDrawnToday, hasIncidentTriggeredToday: state.hasIncidentTriggeredToday, activeIncident: state.activeIncident } };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(game));
+      set({ gameState: game });
+    } catch (error) { console.error('Không thể lưu game:', error); }
   },
 
   loadGame: async () => {
+    const applySave = (raw: GameSaveState) => { const game = migrateSave(raw); set({ gameState: game, ...restoreOperatingState(game), showFlashScreen: false }); };
     try {
       const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (local) {
-        const parsed = JSON.parse(local) as GameSaveState;
-        const stg = parsed.businessStage || 'cart';
-        const loadedStageUpgrades = parsed.stageUpgrades || {
-          cart: parsed.purchasedUpgrades || {},
-          corner: {},
-          awning: {},
-          eatery: {},
-          empire: {},
-        };
-        const currentStageUpgrades = loadedStageUpgrades[stg] || {};
-        const correctCapacity = Math.max(
-          parsed.storageCapacity || 100,
-          calculateStorageCapacity(stg, currentStageUpgrades)
-        );
-
-        const activeRestId = parsed.activeRestaurantId || 'banh_mi';
-        const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
-
-        // Phân tách & làm sạch kho riêng cho từng thương hiệu quán
-        let restInvs = parsed.restaurantInventories || {};
-        let currentInv = { ...(parsed.inventory || {}) };
-
-        // Kiểm tra xem kho hiện tại có lẫn nguyên liệu của quán khác không
-        const foreignIngs = Object.keys(currentInv).filter(
-          (id) => !currentRest.allowedIngredientIds.includes(id as IngredientId)
-        );
-
-        if (foreignIngs.length > 0 || !restInvs[activeRestId]) {
-          const cleanCurrentInv: Partial<Record<IngredientId, number>> = {};
-          for (const id of currentRest.allowedIngredientIds) {
-            cleanCurrentInv[id] = currentInv[id] ?? 10;
-          }
-
-          const updatedRestInvs: Partial<Record<RestaurantTypeId, Partial<Record<IngredientId, number>>>> = {
-            ...restInvs,
-            [activeRestId]: cleanCurrentInv,
-          };
-
-          const unlocked = parsed.unlockedRestaurants || [activeRestId];
-          for (const rId of unlocked) {
-            if (!updatedRestInvs[rId]) {
-              updatedRestInvs[rId] = getStarterInventoryForRestaurant(rId);
-            }
-          }
-
-          currentInv = cleanCurrentInv;
-          restInvs = updatedRestInvs;
+      if (local) applySave(JSON.parse(local));
+      else set({ showFlashScreen: !get().gameState.hasChosenStarter });
+      const loadedAt = get().gameState.lastSavedAt;
+      try {
+        const response = await fetch(`/api/save/${get().gameState.playerId}`);
+        if (!response.ok) return;
+        const json = await response.json();
+        if (json.success && json.data && get().gameState.lastSavedAt === loadedAt && new Date(json.data.lastSavedAt).getTime() > new Date(loadedAt || 0).getTime()) {
+          applySave(json.data);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(get().gameState));
         }
-
-        const starterRecipes = getStarterRecipesForRestaurant(activeRestId);
-        const unlockedRecipes = parsed.unlockedRecipes?.length
-          ? Array.from(new Set([...parsed.unlockedRecipes, ...starterRecipes]))
-          : starterRecipes;
-
-        const migratedEmployeeDetails = { ...(parsed.employeeDetails || {}) };
-        for (const [id, emp] of Object.entries(migratedEmployeeDetails)) {
-          const defaultEmp = EMPLOYEES.find((e) => e.id === id);
-          if (defaultEmp && (!emp.salaryPerDay || emp.salaryPerDay < defaultEmp.salaryPerDay)) {
-            migratedEmployeeDetails[id] = {
-              ...emp,
-              salaryPerDay: defaultEmp.salaryPerDay,
-            };
-          }
-        }
-
-        // Lọc đơn giao hàng: chỉ giữ các đơn thuộc thực đơn quán đang kích hoạt
-        const validDeliveries = (parsed.deliveryOrders || []).filter((o) =>
-          currentRest.primaryRecipeIds.includes(o.recipeId)
-        );
-
-        set({
-          deliveryOrders: validDeliveries,
-          gameState: {
-            ...INITIAL_GAME_STATE,
-            ...parsed,
-            businessStage: stg,
-            stageUpgrades: loadedStageUpgrades,
-            storageCapacity: correctCapacity,
-            inventory: currentInv,
-            restaurantInventories: restInvs,
-            unlockedRecipes: unlockedRecipes,
-            deliveryOrders: validDeliveries,
-            ownedThemes: parsed.ownedThemes || ['sakura_pink'],
-            ownedDecorations: parsed.ownedDecorations || [],
-            equippedDecorations: parsed.equippedDecorations || [],
-            employeeDetails: migratedEmployeeDetails,
-            shopName: parsed.shopName || currentRest.name,
-            neighbors: {
-              ...INITIAL_GAME_STATE.neighbors,
-              ...(parsed.neighbors || {}),
-            },
-            lotteryHistory: parsed.lotteryHistory || [],
-            activeLotteryTicket: parsed.activeLotteryTicket || null,
-            activeRestaurantId: activeRestId,
-            unlockedRestaurants: parsed.unlockedRestaurants || [activeRestId],
-            hasChosenStarter: parsed.hasChosenStarter ?? false,
-            weather: parsed.weather || 'sunny',
-            marketSpecial: parsed.marketSpecial || null,
-          },
-        });
-      }
-
-          const res = await fetch('/api/save/player_default');
-          if (res.ok) {
-            const json = await res.json();
-            if (json.success && json.data) {
-              const cloudState = json.data as GameSaveState;
-              const currentLocal = get().gameState;
-              if (
-                new Date(cloudState.lastSavedAt).getTime() >
-                new Date(currentLocal.lastSavedAt || 0).getTime()
-              ) {
-                const cloudStg = cloudState.businessStage || 'cart';
-                const cloudStageUpgrades = cloudState.stageUpgrades || {
-                  cart: cloudState.purchasedUpgrades || {},
-                  corner: {},
-                  awning: {},
-                  eatery: {},
-                  empire: {},
-                };
-                const cloudCurrentUpgrades = cloudStageUpgrades[cloudStg] || {};
-                const cloudCapacity = Math.max(
-                  cloudState.storageCapacity || 100,
-                  calculateStorageCapacity(cloudStg, cloudCurrentUpgrades)
-                );
-
-                const cloudActiveRestId = cloudState.activeRestaurantId || 'banh_mi';
-                const cloudCurrentRest = RESTAURANT_TYPES[cloudActiveRestId] || RESTAURANT_TYPES.banh_mi;
-
-                let cloudRestInvs = cloudState.restaurantInventories || {};
-                let cloudCurrentInv = { ...(cloudState.inventory || {}) };
-
-                const cloudForeignIngs = Object.keys(cloudCurrentInv).filter(
-                  (id) => !cloudCurrentRest.allowedIngredientIds.includes(id as IngredientId)
-                );
-
-                if (cloudForeignIngs.length > 0 || !cloudRestInvs[cloudActiveRestId]) {
-                  const cleanCloudInv: Partial<Record<IngredientId, number>> = {};
-                  for (const id of cloudCurrentRest.allowedIngredientIds) {
-                    cleanCloudInv[id] = cloudCurrentInv[id] ?? 10;
-                  }
-
-                  const updatedCloudRestInvs: Partial<Record<RestaurantTypeId, Partial<Record<IngredientId, number>>>> = {
-                    ...cloudRestInvs,
-                    [cloudActiveRestId]: cleanCloudInv,
-                  };
-
-                  const unlocked = cloudState.unlockedRestaurants || [cloudActiveRestId];
-                  for (const rId of unlocked) {
-                    if (!updatedCloudRestInvs[rId]) {
-                      updatedCloudRestInvs[rId] = getStarterInventoryForRestaurant(rId);
-                    }
-                  }
-
-                  cloudCurrentInv = cleanCloudInv;
-                  cloudRestInvs = updatedCloudRestInvs;
-                }
-
-                const cloudStarterRecipes = getStarterRecipesForRestaurant(cloudActiveRestId);
-                const cloudUnlockedRecipes = cloudState.unlockedRecipes?.length
-                  ? Array.from(new Set([...cloudState.unlockedRecipes, ...cloudStarterRecipes]))
-                  : cloudStarterRecipes;
-
-                const cloudMigratedEmployeeDetails = { ...(cloudState.employeeDetails || {}) };
-                for (const [id, emp] of Object.entries(cloudMigratedEmployeeDetails)) {
-                  const defaultEmp = EMPLOYEES.find((e) => e.id === id);
-                  if (defaultEmp && (!emp.salaryPerDay || emp.salaryPerDay < defaultEmp.salaryPerDay)) {
-                    cloudMigratedEmployeeDetails[id] = {
-                      ...emp,
-                      salaryPerDay: defaultEmp.salaryPerDay,
-                    };
-                  }
-                }
-
-                const cloudValidDeliveries = (cloudState.deliveryOrders || []).filter((o) =>
-                  cloudCurrentRest.primaryRecipeIds.includes(o.recipeId)
-                );
-
-                set({
-                  deliveryOrders: cloudValidDeliveries,
-                  gameState: {
-                    ...INITIAL_GAME_STATE,
-                    ...cloudState,
-                    businessStage: cloudStg,
-                    stageUpgrades: cloudStageUpgrades,
-                    storageCapacity: cloudCapacity,
-                    inventory: cloudCurrentInv,
-                    restaurantInventories: cloudRestInvs,
-                    unlockedRecipes: cloudUnlockedRecipes,
-                    deliveryOrders: cloudValidDeliveries,
-                    ownedThemes: cloudState.ownedThemes || ['sakura_pink'],
-                    ownedDecorations: cloudState.ownedDecorations || [],
-                    equippedDecorations: cloudState.equippedDecorations || [],
-                    employeeDetails: cloudMigratedEmployeeDetails,
-                    shopName: cloudState.shopName || cloudCurrentRest.name,
-                    neighbors: {
-                      ...INITIAL_GAME_STATE.neighbors,
-                      ...(cloudState.neighbors || {}),
-                    },
-                    lotteryHistory: cloudState.lotteryHistory || [],
-                    activeLotteryTicket: cloudState.activeLotteryTicket || null,
-                    activeRestaurantId: cloudActiveRestId,
-                    unlockedRestaurants: cloudState.unlockedRestaurants || [cloudActiveRestId],
-                    hasChosenStarter: cloudState.hasChosenStarter ?? false,
-                    weather: cloudState.weather || 'sunny',
-                    marketSpecial: cloudState.marketSpecial || null,
-                  },
-                });
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState));
-              }
-            }
-      }
-    } catch (e) {
-      console.warn('Sử dụng Local save do Cloud offline:', e);
-    }
+      } catch { /* Local save remains authoritative while offline. */ }
+    } catch (error) { console.warn('Không thể tải bản lưu:', error); }
   },
 
   syncCloud: async () => {
+    get().saveLocal();
     try {
       const state = get().gameState;
-      await fetch(`/api/save/${state.playerId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
-      });
-    } catch (e) {
-      console.warn('Lỗi đồng bộ Cloud:', e);
-    }
+      const response = await fetch(`/api/save/${state.playerId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) });
+      if (!response.ok) return false;
+      const result = await response.json();
+      return result.success === true;
+    } catch { return false; }
   },
 
   resetGame: () => {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     set({
-      gameState: { ...INITIAL_GAME_STATE, lastSavedAt: new Date().toISOString() },
+      gameState: { ...structuredClone(INITIAL_GAME_STATE), lastSavedAt: new Date().toISOString() },
+      activeOrders: [], deliveryOrders: [], activeIncident: null, employeeActionStatus: {}, showFlashScreen: true, lossReasons:{ inventory:0, capacity:0, demand:0 },
       isShopOpen: false,
       dailyRevenue: 0,
       dailyCost: 0,
@@ -2798,5 +2751,5 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
     get().showToast('🔄 Đã khởi động lại tiệm từ đầu!');
   },
-}));
-
+};
+});

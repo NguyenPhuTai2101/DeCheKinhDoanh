@@ -6,8 +6,8 @@ import { DeliveryOrder } from '../../../shared/types';
 describe('Module: Delivery Orders & Street Life', () => {
   beforeEach(() => {
     useGameStore.setState({
-      gameState: JSON.parse(JSON.stringify(INITIAL_GAME_STATE)),
-      deliveryOrders: [],
+      gameState: { ...structuredClone(INITIAL_GAME_STATE), player:{ ...INITIAL_GAME_STATE.player,cookingLevel:2 } },
+      deliveryOrders: [], activeOrders: [], dailyRevenue: 0, dailyCost: 0, dailyCustomersServed: 0,
       isShopOpen: true,
       toastMessage: null,
     });
@@ -67,6 +67,12 @@ describe('Module: Delivery Orders & Street Life', () => {
       const success = fulfillDeliveryOrder('deliv_1');
       expect(success).toBe(true);
 
+      expect(useGameStore.getState().gameState.money).toBe(100000);
+      expect(useGameStore.getState().fulfillDeliveryOrder('deliv_1')).toBe(false);
+      useGameStore.getState().tickDeliveries(10);
+      expect(useGameStore.getState().deliveryOrders[0].status).toBe('ready');
+      expect(useGameStore.getState().fulfillDeliveryOrder('deliv_1')).toBe(true);
+      useGameStore.getState().tickDeliveries(12);
       const state = useGameStore.getState();
       expect(state.gameState.money).toBeGreaterThan(100000);
       expect(state.deliveryOrders.find((o) => o.id === 'deliv_1')).toBeUndefined();

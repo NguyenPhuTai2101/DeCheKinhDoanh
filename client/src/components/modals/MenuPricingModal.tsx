@@ -4,11 +4,12 @@ import { RESTAURANT_TYPES, RECIPES, INGREDIENTS } from '../../../../shared/gameD
 import { RecipeId } from '../../../../shared/types';
 import { calculateDishCOGS, calculateGrossProfit, calculateGrossMargin } from '../../../../shared/economy/pricing';
 import { calculateDishDemand } from '../../../../shared/economy/demand';
+import { getRecipeLearningCost } from '../../../../shared/progression/recipes';
 import { soundManager } from '../../utils/soundManager';
 import { X, CheckCircle, XCircle, TrendingUp, DollarSign, ChefHat, Tag, Info, AlertTriangle } from 'lucide-react';
 
 export const MenuPricingModal: React.FC = () => {
-  const { closeModal, gameState, setDishPrice, toggleActiveRecipe } = useGameStore();
+  const { closeModal, gameState, setDishPrice, toggleActiveRecipe, learnRecipe } = useGameStore();
 
   const activeRestId = gameState.activeRestaurantId || 'banh_mi';
   const currentRest = RESTAURANT_TYPES[activeRestId] || RESTAURANT_TYPES.banh_mi;
@@ -36,6 +37,8 @@ export const MenuPricingModal: React.FC = () => {
   });
 
   const isDishActive = activeRecipes.includes(selectedRecipeId);
+  const learning = getRecipeLearningCost(activeRestId, selectedRecipeId);
+  const learned = gameState.unlockedRecipes.includes(selectedRecipeId);
 
   const handleAdjustPrice = (delta: number) => {
     soundManager.playClick();
@@ -49,22 +52,22 @@ export const MenuPricingModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50 animate-fade-in select-none">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-rose-300 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88vh]">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50 animate-fade-in select-none">
+      <div role="dialog" aria-modal="true" aria-label="MenuPricing" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-rose-300 w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88vh]">
         {/* Header Modal */}
         <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 px-4 sm:px-6 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">📋</span>
             <div>
               <h2 className="text-base sm:text-lg font-black leading-tight drop-shadow-2xs">
-                Thực Đơn & Chiến Lược Định Giá (V2)
+                Thực Đơn & Giá Bán
               </h2>
               <p className="text-[11px] text-pink-100 font-medium">
-                Tối ưu hóa Active Menu, Giá vốn (COGS) & Biên lợi nhuận cho {currentRest.name}
+                Chọn món, xem giá vốn và lợi nhuận cho {currentRest.name}
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -130,11 +133,12 @@ export const MenuPricingModal: React.FC = () => {
                         <span className="font-black text-xs text-[#5C3A33] truncate">{r.name}</span>
                       </div>
                       <button
+                        disabled={!gameState.unlockedRecipes.includes(rId)}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleToggleActive(rId);
                         }}
-                        title={isActive ? 'Đang bán (bấm để ngưng)' : 'Đang ngưng (bấm để bán)'}
+                        title={!gameState.unlockedRecipes.includes(rId) ? 'Chưa học công thức' : isActive ? 'Đang bán (bấm để ngưng)' : 'Đang ngưng (bấm để bán)'}
                         className="cursor-pointer"
                       >
                         {isActive ? (
@@ -160,6 +164,7 @@ export const MenuPricingModal: React.FC = () => {
           {/* Chi tiết định giá của món đang chọn */}
           {selectedRecipe && (
             <div className="bg-white rounded-2xl p-3.5 sm:p-4 border-2 border-rose-300 shadow-sm space-y-3">
+              {!learned && <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm"><p>Món mới · Cần tay nghề cấp {learning.requiredLevel}. Học xong, món sẽ xuất hiện trong đơn tại bàn và giao hàng.</p><button className="mt-2 rounded-xl bg-pink-500 text-white p-2 font-bold" disabled={gameState.player.cookingLevel < learning.requiredLevel || gameState.money < learning.cost} onClick={() => learnRecipe(activeRestId,selectedRecipeId)}>Học món · {learning.cost.toLocaleString('vi-VN')}đ</button></div>}
               <div className="flex items-center justify-between pb-2 border-b border-[#FFEBF0]">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{selectedRecipe.icon}</span>
@@ -175,6 +180,7 @@ export const MenuPricingModal: React.FC = () => {
                   </span>
                   <button
                     onClick={() => handleToggleActive(selectedRecipeId)}
+                    disabled={!learned}
                     className={`px-2.5 py-1 rounded-xl text-xs font-black cursor-pointer transition-all ${
                       isDishActive
                         ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'

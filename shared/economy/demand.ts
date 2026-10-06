@@ -24,6 +24,8 @@ export function calculatePriceMultiplier(
 ): number {
   if (basePrice <= 0) return 1.0;
   const priceRatio = playerPrice / basePrice;
+  // Arbitrary markups cannot preserve a guaranteed stream of buyers.
+  if (priceRatio > 2) return Math.max(0, 0.35 * Math.exp(-3 * (priceRatio - 2)) - 0.01);
   const sensitivity = CUSTOMER_PRICE_SENSITIVITY[customerType]?.sensitivity ?? 1.0;
 
   if (priceRatio > 1.0) {

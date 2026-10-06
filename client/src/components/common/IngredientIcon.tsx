@@ -1,5 +1,6 @@
 import React from 'react';
 import { IngredientId } from '../../../../shared/types';
+import { banhMiArt, ingredientArtNames } from '../../assets/banhMiArt';
 
 interface IngredientIconProps {
   id: string;
@@ -15,6 +16,10 @@ export const IngredientIcon: React.FC<IngredientIconProps> = ({
   fallbackIcon = '✨',
 }) => {
   const s = size;
+  const artName = ingredientArtNames[id];
+  if (artName) {
+    return <img src={banhMiArt(artName)} alt="" aria-hidden="true" width={s} height={s} className={className} style={{ objectFit: 'contain' }} decoding="async" />;
+  }
 
   switch (id as IngredientId) {
     case 'bread':

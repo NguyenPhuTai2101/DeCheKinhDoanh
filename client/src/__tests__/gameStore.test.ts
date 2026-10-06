@@ -83,6 +83,7 @@ describe('Module: Game Store & Lifecycle Integration', () => {
         dailyCustomersLost: 2,
       }));
 
+      store.openStoreForDay();
       store.endDayAndSleep();
 
       const nextState = useGameStore.getState();
@@ -125,15 +126,14 @@ describe('Module: Game Store & Lifecycle Integration', () => {
       expect(state.gameState.loanDebt).toBe(5500000); // 5M + 10% lãi
     });
 
-    it('TC_STR_07: Thanh lý đồ nghề thu hồi 2.000.000đ tiền mặt', () => {
-      const { liquidateEquipment } = useGameStore.getState();
-      const initialMoney = useGameStore.getState().gameState.money;
-
-      const success = liquidateEquipment();
-      expect(success).toBe(true);
-
-      const state = useGameStore.getState();
-      expect(state.gameState.money).toBe(initialMoney + 2000000);
+    it('TC_STR_07: Chỉ thanh lý thiết bị đã mua và giảm một cấp', () => {
+      useGameStore.setState(s => ({ gameState: { ...s.gameState, money: 1000000 } }));
+      expect(useGameStore.getState().purchaseUpgrade('cozy_storage')).toBe(true);
+      const before = useGameStore.getState().gameState.money;
+      expect(useGameStore.getState().liquidateEquipment()).toBe(true);
+      expect(useGameStore.getState().gameState.money).toBeGreaterThan(before);
+      expect(useGameStore.getState().gameState.stageUpgrades?.cart?.cozy_storage).toBe(0);
+      expect(useGameStore.getState().liquidateEquipment()).toBe(false);
     });
 
     it('TC_STR_08: Phá sản & Làm lại với Điểm Di Sản (Legacy Points)', () => {
@@ -191,7 +191,7 @@ describe('Module: Game Store & Lifecycle Integration', () => {
       addBranchRevenue('pho', 120000, 'Phở Bò Tái Lăn');
 
       const state = useGameStore.getState();
-      expect(state.gameState.money).toBe(initialMoney + 120000);
+      expect(state.gameState.money).toBe(initialMoney + 120000 - 48000);
       expect(state.gameState.branchFinances?.['pho']).toBeDefined();
       expect(state.gameState.branchFinances?.['pho']?.revenue).toBe(120000);
       expect(state.gameState.branchFinances?.['pho']?.customersServed).toBe(1);

@@ -1,0 +1,156 @@
+[
+  {
+    "name": "banh-mi.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 168465
+  },
+  {
+    "name": "bread.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 122860
+  },
+  {
+    "name": "cha-lua.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 142272
+  },
+  {
+    "name": "chili.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 129509
+  },
+  {
+    "name": "coffee.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 150740
+  },
+  {
+    "name": "condensed-milk.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 146574
+  },
+  {
+    "name": "cucumber.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 165112
+  },
+  {
+    "name": "customer-1.png",
+    "width": 384,
+    "height": 384,
+    "alphaCorner": 0,
+    "bytes": 248016
+  },
+  {
+    "name": "customer-2.png",
+    "width": 384,
+    "height": 384,
+    "alphaCorner": 0,
+    "bytes": 228759
+  },
+  {
+    "name": "customer-3.png",
+    "width": 384,
+    "height": 384,
+    "alphaCorner": 0,
+    "bytes": 260959
+  },
+  {
+    "name": "customer-4.png",
+    "width": 384,
+    "height": 384,
+    "alphaCorner": 0,
+    "bytes": 215146
+  },
+  {
+    "name": "customer-5.png",
+    "width": 384,
+    "height": 384,
+    "alphaCorner": 0,
+    "bytes": 208524
+  },
+  {
+    "name": "egg.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 185769
+  },
+  {
+    "name": "herbs.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 180290
+  },
+  {
+    "name": "mayo.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 121057
+  },
+  {
+    "name": "milk-tea.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 136283
+  },
+  {
+    "name": "milk.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 91862
+  },
+  {
+    "name": "pate.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 173563
+  },
+  {
+    "name": "pepper-sauce.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 155779
+  },
+  {
+    "name": "pickles.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 135170
+  },
+  {
+    "name": "pork.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 182992
+  },
+  {
+    "name": "tea.png",
+    "width": 320,
+    "height": 320,
+    "alphaCorner": 0,
+    "bytes": 140723
+  }
+]

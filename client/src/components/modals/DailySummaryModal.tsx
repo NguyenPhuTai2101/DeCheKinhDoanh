@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { getOperatingStatement, getLiquidationOffer } from '../../../../shared/economy/operating';
 import { useGameStore } from '../../store/gameStore';
 import { EMPLOYEES } from '../../../../shared/gameData';
 import {
@@ -47,48 +48,32 @@ export const DailySummaryModal: React.FC = () => {
     resetGameWithLegacy,
   } = useGameStore();
 
-  // 1. Quỹ lương nhân sự
-  let totalSalaries = 0;
-  for (const empId of gameState.hiredEmployees) {
-    const emp = gameState.employeeDetails[empId] || EMPLOYEES.find((e) => e.id === empId);
-    if (emp) totalSalaries += emp.salaryPerDay;
-  }
-
-  // 2. Chi phí cố định (Mặt bằng + Điện nước/vận hành)
-  const stageCosts = calculateStageFixedCosts(gameState.businessStage || 'cart');
-  const rent = stageCosts.rent;
-  const utilities = stageCosts.utilities;
-
-  // 3. Hao hụt nguyên liệu tươi cuối ngày (Daily Spoilage)
-  const spoilage = calculateDailySpoilage({
-    inventory: gameState.inventory,
-    fridgeLevel: gameState.fridgeUpgradeLevel || 0,
-  });
-
-  // 4. Giá vốn thực tế (COGS) & Lợi nhuận gộp
-  const cogs =
-    gameState.dailyFinance && gameState.dailyFinance.cogs > 0
-      ? gameState.dailyFinance.cogs
-      : dailyCost;
-  const grossProfit = dailyRevenue - cogs;
+  const statement = getOperatingStatement(gameState);
+  const liquidation = getLiquidationOffer(gameState);
+  const totalSalaries = statement.payroll;
+  const rent = statement.rent;
+  const utilities = statement.utilities;
+  const spoilage = statement.spoilage;
+  const cogs = statement.finance.cogs;
+  const grossProfit = statement.grossProfit;
   const grossMargin = dailyRevenue > 0 ? (grossProfit / dailyRevenue) * 100 : 0;
-
-  // 5. Lợi nhuận ròng (Net Profit) - trừ cả chi phí hao hụt
-  const netProfit = grossProfit - totalSalaries - rent - utilities - spoilage.spoilageCost;
+  const netProfit = statement.netProfit;
   const netMargin = dailyRevenue > 0 ? (netProfit / dailyRevenue) * 100 : 0;
 
   // 6. Phân tích Nút Cổ Chai (Bottleneck: Cầu - Năng lực - Tồn kho)
   const bottleneck = calculateBottleneck({
     servedCount: dailyCustomersServed,
     lostCount: dailyCustomersLost,
-    capacityBottleneckCount: dailyCustomersLost,
+    capacityBottleneckCount: useGameStore.getState().lossReasons.capacity,
+    stockBottleneckCount: useGameStore.getState().lossReasons.inventory,
+    demandBottleneckCount: useGameStore.getState().lossReasons.demand,
     revenue: dailyRevenue,
     reputation: gameState.reputation || 0,
   });
 
   // 7. Dự báo dòng tiền 3 ngày tới
   const fixedCosts = totalSalaries + rent + utilities;
-  const currentMoneyAfterCosts = gameState.money - fixedCosts - spoilage.spoilageCost;
+  const currentMoneyAfterCosts = statement.closingCash;
   const projectedCashflow = calculate3DayCashflowForecast({
     currentMoney: currentMoneyAfterCosts,
     dailyNetProfit: netProfit,
@@ -153,8 +138,8 @@ export const DailySummaryModal: React.FC = () => {
   }[weather];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50 animate-fade-in select-none">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFCCD9] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50 animate-fade-in select-none">
+      <div role="dialog" aria-modal="true" aria-label="DailySummary" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFCCD9] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]">
         {/* Header Modal */}
         <div className="bg-[#FFF1F6] px-5 py-4 border-b-2 border-[#FFD6E5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -168,7 +153,7 @@ export const DailySummaryModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={closeModal}
             className="w-8 h-8 rounded-full bg-white border border-[#FFD6E5] flex items-center justify-center text-[#7C5C55] hover:bg-rose-100 transition-all cursor-pointer"
           >
@@ -408,7 +393,7 @@ export const DailySummaryModal: React.FC = () => {
             {/* Nếu có dư nợ vay */}
             {(gameState.loanDebt || 0) > 0 && (
               <div className="text-[11px] font-black text-rose-700 bg-white/70 p-1.5 rounded-lg border border-rose-200">
-                💸 Dư nợ cứu trợ chưa thanh toán: {(gameState.loanDebt || 0).toLocaleString('vi-VN')} đ
+                💸 Dư nợ (trả tối đa 10 kỳ, sau chi phí ca): {(gameState.loanDebt || 0).toLocaleString('vi-VN')} đ
               </div>
             )}
 
@@ -418,22 +403,25 @@ export const DailySummaryModal: React.FC = () => {
                 <div className="text-[11px] font-black text-[#5C3A33]">🚑 Phương Án Cứu Trợ Khẩn Cấp:</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <button
+                    disabled={(gameState.loanDebt || 0) > 0}
                     onClick={() => takeEmergencyLoan('neighbor')}
                     className="p-1.5 bg-white hover:bg-emerald-50 rounded-xl border border-emerald-300 text-left font-bold text-[10.5px] text-emerald-800 transition-all cursor-pointer flex items-center justify-between"
                   >
                     <span>🤝 Vay Bác Ba Hàng Xóm (+1.000.000đ)</span>
                   </button>
                   <button
+                    disabled={(gameState.loanDebt || 0) > 0}
                     onClick={() => takeEmergencyLoan('bank')}
                     className="p-1.5 bg-white hover:bg-blue-50 rounded-xl border border-blue-300 text-left font-bold text-[10.5px] text-blue-800 transition-all cursor-pointer flex items-center justify-between"
                   >
                     <span>🏦 Vay Quỹ Hỗ Trợ (+5.000.000đ)</span>
                   </button>
                   <button
+                    disabled={!liquidation}
                     onClick={() => liquidateEquipment()}
                     className="p-1.5 bg-white hover:bg-amber-50 rounded-xl border border-amber-300 text-left font-bold text-[10.5px] text-amber-900 transition-all cursor-pointer col-span-1 sm:col-span-2 flex items-center justify-between"
                   >
-                    <span>📦 Thanh Lý Bớt Đồ Nghề Cũ (+2.000.000đ tiền mặt)</span>
+                    <span>{liquidation ? `📦 Bán ${liquidation.title} (+${liquidation.value.toLocaleString('vi-VN')}đ, giảm 1 cấp)` : 'Không có thiết bị để thanh lý'}</span>
                   </button>
                 </div>
               </div>

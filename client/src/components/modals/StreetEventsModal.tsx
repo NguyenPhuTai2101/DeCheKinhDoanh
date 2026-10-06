@@ -55,8 +55,8 @@ export const StreetEventsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] animate-slide-up">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div role="dialog" aria-modal="true" aria-label="StreetEvents" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] animate-slide-up">
         {/* Header */}
         <div className="bg-[#FFF1F6] px-5 py-3.5 border-b-2 border-[#FFD6E5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -78,7 +78,7 @@ export const StreetEventsModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               if (lastEventOutcome) {

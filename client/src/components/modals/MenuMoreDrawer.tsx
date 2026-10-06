@@ -22,7 +22,8 @@ export const MenuMoreDrawer: React.FC = () => {
 
   const handleSelectModal = (modal: ModalType) => {
     soundManager.playClick();
-    openModal(modal);
+    if (modal === 'dailySummary') useGameStore.getState().forceCloseStoreTonight();
+    else openModal(modal);
   };
 
   const hiredCount = gameState.hiredEmployees.length;
@@ -32,7 +33,7 @@ export const MenuMoreDrawer: React.FC = () => {
   return (
     <div
       onClick={closeModal}
-      className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"
+      className="game-modal-backdrop fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -49,7 +50,7 @@ export const MenuMoreDrawer: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={closeModal}
             className="w-8 h-8 rounded-full bg-white border border-[#FFD6E5] flex items-center justify-center text-[#7C5C55] hover:bg-rose-100 active:scale-90 transition-all shadow-2xs"
           >
@@ -59,6 +60,7 @@ export const MenuMoreDrawer: React.FC = () => {
 
         {/* Nội dung danh mục ngăn kéo */}
         <div className="p-4 overflow-y-auto space-y-4 no-scrollbar">
+          <button onClick={() => handleSelectModal('menuPricing')} className="w-full rounded-2xl border border-pink-200 bg-white p-3 text-left text-sm font-bold text-[#7C5C55]">📋 Thực đơn & giá bán <small className="block font-normal">Chọn món mở bán, xem giá vốn và điều chỉnh giá</small></button>
           {/* NHÓM 1: QUẢN LÝ QUÁN */}
           <div>
             <div className="text-[10px] font-black text-[#9C7C75] uppercase tracking-wider mb-2 flex items-center gap-1.5 px-1">

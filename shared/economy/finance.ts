@@ -191,10 +191,18 @@ export function calculateBottleneck(params: {
   lostCount: number;
   capacityBottleneckCount?: number;
   stockBottleneckCount?: number;
+  demandBottleneckCount?: number;
   revenue: number;
   reputation: number;
 }): BottleneckAnalysis {
   const { servedCount, lostCount, capacityBottleneckCount = 0, stockBottleneckCount = 0 } = params;
+  const priceLoss = params.demandBottleneckCount || 0;
+  if (priceLoss > Math.max(capacityBottleneckCount, stockBottleneckCount)) return {
+    type:'demand', title:'📋 Nút Thắt: Giá Chưa Hợp Phân Khúc',
+    description:`${priceLoss} lượt khách bỏ qua vì mức giá. Bếp nhanh hơn không giải quyết được lý do này.`,
+    recommendation:'Thử giảm giá món chủ lực hoặc phục vụ nhóm khách ít nhạy giá hơn.',
+    demandLoss:priceLoss, capacityLoss:capacityBottleneckCount, stockLoss:stockBottleneckCount,
+  };
 
   // Nếu hầu hết khách bỏ về do thiếu hàng tồn kho
   if (stockBottleneckCount > 0 && (stockBottleneckCount >= capacityBottleneckCount || stockBottleneckCount > 2)) {
@@ -337,12 +345,13 @@ export function calculateRollingReputation(
 export function calculateDailySpoilage(params: {
   inventory: Partial<Record<IngredientId, number>>;
   fridgeLevel?: number;
+  random?: () => number;
 }): {
   spoilageCost: number;
   spoilageDetails: Array<{ ingredientId: IngredientId; name: string; count: number; cost: number }>;
   updatedInventory: Partial<Record<IngredientId, number>>;
 } {
-  const { inventory, fridgeLevel = 0 } = params;
+  const { inventory, fridgeLevel = 0, random = Math.random } = params;
   let totalCost = 0;
   const details: Array<{ ingredientId: IngredientId; name: string; count: number; cost: number }> = [];
   const updatedInv = { ...inventory };
@@ -358,9 +367,9 @@ export function calculateDailySpoilage(params: {
 
     let lossRate = 0;
     if (ing.shelfLifeCategory === 'fresh') {
-      lossRate = (0.04 + Math.random() * 0.04) * fridgeReduction;
+      lossRate = (0.04 + random() * 0.04) * fridgeReduction;
     } else if (ing.shelfLifeCategory === 'semi_fresh') {
-      lossRate = (0.01 + Math.random() * 0.02) * fridgeReduction;
+      lossRate = (0.01 + random() * 0.02) * fridgeReduction;
     }
 
     if (lossRate > 0 && qty >= 3) {

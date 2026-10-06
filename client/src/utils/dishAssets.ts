@@ -1,19 +1,20 @@
 import { RecipeId, RestaurantTypeId } from '../../../shared/types';
+import { banhMiArt } from '../assets/banhMiArt';
 
 /**
  * Mapping các hình ảnh món ăn 2D minh họa chân thực, phong cách ấm cúng (Cozy Kawaii)
  */
 export const DISH_IMAGES: Partial<Record<RecipeId, string>> = {
   // Bánh Mì
-  banh_mi_trung: '/dishes/banh_mi.jpg',
-  banh_mi_thit: '/dishes/banh_mi.jpg',
-  banh_mi_dac_biet: '/dishes/banh_mi.jpg',
-  banh_mi_xiu_mai: '/dishes/banh_mi.jpg',
+  banh_mi_trung: banhMiArt('banh-mi'),
+  banh_mi_thit: banhMiArt('banh-mi'),
+  banh_mi_dac_biet: banhMiArt('banh-mi'),
+  banh_mi_xiu_mai: banhMiArt('banh-mi'),
 
   // Đồ uống
-  cafe_sua: '/dishes/coffee.jpg',
-  tra_sua: '/dishes/milk_tea.jpg',
-  tra_dao: '/dishes/milk_tea.jpg',
+  cafe_sua: banhMiArt('coffee'),
+  tra_sua: banhMiArt('milk-tea'),
+  tra_dao: banhMiArt('tea'),
 
   // Phở Bò Gia Truyền
   pho_tai: '/dishes/pho_bo.jpg',
@@ -37,7 +38,7 @@ export const DISH_IMAGES: Partial<Record<RecipeId, string>> = {
  * Ảnh đại diện theo từng loại hình quán
  */
 export const RESTAURANT_BANNER_IMAGES: Partial<Record<RestaurantTypeId, string>> = {
-  banh_mi: '/dishes/banh_mi.jpg',
+  banh_mi: banhMiArt('banh-mi'),
   pho: '/dishes/pho_bo.jpg',
   bun: '/dishes/bun_bo.jpg',
   beefsteak: '/dishes/bo_ne.jpg',

@@ -51,7 +51,7 @@ export const LotteryDrawModal: React.FC = () => {
   const isWin = prizeAmount > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
       <div className="bg-[#FAF5EE] rounded-3xl border-4 border-amber-400 w-full max-w-sm overflow-hidden shadow-2xl flex flex-col animate-slide-up text-center relative">
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 to-yellow-500 px-5 py-4 text-white relative">
@@ -59,7 +59,7 @@ export const LotteryDrawModal: React.FC = () => {
           <h3 className="text-lg font-black tracking-wide mt-1">XỔ SỐ & ĐÁNH ĐỀ VỈA HÈ</h3>
           <p className="text-xs text-amber-100 font-medium">Lồng Cầu Quay Thưởng Cô Bảy 16:30 Chiều</p>
 
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={closeLotteryDrawModal}
             className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/20 hover:bg-black/30 flex items-center justify-center text-white"
           >

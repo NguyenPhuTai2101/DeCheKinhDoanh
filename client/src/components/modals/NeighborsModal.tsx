@@ -51,8 +51,8 @@ export const NeighborsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div role="dialog" aria-modal="true" aria-label="Neighbors" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
         {/* Header */}
         <div className="bg-[#FFF1F6] px-5 py-3.5 border-b-2 border-[#FFD6E5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -64,7 +64,7 @@ export const NeighborsModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -157,7 +157,7 @@ export const NeighborsModal: React.FC = () => {
 
                 {/* Đặc quyền hàng xóm */}
                 <div className="mt-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
-                  ✨ {selectedData.perkDescription}
+                  ✨ {selectedNeighborId !== 'co_bay' && relation.level < 2 ? 'Mở đặc quyền khi thân thiết cấp 2: ' : 'Đặc quyền đang áp dụng: '}{selectedData.perkDescription}
                 </div>
               </div>
             </div>

@@ -122,6 +122,7 @@ describe('Module: Orders & Cooking Evaluation', () => {
     it('TC_ORD_07: Allergy - Khách dặn kiêng (không dưa leo) mà đầu bếp vẫn cho vào', () => {
       const allergyOrder: ActiveOrder = {
         ...mockOrder,
+        allergyIngredients: ['cucumber'],
         removedIngredients: ['cucumber'],
         orderNotes: ['❌ Không dưa leo'],
       };

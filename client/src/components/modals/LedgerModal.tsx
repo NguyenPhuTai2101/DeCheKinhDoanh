@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getOperatingStatement } from '../../../../shared/economy/operating';
 import { useGameStore } from '../../store/gameStore';
 import { BUSINESS_STAGES } from '../../../../shared/gameData';
 import { BusinessStageId, DailySummary } from '../../../../shared/types';
@@ -43,23 +44,17 @@ export const LedgerModal: React.FC = () => {
   const nextStageId = stageOrder[currentIdx + 1];
   const nextStage = nextStageId ? BUSINESS_STAGES[nextStageId] : null;
 
-  // Tính toán P&L hôm nay theo chuẩn V2
-  const fixedCosts = calculateStageFixedCosts(gameState.businessStage);
-  const mainShopRev = gameState.dailyFinance?.revenue ?? dailyRevenue;
-  const branchRev = gameState.dailyFinance?.branchRevenue ?? 0;
-  const totalRev = mainShopRev + branchRev;
-  const cogsToday = gameState.dailyFinance?.cogs ?? dailyCost;
-  const grossProfitToday = gameState.dailyFinance?.grossProfit ?? (totalRev - cogsToday);
-  const grossMargin = totalRev > 0 ? Math.round((grossProfitToday / totalRev) * 100) : 0;
-  const tipsToday = gameState.dailyFinance?.tips ?? 0;
-
-  const totalStaffSalaries = gameState.hiredEmployees.reduce((sum, id) => {
-    const emp = gameState.employeeDetails[id];
-    return sum + (emp?.salaryPerDay || 0);
-  }, 0);
-
-  const estNetProfit =
-    grossProfitToday + tipsToday - totalStaffSalaries - fixedCosts.rent - fixedCosts.utilities;
+  const statement = getOperatingStatement(gameState);
+  const fixedCosts = { rent: statement.rent, utilities: statement.utilities };
+  const branchRev = statement.finance.branchRevenue || 0;
+  const totalRev = statement.finance.revenue;
+  const mainShopRev = totalRev - branchRev;
+  const cogsToday = statement.finance.cogs;
+  const grossProfitToday = statement.grossProfit;
+  const grossMargin = totalRev > 0 ? Math.round(grossProfitToday / totalRev * 100) : 0;
+  const tipsToday = statement.finance.tips || 0;
+  const totalStaffSalaries = statement.payroll;
+  const estNetProfit = statement.netProfit;
 
   // Fame & Danh tiếng
   const currentFame = gameState.fame ?? gameState.reputation;
@@ -79,20 +74,20 @@ export const LedgerModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div role="dialog" aria-modal="true" aria-label="Ledger" className="game-modal-panel bg-[#FAF5EE] rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#F7A8C4] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-slide-up">
         {/* Header Sổ Tay Lò Xo */}
         <div className="bg-[#FFF1F6] px-5 py-3.5 border-b-2 border-[#FFD6E5] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-2xl">📒</span>
             <div>
-              <h2 className="text-lg font-black text-[#7C5C55]">Sổ Sách & Báo Cáo Tài Chính F&B</h2>
+              <h2 className="text-lg font-black text-[#7C5C55]">Sổ Thu Chi</h2>
               <p className="text-xs text-[#9C7C75]">
                 Kê khai P&L chuẩn mực F&B và lộ trình xây dựng chuỗi thương hiệu
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -117,7 +112,7 @@ export const LedgerModal: React.FC = () => {
             }`}
           >
             <DollarSign className="w-3.5 h-3.5" />
-            <span>P&L Hôm Nay</span>
+            <span>Thu Chi Hôm Nay</span>
           </button>
           <button
             onClick={() => setActiveTab('empire')}
@@ -175,7 +170,7 @@ export const LedgerModal: React.FC = () => {
                       .toString()
                       .padStart(2, '0')}
                     :
-                    {(gameState.gameTimeMinutes % 60).toString().padStart(2, '0')}
+                    {Math.floor(gameState.gameTimeMinutes % 60).toString().padStart(2, '0')}
                   </span>
                 </div>
 
@@ -231,7 +226,7 @@ export const LedgerModal: React.FC = () => {
 
                   {tipsToday > 0 && (
                     <div className="flex justify-between items-center text-xs text-amber-700 font-bold px-1">
-                      <span>✨ Tiền boa từ khách hài lòng (Tips):</span>
+                      <span>✨ Tiền boa (đã gồm trong doanh thu):</span>
                       <span className="text-emerald-600">+{tipsToday.toLocaleString('vi-VN')} đ</span>
                     </div>
                   )}
@@ -503,7 +498,7 @@ export const LedgerModal: React.FC = () => {
                         <div className="p-3 pt-0 border-t border-dashed border-[#FFD6E5] bg-[#FFFDF8] text-[11px] space-y-2">
                           <div className="grid grid-cols-2 gap-1.5 pt-2 text-[#7C5C55]">
                             <div>
-                              <span>Giá vốn (COGS):</span>{' '}
+                              <span>Giá vốn món bán:</span>{' '}
                               <strong className="text-rose-500">
                                 -{(summary.cogs || summary.ingredientCost || 0).toLocaleString('vi-VN')} đ
                               </strong>
@@ -592,6 +587,12 @@ export const LedgerModal: React.FC = () => {
             </div>
           )}
         </div>
+        <details className="px-4 pb-3 text-xs text-[#7C5C55] border-t border-pink-100">
+          <summary className="py-3 font-bold cursor-pointer">Dòng tiền thực · {gameState.cashJournal?.length || 0} giao dịch</summary>
+          <p className="mb-2">Lợi nhuận khác tiền trong ví. Mua hàng, đầu tư và vay đều được ghi riêng.</p>
+          <div className="max-h-40 overflow-y-auto space-y-2">{[...(gameState.cashJournal || [])].reverse().map((entry, i) => <div key={i} className="flex justify-between gap-3"><span>Ngày {entry.day} · {entry.label}</span><b>{entry.amount > 0 ? '+' : ''}{entry.amount.toLocaleString('vi-VN')}đ</b></div>)}</div>
+          <p className="mt-2">Thu khác: {statement.finance.otherIncome.toLocaleString('vi-VN')}đ · Chi khác và biến cố: {(statement.finance.eventExpenses + statement.finance.otherExpense).toLocaleString('vi-VN')}đ · Hao hụt: {statement.spoilage.spoilageCost.toLocaleString('vi-VN')}đ · Trả nợ dự kiến: {statement.debtPayment.toLocaleString('vi-VN')}đ</p>
+        </details>
       </div>
     </div>
   );

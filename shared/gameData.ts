@@ -16,6 +16,10 @@ import {
 } from './types';
 
 export const INGREDIENTS: Record<IngredientId, Ingredient> = {
+  cha_lua: { id: 'cha_lua', name: 'Chả lụa', icon: '🍥', category: 'meat', shelfLifeCategory: 'semi_fresh', cost: 4000, description: 'Chả lụa thái lát cho bánh mì.' },
+  pickles: { id: 'pickles', name: 'Đồ chua', icon: '🥕', category: 'veg', shelfLifeCategory: 'semi_fresh', cost: 1000, description: 'Cà rốt và củ cải ngâm chua giòn.' },
+  chili: { id: 'chili', name: 'Ớt', icon: '🌶️', category: 'veg', shelfLifeCategory: 'fresh', cost: 500, description: 'Một phần ớt tươi thái lát.' },
+  mayo: { id: 'mayo', name: 'Sốt mayo', icon: '🧴', category: 'veg', shelfLifeCategory: 'semi_fresh', cost: 1000, description: 'Sốt mayonnaise béo mịn.' },
   bread: {
     id: 'bread',
     name: 'Bánh Mì Giòn',
@@ -509,7 +513,7 @@ export const RESTAURANT_TYPES: Record<RestaurantTypeId, RestaurantType> = {
     equipmentIcon: '🪵',
     equipmentType: 'board',
     primaryRecipeIds: ['banh_mi_trung', 'banh_mi_thit', 'banh_mi_dac_biet', 'banh_mi_xiu_mai', 'cafe_sua', 'tra_sua', 'tra_dao'],
-    allowedIngredientIds: ['bread', 'egg', 'pork', 'pate', 'cucumber', 'herb', 'tea', 'milk', 'condensed_milk', 'coffee'],
+    allowedIngredientIds: ['bread', 'egg', 'pork', 'pate', 'cucumber', 'herb', 'cha_lua', 'pickles', 'chili', 'mayo', 'pepper_sauce', 'tea', 'milk', 'condensed_milk', 'coffee'],
   },
   pho: {
     id: 'pho',
@@ -1706,13 +1710,30 @@ export const getStageUpgradeTierInfo = (
   return getUpgradeTierInfo(upgrade, currentLevel);
 };
 
+
+// Keep paid-for benefits when moving to a new premises; new equipment starts at level zero.
+export type UpgradeHistory = Partial<Record<BusinessStageId, Record<string, number>>>;
+const stageSequence: BusinessStageId[] = ['cart', 'corner', 'awning', 'eatery', 'empire'];
+function inheritedBase(stageId: BusinessStageId, metric: keyof StageUpgradeCatalog, upgradeId: string, history: UpgradeHistory): number {
+  let value = 0;
+  for (const id of stageSequence.slice(0, stageSequence.indexOf(stageId))) {
+    const catalog = getStageCatalog(id);
+    value = Math.max(value, Number(catalog[metric]));
+    const item = catalog.upgrades.find(u => u.id === upgradeId);
+    const level = history[id]?.[upgradeId] || 0;
+    value += (item?.tiers || []).slice(0, level).reduce((sum,t) => sum + t.effectValue, 0);
+  }
+  return value;
+}
+
 // 1. Dung tích kho: Sàn của Kỷ Nguyên + Tổng các tầng nâng cấp đã mua trong kỷ nguyên
 export const calculateStorageCapacity = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseStorage;
+  let total = Math.max(catalog.baseStorage, inheritedBase(stageId, 'baseStorage', 'cozy_storage', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'cozy_storage');
   const lvl = stageUpgrades['cozy_storage'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1726,10 +1747,11 @@ export const calculateStorageCapacity = (
 // 2. Tốc độ nấu: Sàn của Kỷ Nguyên + Tổng các tầng nâng cấp bếp
 export const calculateCookSpeedBoost = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseCookSpeed;
+  let total = Math.max(catalog.baseCookSpeed, inheritedBase(stageId, 'baseCookSpeed', 'modern_stove', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'modern_stove');
   const lvl = stageUpgrades['modern_stove'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1743,10 +1765,11 @@ export const calculateCookSpeedBoost = (
 // 3. Tỷ lệ khách kéo đến: Sàn của Kỷ Nguyên + Biển hiệu
 export const calculateSpawnRateBoost = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseSpawnRate;
+  let total = Math.max(catalog.baseSpawnRate, inheritedBase(stageId, 'baseSpawnRate', 'flower_signboard', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'flower_signboard');
   const lvl = stageUpgrades['flower_signboard'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1760,10 +1783,11 @@ export const calculateSpawnRateBoost = (
 // 4. Thời gian khách kiên nhẫn (giây): Sàn của Kỷ Nguyên + Bàn ghế
 export const calculateCustomerPatienceBonus = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.basePatience;
+  let total = Math.max(catalog.basePatience, inheritedBase(stageId, 'basePatience', 'seating_comfort', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'seating_comfort');
   const lvl = stageUpgrades['seating_comfort'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1777,10 +1801,11 @@ export const calculateCustomerPatienceBonus = (
 // 5. Tỷ lệ tiền tip boa: Sàn của Kỷ Nguyên + Bát đĩa
 export const calculateTipRateBonus = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseTipRate;
+  let total = Math.max(catalog.baseTipRate, inheritedBase(stageId, 'baseTipRate', 'dishware_premium', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'dishware_premium');
   const lvl = stageUpgrades['dishware_premium'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1794,10 +1819,11 @@ export const calculateTipRateBonus = (
 // 6. Thưởng đơn giao hàng: Sàn của Kỷ Nguyên + Đội xe
 export const calculateDeliveryBonus = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseDeliveryBonus;
+  let total = Math.max(catalog.baseDeliveryBonus, inheritedBase(stageId, 'baseDeliveryBonus', 'delivery_fleet', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'delivery_fleet');
   const lvl = stageUpgrades['delivery_fleet'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1811,10 +1837,11 @@ export const calculateDeliveryBonus = (
 // 7. Thưởng nhận sao uy tín: Sàn của Kỷ Nguyên + Âm thanh
 export const calculateReputationBonus = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const catalog = getStageCatalog(stageId);
-  let total = catalog.baseRepBonus;
+  let total = Math.max(catalog.baseRepBonus, inheritedBase(stageId, 'baseRepBonus', 'sound_ambience', history));
   const upgrade = catalog.upgrades.find((u) => u.id === 'sound_ambience');
   const lvl = stageUpgrades['sound_ambience'] || 0;
   if (upgrade?.tiers && lvl > 0) {
@@ -1828,7 +1855,8 @@ export const calculateReputationBonus = (
 // 8. Số bàn ăn tối đa: Sàn theo stage + Kê thêm bàn
 export const calculateMaxTables = (
   stageId: BusinessStageId = 'cart',
-  stageUpgrades: Record<string, number> = {}
+  stageUpgrades: Record<string, number> = {},
+  history: UpgradeHistory = {}
 ): number => {
   const baseStageTables: Record<BusinessStageId, number> = {
     cart: 2,
@@ -1837,7 +1865,12 @@ export const calculateMaxTables = (
     eatery: 5,
     empire: 6,
   };
-  const base = baseStageTables[stageId] || 2;
+  let base = baseStageTables[stageId] || 2;
+  let previous = 0;
+  for (const id of stageSequence.slice(0, stageSequence.indexOf(stageId))) {
+    previous = Math.max(previous, baseStageTables[id]) + (history[id]?.extra_tables || 0);
+  }
+  base = Math.max(base, previous);
   const extra = stageUpgrades['extra_tables'] || 0;
   return Math.min(8, base + extra);
 };
@@ -2814,7 +2847,8 @@ export function getStarterInventoryForRestaurant(restaurantId: RestaurantTypeId)
  */
 export function getStarterRecipesForRestaurant(restaurantId: RestaurantTypeId): RecipeId[] {
   const rest = RESTAURANT_TYPES[restaurantId];
-  return rest ? [...rest.primaryRecipeIds] : ['banh_mi_trung', 'banh_mi_thit', 'cafe_sua', 'tra_dao'];
+  if (!rest || restaurantId === 'banh_mi') return ['banh_mi_trung', 'banh_mi_thit', 'cafe_sua', 'tra_dao'];
+  return [...rest.primaryRecipeIds.filter(id => RECIPES[id].category === 'food').slice(0,2), ...rest.primaryRecipeIds.filter(id => RECIPES[id].category === 'drink').slice(0,1)];
 }
 
 export const INITIAL_GAME_STATE: GameSaveState = {

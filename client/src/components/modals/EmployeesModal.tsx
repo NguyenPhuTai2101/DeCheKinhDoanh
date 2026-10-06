@@ -92,8 +92,8 @@ export const EmployeesModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFCCD9] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88vh] animate-slide-up">
+    <div className="game-modal-backdrop fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 z-50">
+      <div role="dialog" aria-modal="true" aria-label="Employees" className="game-modal-panel bg-white rounded-t-3xl sm:rounded-3xl border-t-4 sm:border-4 border-[#FFCCD9] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88vh] animate-slide-up">
         {/* Header Modal */}
         <div className="bg-[#FFF5F8] px-4 sm:px-6 py-3 border-b-2 border-[#FFCCD9] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -110,7 +110,7 @@ export const EmployeesModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={() => {
               soundManager.playClick();
               closeModal();
@@ -268,7 +268,7 @@ export const EmployeesModal: React.FC = () => {
                             <span>Tốc độ: {emp.speed.toFixed(2)}x</span>
                             {isShopper && (
                               <span className="text-emerald-700 font-black">
-                                · Giảm {emp.marketSkill || 75}% giá sỉ
+                                · Giảm {Math.round(Math.min(0.35, ((emp.marketSkill || 75) - 50) * 0.006 + 0.1) * 100)}% giá sỉ
                               </span>
                             )}
                             {isManager && (
@@ -552,7 +552,7 @@ export const EmployeesModal: React.FC = () => {
                         </span>
                         {isShopper && (
                           <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md border border-emerald-200">
-                            Chiết khấu sỉ: -{cand.marketSkill || 75}%
+                            Chiết khấu sỉ: -{Math.round(Math.min(0.35, ((cand.marketSkill || 75) - 50) * 0.006 + 0.1) * 100)}%
                           </span>
                         )}
                         {cand.role === 'manager' && (

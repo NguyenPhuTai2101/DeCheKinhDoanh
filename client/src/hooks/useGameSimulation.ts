@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { simulationDelta } from '../../../shared/simulation/time';
 import { useGameStore } from '../store/gameStore';
 import {
   BUSINESS_STAGES,
@@ -17,6 +18,9 @@ import {
 } from '../../../shared/gameData';
 import { ActiveOrder, CustomerTypeId, Employee, NeighborId, RecipeId, IngredientId } from '../../../shared/types';
 import { getRandomRecipeCustomization } from '../../../shared/simulationConfig';
+import { calculateCookEfficiency, calculateServerEfficiency } from '../../../shared/simulation/employees';
+import { getOrderIngredients, evaluateDishMatch } from '../../../shared/simulation/orders';
+import { calculatePriceMultiplier } from '../../../shared/economy/demand';
 import { generateOrderCustomization } from '../../../shared/simulation/orders';
 import { calculateRatingMultiplier } from '../../../shared/economy/demand';
 import { simulatePassiveBranchTick } from '../../../shared/simulation/branches';
@@ -42,8 +46,8 @@ export const useGameSimulation = () => {
 
   const currentStage = BUSINESS_STAGES[gameState.businessStage] || BUSINESS_STAGES.cart;
   const stageId = gameState.businessStage || 'cart';
-  const stageUpgrades = gameState.stageUpgrades?.[stageId] || gameState.purchasedUpgrades || {};
-  const maxTables = calculateMaxTables(stageId, stageUpgrades);
+  const stageUpgrades = gameState.stageUpgrades?.[stageId] ?? (gameState.stageUpgrades ? {} : gameState.purchasedUpgrades || {});
+  const maxTables = calculateMaxTables(stageId, stageUpgrades, gameState.stageUpgrades);
 
   // Timers tracked in refs so component re-renders do NOT reset them
   const spawnTimerRef = useRef(0);
@@ -58,8 +62,10 @@ export const useGameSimulation = () => {
   useEffect(() => {
     if (!isShopOpen || timeSpeed === 0) return;
 
+    const delta = simulationDelta(500, timeSpeed);
     const tickMs = 500; // Chu kỳ quét 500ms
     const interval = setInterval(() => {
+      if (!useGameStore.getState().isShopOpen || useGameStore.getState().activeModal || useGameStore.getState().activeIncident) return;
       const state = useGameStore.getState();
       const currentGameState = state.gameState;
       const currentOrders = state.activeOrders;
@@ -67,7 +73,8 @@ export const useGameSimulation = () => {
       const currentWeather = currentGameState.weather || 'sunny';
 
       // 1.1 Cập nhật đồng hồ trò chơi
-      tickTime(1.25 * timeSpeed);
+      tickTime(delta.gameMinutes);
+      if (!useGameStore.getState().isShopOpen || useGameStore.getState().activeModal) return;
 
       // Hiệu ứng thời tiết
       const weatherPatienceBonus = currentWeather === 'breezy' ? 6 : 0;
@@ -75,7 +82,7 @@ export const useGameSimulation = () => {
       const weatherSpawnDelay = currentWeather === 'rainy' ? 1.35 : 1.0;
 
       // Tự động sinh đơn ship giao hàng (Mưa: 12s, Bình thường: 28s)
-      deliveryTimerRef.current += tickMs * timeSpeed;
+      deliveryTimerRef.current += delta.milliseconds;
       const deliveryInterval = currentWeather === 'rainy' ? 12000 : 28000;
       if (deliveryTimerRef.current >= deliveryInterval) {
         deliveryTimerRef.current = 0;
@@ -94,7 +101,7 @@ export const useGameSimulation = () => {
         currentMinute >= 630 && // Sau 10:30 sáng
         currentMinute <= 1050    // Trước 17:30 chiều
       ) {
-        incidentTimerRef.current += tickMs * timeSpeed;
+        incidentTimerRef.current += delta.milliseconds;
         if (incidentTimerRef.current >= 25000) {
           incidentTimerRef.current = 0;
           // Xác suất 25% mỗi 25s trong khung giờ vàng (chỉ nổ đúng 1 lần duy nhất trong cả ngày)
@@ -121,12 +128,12 @@ export const useGameSimulation = () => {
       const hasTuan = activeStaff.some((e) => e.id === 'emp_tuan');
 
       const simStageId = currentGameState.businessStage || 'cart';
-      const simStageUpgrades = currentGameState.stageUpgrades?.[simStageId] || currentGameState.purchasedUpgrades || {};
-      const simMaxTables = calculateMaxTables(simStageId, simStageUpgrades);
-      const cookSpeedBoost = calculateCookSpeedBoost(simStageId, simStageUpgrades);
-      const spawnRateBoost = calculateSpawnRateBoost(simStageId, simStageUpgrades);
-      const extraPatience = calculateCustomerPatienceBonus(simStageId, simStageUpgrades) + weatherPatienceBonus;
-      const tipRateBoost = calculateTipRateBonus(simStageId, simStageUpgrades) + weatherTipBoost;
+      const simStageUpgrades = currentGameState.stageUpgrades?.[simStageId] ?? (currentGameState.stageUpgrades ? {} : currentGameState.purchasedUpgrades || {});
+      const simMaxTables = calculateMaxTables(simStageId, simStageUpgrades, currentGameState.stageUpgrades);
+      const cookSpeedBoost = calculateCookSpeedBoost(simStageId, simStageUpgrades, currentGameState.stageUpgrades);
+      const spawnRateBoost = calculateSpawnRateBoost(simStageId, simStageUpgrades, currentGameState.stageUpgrades);
+      const extraPatience = calculateCustomerPatienceBonus(simStageId, simStageUpgrades, currentGameState.stageUpgrades) + weatherPatienceBonus;
+      const tipRateBoost = calculateTipRateBonus(simStageId, simStageUpgrades, currentGameState.stageUpgrades) + weatherTipBoost;
 
       // 1.3 Quản lý đơn hàng: Nấu ăn (Cook), Bưng món (Server), Quản lý điều hành (Manager)
       // Tìm đầu bếp rảnh tay
@@ -134,6 +141,7 @@ export const useGameSimulation = () => {
         currentOrders
           .filter((o) => o.state === 'cooking' && o.chefId)
           .map((o) => o.chefId!)
+          .concat(state.deliveryOrders.filter(o => o.status === 'cooking' && o.chefId).map(o => o.chefId!))
       );
       const freeCooks = cooks.filter((c) => !busyCookIds.has(c.id));
 
@@ -149,13 +157,14 @@ export const useGameSimulation = () => {
       const busyManagerIds = new Set(
         currentOrders
           .filter((o) => (o.state === 'cooking' && o.chefId) || (o.state === 'eating' && o.serverId))
-          .map((o) => o.chefId || o.serverId)
+          .map((o) => o.state === 'cooking' ? o.chefId : o.serverId)
           .filter(Boolean) as string[]
       );
-      const freeManagers = managers.filter((m) => !busyManagerIds.has(m.id));
+      const freeManagers = managers.filter((m) => !busyManagerIds.has(m.id) && !busyCookIds.has(m.id));
 
       const updatedInventory = { ...currentGameState.inventory };
       let inventoryChanged = false;
+      let consumedCost = 0;
       let moneySpentOnShopping = 0;
       const newActionStatuses: Record<string, string> = {};
 
@@ -172,15 +181,16 @@ export const useGameSimulation = () => {
       };
 
       if (shoppers.length > 0 && shopperPolicy.autoRestock) {
-        autoShopCooldownRef.current += tickMs * timeSpeed;
-        const bestShopper = shoppers[0];
-        const shopperInterval = Math.max(7000, 14000 / (bestShopper.speed || 1.2));
+        autoShopCooldownRef.current += delta.milliseconds;
+        const bestShopper = shoppers.filter(e => e.role === 'shopper' || freeManagers.some(m => m.id === e.id)).sort((a,b) => (b.marketSkill || 0) - (a.marketSkill || 0))[0];
+        if (!bestShopper) autoShopCooldownRef.current = 0;
+        const shopperInterval = Math.max(7000, 14000 / (bestShopper?.speed || 1.2));
 
-        if (autoShopCooldownRef.current >= shopperInterval) {
+        if (bestShopper && autoShopCooldownRef.current >= shopperInterval) {
           autoShopCooldownRef.current = 0;
 
           const currentRest = RESTAURANT_TYPES[currentRestId];
-          const neededIngs = currentRest?.allowedIngredientIds || [];
+          const neededIngs = [...new Set((currentGameState.menuSettings?.[currentRestId]?.activeRecipes || currentRest?.primaryRecipeIds || []).filter(id => currentGameState.unlockedRecipes.includes(id)).flatMap(id => RECIPES[id].requiredIngredients))];
 
           // Tìm các nguyên liệu dưới ngưỡng tối thiểu (minStock)
           const lowIngs = neededIngs.filter(
@@ -188,7 +198,7 @@ export const useGameSimulation = () => {
           );
 
           if (lowIngs.length > 0) {
-            const capacity = calculateStorageCapacity(simStageId, simStageUpgrades);
+            const capacity = calculateStorageCapacity(simStageId, simStageUpgrades, currentGameState.stageUpgrades);
             const currentStock = Object.values(updatedInventory).reduce((a, b) => a + b, 0);
             const freeSpace = capacity - currentStock;
 
@@ -231,6 +241,8 @@ export const useGameSimulation = () => {
                 }
 
                 newActionStatuses[bestShopper.id] = 'shopping';
+                const index = freeManagers.findIndex(m => m.id === bestShopper.id);
+                if (index >= 0) freeManagers.splice(index, 1);
                 soundManager.playCoin();
                 const roleTitle = bestShopper.role === 'manager' ? 'Quản lý' : 'Shopper';
                 showToast(
@@ -257,17 +269,19 @@ export const useGameSimulation = () => {
           const canCook = freeCooks.length > 0 || freeManagers.length > 0;
           if (canCook) {
             // Kiểm tra nguyên liệu trong kho
-            const hasStock = recipe.requiredIngredients.every(
-              (ingId) => (updatedInventory[ingId] || 0) > 0
-            );
+            let ingredients = getOrderIngredients(order);
+            const hasStock = ingredients.every(id => (updatedInventory[id] || 0) >= ingredients.filter(value => value === id).length);
 
             if (hasStock) {
               const assignedChef = freeCooks.length > 0 ? freeCooks.shift()! : freeManagers.shift()!;
               const isManagerCooking = assignedChef.role === 'manager';
+              const efficiency = calculateCookEfficiency(assignedChef);
+              if (efficiency.mistakeRisk > 0 && Math.random() < efficiency.mistakeRisk) { ingredients = ingredients.slice(0,-1); showToast(`${assignedChef.name} đang căng thẳng và bỏ sót nguyên liệu. Cân nhắc thưởng hoặc nghỉ sau ca.`); }
 
               // Trừ nguyên liệu vào kho
-              recipe.requiredIngredients.forEach((ingId) => {
+              ingredients.forEach((ingId) => {
                 updatedInventory[ingId] = Math.max(0, (updatedInventory[ingId] || 0) - 1);
+                consumedCost += currentGameState.marketPrices?.[ingId] ?? INGREDIENTS[ingId].cost;
               });
               inventoryChanged = true;
 
@@ -275,12 +289,17 @@ export const useGameSimulation = () => {
               if (isManagerCooking) {
                 showToast(`👩‍🍳 Quản lý [${assignedChef.name}] xắn tay vào bếp nấu ${recipe.name}!`);
               }
+              const dishMatch = evaluateDishMatch({ recipeId: order.recipeId, order, preparedIngredients: ingredients });
               nextOrders.push({
                 ...order,
                 state: 'cooking',
                 chefId: assignedChef.id,
                 chefName: assignedChef.name,
-                cookingProgress: 5,
+                cookingProgress: 0,
+                preparedIngredients: ingredients,
+                cogsBooked: true,
+                matchGrade: dishMatch.matchGrade,
+                matchFeedback: dishMatch.feedback,
               });
               continue;
             } else {
@@ -293,7 +312,7 @@ export const useGameSimulation = () => {
           }
 
           // Giảm độ kiên nhẫn nếu vẫn đang chờ
-          const newPatience = order.patienceRemaining - (tickMs / 1000) * timeSpeed;
+          const newPatience = order.patienceRemaining - delta.seconds;
           if (newPatience <= 0) {
             handleCustomerLeaveAngry(order.tableIndex);
             continue; // Khách bỏ về
@@ -306,13 +325,14 @@ export const useGameSimulation = () => {
           const cook = hiredList.find((e) => e.id === order.chefId);
           const isManager = cook?.role === 'manager';
           const cookSkill = isManager ? (cook?.cookingSkill || 65) : (cook?.cookingSkill || 50);
-          const cookSpeed = (cook?.speed || 1.0) * (0.8 + (cookSkill / 100) * 0.4) * managerBoost;
+          const isPlayerCooking = !order.chefId && order.chefName === 'Bạn';
+          const cookSpeed = isPlayerCooking ? 1 : (cook ? calculateCookEfficiency(cook).speedMultiplier : 1) * managerBoost;
           const cookingDurationMs = Math.max(
             350,
-            (recipe.cookingTimeMs * (hasTuan ? 0.75 : 1.0)) / (1 + cookSpeedBoost) / cookSpeed / timeSpeed
+            (recipe.cookingTimeMs * (!isPlayerCooking && hasTuan ? 0.75 : 1.0)) / (1 + cookSpeedBoost) / cookSpeed
           );
 
-          const progressDelta = (tickMs / cookingDurationMs) * 100;
+          const progressDelta = (delta.milliseconds / cookingDurationMs) * 100;
           const currentProgress = (order.cookingProgress || 0) + progressDelta;
 
           if (currentProgress >= 100) {
@@ -351,7 +371,7 @@ export const useGameSimulation = () => {
             } else {
               showToast(`🏃‍♀️ ${assignedServer.name} bưng ${recipe.name} ra Bàn ${order.tableIndex}!`);
             }
-            const eatDuration = 10; // 10 giây thong thả ngồi ăn tại bàn
+            const eatDuration = 10 / calculateServerEfficiency(assignedServer).speedMultiplier;
             nextOrders.push({
               ...order,
               state: 'eating',
@@ -370,13 +390,15 @@ export const useGameSimulation = () => {
         // --- TRẠNG THÁI EATING: Khách đang ăn uống thong thả tại bàn ---
         else if (order.state === 'eating') {
           const eatDuration = order.maxEatingTimer || 10;
-          const remainingTimer = (order.eatingTimer ?? eatDuration) - (tickMs / 1000) * timeSpeed;
+          const remainingTimer = (order.eatingTimer ?? eatDuration) - delta.seconds;
           if (remainingTimer <= 0) {
             // Khách ăn xong! Tính tiền tip và chuyển sang trạng thái chờ trả tiền 'paying'
             const cType = CUSTOMER_TYPES[order.typeId];
             const patiencePercent = Math.max(0, order.patienceRemaining / order.maxPatience);
             const dishwareTipBoost = 1 + tipRateBoost;
             let tip = Math.round(recipe.basePrice * (cType?.tipRate || 0.1) * patiencePercent * dishwareTipBoost);
+            const server = hiredList.find(e => e.id === order.serverId);
+            if (server) tip = Math.round(tip * (1 + calculateServerEfficiency(server).tipBonusRate));
             if (hasTuan) tip = Math.round(tip * 1.15);
             // Trời nắng: Khách thưởng thêm cho các món đồ uống giải khát mát lạnh
             if (currentWeather === 'sunny' && recipe.category === 'drink') {
@@ -442,20 +464,7 @@ export const useGameSimulation = () => {
 
       // Cập nhật nguyên liệu & tiền nếu có đi chợ hoặc trừ kho
       if (inventoryChanged || moneySpentOnShopping > 0) {
-        useGameStore.setState((s) => {
-          const activeRestId = s.gameState.activeRestaurantId || 'banh_mi';
-          return {
-            gameState: {
-              ...s.gameState,
-              money: s.gameState.money - moneySpentOnShopping,
-              inventory: updatedInventory,
-              restaurantInventories: {
-                ...(s.gameState.restaurantInventories || {}),
-                [activeRestId]: updatedInventory,
-              },
-            },
-          };
-        });
+        state.commitKitchenChanges(updatedInventory, consumedCost, moneySpentOnShopping);
       }
 
       // Cập nhật trạng thái hành động của nhân viên
@@ -466,15 +475,23 @@ export const useGameSimulation = () => {
       // Cập nhật danh sách đơn hàng
       setActiveOrders(nextOrders);
 
+      state.tickDeliveries(delta.seconds);
+
       // 1.4 Sinh khách hàng mới vào bàn ăn theo Rating & Thực đơn mở bán (Active Menu)
       const ratingMult = calculateRatingMultiplier(currentGameState.rating ?? 75);
-      const baseRate = currentStage.customerRateMs * weatherSpawnDelay;
+      const hour = Math.floor(currentGameState.gameTimeMinutes / 60);
+      const peak = hour >= 11 && hour < 14 ? 1.3 : hour >= 17 && hour < 20 ? 1.15 : 0.85;
+      const restMenuForRate = currentGameState.menuSettings?.[currentRestId];
+      const menuForRate = (restMenuForRate?.activeRecipes || RESTAURANT_TYPES[currentRestId].primaryRecipeIds).filter(id => currentGameState.unlockedRecipes.includes(id));
+      const discountAttraction = Math.max(1, menuForRate.reduce((sum,id) => sum + calculatePriceMultiplier(restMenuForRate?.prices?.[id] ?? RECIPES[id].basePrice, RECIPES[id].basePrice), 0) / Math.max(1,menuForRate.length));
+      const studentAttraction = (currentGameState.neighbors.be_bong?.level || 1) >= 2 ? 1.0375 : 1;
+      const baseRate = currentStage.customerRateMs * weatherSpawnDelay / peak / discountAttraction / studentAttraction;
       const spawnRate = Math.max(500, Math.round(baseRate / ((1 + spawnRateBoost) * ratingMult)));
 
-      spawnTimerRef.current += tickMs * timeSpeed;
+      spawnTimerRef.current += delta.milliseconds;
       if (spawnTimerRef.current >= spawnRate) {
         spawnTimerRef.current = 0;
-
+        (() => {
         if (nextOrders.length < simMaxTables) {
           const takenTables = nextOrders.map((o) => o.tableIndex);
           let freeTable = 1;
@@ -490,9 +507,10 @@ export const useGameSimulation = () => {
           const restMenu = currentGameState.menuSettings?.[currentRestId];
           const activeMenu =
             restMenu?.activeRecipes && restMenu.activeRecipes.length > 0
-              ? restMenu.activeRecipes.filter((r) => activeRest.primaryRecipeIds.includes(r))
-              : activeRest.primaryRecipeIds;
-          const availableRecipes = activeMenu.length > 0 ? activeMenu : activeRest.primaryRecipeIds;
+              ? restMenu.activeRecipes.filter((r) => activeRest.primaryRecipeIds.includes(r) && currentGameState.unlockedRecipes.includes(r))
+              : activeRest.primaryRecipeIds.filter(r => currentGameState.unlockedRecipes.includes(r));
+          const availableRecipes = activeMenu;
+          if (!availableRecipes.length) return;
 
           const isNeighbor = Math.random() < 0.22;
           let chosenType: CustomerTypeId = 'student';
@@ -504,6 +522,7 @@ export const useGameSimulation = () => {
             const neighborKeys: NeighborId[] = ['bac_ba', 'co_bay', 'chu_nam', 'be_bong', 'chi_lan'];
             chosenNeighborId = neighborKeys[Math.floor(Math.random() * neighborKeys.length)];
             const nData = NEIGHBORS_DATA[chosenNeighborId];
+            chosenType = chosenNeighborId === 'be_bong' ? 'student' : chosenNeighborId === 'chi_lan' ? 'office_worker' : 'neighborhood';
             if (availableRecipes.includes(nData.favoriteDishId)) {
               chosenRecipe = nData.favoriteDishId;
             } else {
@@ -512,7 +531,9 @@ export const useGameSimulation = () => {
             patienceSeconds = 55 + extraPatience;
           } else {
             const typeKeys: CustomerTypeId[] = ['student', 'office_worker', 'food_lover', 'neighborhood'];
-            chosenType = typeKeys[Math.floor(Math.random() * typeKeys.length)];
+            const weights = typeKeys.map(type => type === 'student' && (currentGameState.neighbors.be_bong?.level || 1) >= 2 ? 1.15 : 1);
+            let roll = Math.random() * weights.reduce((sum,value) => sum + value,0);
+            chosenType = typeKeys[weights.findIndex(value => (roll -= value) < 0)] || 'neighborhood';
             const cType = CUSTOMER_TYPES[chosenType];
             const matched = cType.favoriteRecipeIds.filter((r) => availableRecipes.includes(r));
             if (matched.length > 0) {
@@ -522,6 +543,10 @@ export const useGameSimulation = () => {
             }
             patienceSeconds = cType.patienceSeconds + extraPatience;
           }
+
+          const dish = RECIPES[chosenRecipe];
+          const price = restMenu?.prices?.[chosenRecipe] ?? dish.basePrice;
+          if (Math.random() > Math.min(1, calculatePriceMultiplier(price, dish.basePrice, chosenType))) { state.recordLostCustomer('demand'); return; }
 
           // Sinh biến tấu ngẫu nhiên chân thực theo từng món (Order Customization)
           const customSpec = generateOrderCustomization({
@@ -534,7 +559,7 @@ export const useGameSimulation = () => {
           let dialogue = customSpec.dialogueText || 'Làm nóng giòn, vừa miệng nha chủ quán!';
           if (isNeighbor && chosenNeighborId) {
             const nData = NEIGHBORS_DATA[chosenNeighborId];
-            dialogue = `${nData.dialogues[1] || 'Chào chủ quán!'} ${customSpec.dialogueText || ''}`;
+            dialogue = `${nData.dialogues[currentGameState.neighbors[chosenNeighborId]?.level || 1] || nData.dialogues[1] || 'Chào chủ quán!'} ${customSpec.dialogueText || ''}`;
           }
 
           soundManager.playDoorBell();
@@ -556,11 +581,12 @@ export const useGameSimulation = () => {
           };
 
           setActiveOrders((prev) => [...prev, newOrder]);
-        }
+        } else state.recordLostCustomer('capacity');
+        })();
       }
 
       // 1.5 MÔ PHỎNG CHI NHÁNH CHẠY NỀN CHÂN THỰC (V2: Có tính COGS & Quản lý điều hành)
-      branchPassiveTimerRef.current += tickMs * timeSpeed;
+      branchPassiveTimerRef.current += delta.milliseconds;
       if (branchPassiveTimerRef.current >= 4500) {
         branchPassiveTimerRef.current = 0;
 
@@ -585,7 +611,9 @@ export const useGameSimulation = () => {
             marketPrices: currentGameState.marketPrices,
             weather: currentWeather,
             playerPrices: bMenu?.prices,
-            activeRecipes: bMenu?.activeRecipes,
+            activeRecipes: (bMenu?.activeRecipes || RESTAURANT_TYPES[branchId].primaryRecipeIds).filter(id => currentGameState.unlockedRecipes.includes(id)),
+            inventory: useGameStore.getState().gameState.restaurantInventories?.[branchId] || {},
+            rating: currentGameState.rating,
             hasChainManager,
           });
 
@@ -594,7 +622,9 @@ export const useGameSimulation = () => {
               branchId,
               simResult.earnedRevenue,
               simResult.cogsCost,
-              simResult.dishName
+              simResult.dishName,
+              simResult.recipeId,
+              simResult.servedCustomers
             );
 
             // Thông báo định kỳ để người chơi thấy rõ chi nhánh đang bán hàng mang tiền về két
@@ -609,7 +639,7 @@ export const useGameSimulation = () => {
           }
         }
       }
-    }, tickMs / timeSpeed);
+    }, tickMs);
 
     return () => clearInterval(interval);
   }, [

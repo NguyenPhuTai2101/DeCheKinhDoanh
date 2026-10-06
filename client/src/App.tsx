@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import './components/modals/game-modals.css';
+import { soundManager } from './utils/soundManager';
 import { TopBar } from './components/TopBar';
 import { BottomBar } from './components/BottomBar';
 import { CozyShopView } from './components/views/CozyShopView';
@@ -24,6 +26,7 @@ import { FlashScreen } from './components/views/FlashScreen';
 import { ToastNotification } from './components/ToastNotification';
 import { useGameStore } from './store/gameStore';
 import { useGameSimulation } from './hooks/useGameSimulation';
+import { ReferenceShopView } from './components/views/ReferenceShopView';
 
 export const App: React.FC = () => {
   const {
@@ -35,9 +38,12 @@ export const App: React.FC = () => {
     gameState,
     showFlashScreen,
   } = useGameStore();
+  const referenceMode = currentView === 'shop' && (gameState.activeRestaurantId || 'banh_mi') === 'banh_mi';
 
   // Chạy vòng lặp mô phỏng & nhân viên tự động trên toàn bộ game
   useGameSimulation();
+
+  useEffect(() => { soundManager.setMuted(!!gameState.soundMuted); }, [gameState.soundMuted]);
 
   useEffect(() => {
     loadGame();
@@ -50,23 +56,23 @@ export const App: React.FC = () => {
   }, [loadGame, saveLocal]);
 
   return (
-    <div className="w-full h-[100dvh] bg-gradient-to-b from-[#FFF0F5] to-[#FFE6EE] flex justify-center items-center overflow-hidden">
+    <div className="reference-stage w-full h-[100dvh] bg-gradient-to-b from-[#FFF0F5] to-[#FFE6EE] flex justify-center items-center overflow-hidden">
       {/* Container chuẩn phong cách Mobile-First (Đế Chế Vỉa Hè & Tiệm Trà Nhỏ) */}
-      <div className="w-full max-w-md sm:max-w-[430px] h-full sm:h-[96dvh] bg-[#FAF5EE] sm:shadow-[0_15px_50px_rgba(255,101,132,0.22)] sm:border-2 sm:border-[#FFCCD9] sm:rounded-3xl flex flex-col justify-between overflow-hidden relative">
+      <div className={`${referenceMode ? 'reference-shell' : ''} w-full max-w-md sm:max-w-[430px] h-full sm:h-[96dvh] bg-[#FAF5EE] sm:shadow-[0_15px_50px_rgba(255,101,132,0.22)] sm:border-2 sm:border-[#FFCCD9] sm:rounded-3xl flex flex-col justify-between overflow-hidden relative`}>
         {showFlashScreen ? (
           <FlashScreen />
         ) : (
           <>
             {/* 1. Thanh Header HUD Vỉa Hè */}
-            <TopBar />
+            {!referenceMode && <TopBar />}
 
             {/* 2. Khu vực hiển thị trò chơi chính: Quầy Hàng (Bếp) ⇄ Ra Đường Quan Sát (Phố Vỉa Hè) */}
             <main className="flex-1 w-full relative overflow-hidden flex flex-col min-h-0 bg-[#FAF5EE]">
-              {currentView === 'street' ? <StreetMapView /> : <CozyShopView />}
+              {referenceMode ? <ReferenceShopView /> : currentView === 'street' ? <StreetMapView /> : <CozyShopView />}
             </main>
 
             {/* 3. Thanh điều hướng dưới cùng */}
-            <BottomBar />
+            {!referenceMode && <BottomBar />}
 
             {/* 4. Các Popup & Cửa sổ tương tác */}
             {activeModal === 'franchise' && <FranchiseModal />}

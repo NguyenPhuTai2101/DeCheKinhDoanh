@@ -73,7 +73,7 @@ export const CookingModal: React.FC = () => {
   return (
     <div
       onClick={closeModal}
-      className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"
+      className="game-modal-backdrop fixed inset-0 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -95,7 +95,7 @@ export const CookingModal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Đóng cửa sổ"
             onClick={closeModal}
             className="w-8 h-8 rounded-full bg-white border border-[#FFD6E5] flex items-center justify-center text-[#7C5C55] hover:bg-rose-100 active:scale-90 transition-all shadow-2xs"
           >
