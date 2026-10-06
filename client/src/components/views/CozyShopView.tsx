@@ -631,7 +631,7 @@ export const CozyShopView: React.FC = () => {
       </div>
 
       {/* 2. BÀN CHẾ BIẾN & THIẾT BỊ NẤU ĐẶC TRƯNG (PORCELAIN WORKBENCH) */}
-      <div className="flex-1 min-h-[140px] max-h-[220px] rounded-2xl sm:rounded-3xl border-2 border-[#FFCCD9] p-2 sm:p-2.5 shadow-[0_4px_16px_rgba(255,168,197,0.14)] relative flex flex-col justify-between bg-white/95 overflow-hidden">
+      <div className="flex-1 min-h-[180px] max-h-[270px] rounded-2xl sm:rounded-3xl border-2 border-[#FFCCD9] p-2 sm:p-2.5 shadow-[0_4px_16px_rgba(255,168,197,0.14)] relative flex flex-col justify-between bg-white/95 overflow-hidden">
         {/* Nền bàn gỗ ấm cúng */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none"
@@ -646,7 +646,8 @@ export const CozyShopView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {Object.values(selectedIngredients).some(Boolean) && (
+            <span className="hidden sm:inline text-[9px] font-bold text-[#9C7C75]">Đọc order → tự chọn</span>
+            {Object.values(selectedIngredients).some((qty) => (qty || 0) > 0) && (
               <button
                 onClick={clearCuttingBoard}
                 className="text-rose-600 hover:text-rose-700 px-1.5 py-0.5 rounded-xl border border-[#FFCCD9] bg-[#FFF0F5] text-[8.5px] font-bold flex items-center gap-0.5 active:scale-95 transition-all shadow-2xs cursor-pointer"
@@ -664,7 +665,7 @@ export const CozyShopView: React.FC = () => {
             <div className="flex flex-col items-center justify-center gap-0.5 w-full">
               <div className="relative flex items-center justify-center">
                 {/* Đĩa sứ tròn xinh xắn */}
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-b from-white via-[#FFF8FA] to-[#FFEBF2] border-2 border-[#FFCCD9] shadow-[0_3px_12px_rgba(255,168,197,0.22)] flex items-center justify-center relative overflow-hidden group">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-b from-white via-[#FFF8FA] to-[#FFEBF2] border-2 border-[#FFCCD9] shadow-[0_5px_18px_rgba(255,168,197,0.22)] flex items-center justify-center relative overflow-hidden group">
                   {/* Món ăn minh họa chân thực ở giữa */}
                   {activeDishImage ? (
                     <img
@@ -678,31 +679,35 @@ export const CozyShopView: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Topping nhảy vào quanh đĩa */}
-                  <div className="absolute top-0.5 right-0.5 flex flex-wrap gap-0.5 max-w-[70px] pointer-events-none z-10">
-                    {Object.keys(selectedIngredients)
-                      .filter((k) => selectedIngredients[k])
-                      .map((k) => (
+                  {/* Nguyên liệu đã chọn */}
+                  <div className="absolute top-1 right-1 flex flex-wrap gap-0.5 max-w-[88px] pointer-events-none z-10">
+                    {Object.entries(selectedIngredients)
+                      .filter(([, qty]) => (qty || 0) > 0)
+                      .map(([id, qty]) => (
                         <span
-                          key={k}
-                          className="bg-white/95 p-0.5 rounded-md border border-[#FFCCD9] shadow-2xs animate-fade-in flex items-center justify-center"
+                          key={id}
+                          className="relative bg-white/95 p-1 rounded-lg border border-[#FFCCD9] shadow-2xs animate-fade-in flex items-center justify-center"
                         >
-                          <IngredientIcon id={k} size={15} fallbackIcon={INGREDIENTS[k as IngredientId]?.icon} />
+                          <IngredientIcon
+                            id={id}
+                            size={17}
+                            fallbackIcon={INGREDIENTS[id as IngredientId]?.icon}
+                          />
+                          {(qty || 0) > 1 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-0.5 rounded-full bg-[#FF6584] text-white text-[8px] font-black flex items-center justify-center">
+                              ×{qty}
+                            </span>
+                          )}
                         </span>
                       ))}
                   </div>
                 </div>
               </div>
 
-              {/* Nhãn tiến độ & Tên món */}
+                            {/* Nhãn tiến độ & Tên món */}
               <div className="text-[10px] sm:text-[10.5px] font-black text-[#5C3A33] flex items-center gap-1 mt-0.5 max-w-full truncate">
                 <span className="truncate">{currentRecipe.name}</span>
-                {activeOrder?.customTag && (
-                  <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1 py-0.2 rounded-md text-[7.5px] sm:text-[8px] font-black shrink-0 shadow-2xs">
-                    🏷️ {activeOrder.customTag}
-                  </span>
-                )}
-                <span className="text-[#D81B60] bg-[#FFF0F5] border border-[#FFCCD9] px-1.5 py-0.2 rounded-full text-[8.5px] sm:text-[9px] font-black shrink-0 shadow-2xs">
+                <span className="text-[#D81B60] bg-[#FFF0F5] border border-[#FFCCD9] px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 shadow-2xs">
                   {pickedRequiredCount}/{requiredCount} nguyên liệu
                 </span>
               </div>
@@ -792,7 +797,7 @@ export const CozyShopView: React.FC = () => {
                 soundManager.playClick();
                 setActiveIngredientTab('food');
               }}
-              className={`px-2.5 py-0.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer ${
+              className={`min-h-9 px-3 py-1 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer ${
                 activeIngredientTab === 'food'
                   ? 'bg-gradient-to-r from-[#FF6584] to-[#FF8EA3] text-white shadow-2xs border border-white/60'
                   : 'bg-white border-2 border-[#FFCCD9] text-[#8C6258] hover:bg-[#FFF0F5]'
@@ -806,7 +811,7 @@ export const CozyShopView: React.FC = () => {
                 soundManager.playClick();
                 setActiveIngredientTab('drink');
               }}
-              className={`px-2.5 py-0.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer ${
+              className={`min-h-9 px-3 py-1 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer ${
                 activeIngredientTab === 'drink'
                   ? 'bg-gradient-to-r from-[#FF6584] to-[#FF8EA3] text-white shadow-2xs border border-white/60'
                   : 'bg-white border-2 border-[#FFCCD9] text-[#8C6258] hover:bg-[#FFF0F5]'
@@ -846,12 +851,12 @@ export const CozyShopView: React.FC = () => {
           </div>
         </div>
 
-        {/* Khay topping dạng cuộn ngang (Nhỏ gọn, chiều cao ~62-66px, không làm vỡ giao diện) */}
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5 touch-pan-x px-0.5 scroll-smooth">
+        {/* Khay nguyên liệu 5 cột — tối ưu mobile và thao tác một tay. */}
+        <div className="grid grid-cols-5 gap-1.5 py-0.5 px-0.5 max-h-[166px] overflow-y-auto no-scrollbar">
           {currentIngredientsList.map((item) => {
             const stock = gameState.inventory[item.id] ?? 0;
-            const isPicked = !!selectedIngredients[item.id];
-            const isNeeded = currentRecipe?.requiredIngredients.includes(item.id);
+            const selectedQty = selectedIngredients[item.id] || 0;
+            const isPicked = selectedQty > 0;
 
             return (
               <div
@@ -863,28 +868,35 @@ export const CozyShopView: React.FC = () => {
                     addIngredient(item.id);
                   }
                 }}
-                className={`min-w-[62px] sm:min-w-[68px] h-[62px] sm:h-[66px] rounded-xl border-2 flex flex-col items-center justify-between p-1 cursor-pointer transition-all active:scale-95 relative shrink-0 select-none shadow-[0_2px_8px_rgba(255,168,197,0.12)] ${
+                className={`h-[78px] sm:h-[84px] rounded-2xl border-2 flex flex-col items-center justify-between p-1.5 cursor-pointer transition-all active:scale-95 relative select-none shadow-[0_2px_8px_rgba(255,168,197,0.12)] ${
                   isPicked
-                    ? 'bg-gradient-to-b from-[#FFF0F5] to-[#FFE4EC] border-[#FF6584] ring-2 ring-[#FFA8C5] shadow-xs scale-102'
-                    : isNeeded
-                    ? 'bg-white border-amber-400 ring-2 ring-amber-200/90 shadow-2xs'
+                    ? 'bg-gradient-to-b from-[#FFF0F5] to-[#FFE4EC] border-[#FF6584] ring-2 ring-[#FFA8C5] shadow-xs'
                     : 'bg-white border-[#FFCCD9] hover:border-[#FFA8C5]'
                 }`}
               >
-                {/* Badge Trạng thái: CẦN ⭐ hoặc ĐÃ CHỌN ✓ */}
-                {isPicked ? (
-                  <span className="absolute top-0.5 left-0.5 bg-emerald-500 text-white text-[6.5px] font-black px-1 rounded-full flex items-center gap-0.5 shadow-2xs">
-                    <Check className="w-1.5 h-1.5 stroke-[3]" /> Cho
-                  </span>
-                ) : isNeeded ? (
-                  <span className="absolute top-0.5 left-0.5 bg-amber-500 text-white text-[6.5px] font-black px-1 rounded-full animate-pulse shadow-2xs">
-                    Cần ⭐
-                  </span>
-                ) : null}
+                {/* Không tiết lộ đáp án; chỉ báo nguyên liệu người chơi đã tự chọn. */}
+                {isPicked && (
+                  <div className="absolute top-0.5 left-0.5 z-10 flex items-center gap-0.5">
+                    <span className="bg-emerald-500 text-white text-[7.5px] font-black px-1.5 py-0.5 rounded-full shadow-2xs">
+                      ✓ ×{selectedQty}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeIngredient(item.id);
+                      }}
+                      className="w-5 h-5 rounded-full bg-white border border-rose-300 text-rose-600 text-xs font-black flex items-center justify-center shadow-2xs active:scale-90"
+                      aria-label={`Bớt 1 ${item.name}`}
+                    >
+                      −
+                    </button>
+                  </div>
+                )}
 
-                {/* Huy hiệu số lượng kho */}
+                                {/* Huy hiệu số lượng kho */}
                 <span
-                  className={`absolute top-0.5 right-0.5 text-[7px] font-black px-1 rounded-full border shadow-2xs ${
+                  className={`absolute top-0.5 right-0.5 text-[8px] font-black px-1.5 py-0.5 rounded-full border shadow-2xs ${
                     stock > 0
                       ? 'bg-[#FFF0F5] text-[#D81B60] border-[#FFCCD9]'
                       : 'bg-rose-500 text-white border-white animate-bounce'
@@ -895,11 +907,11 @@ export const CozyShopView: React.FC = () => {
 
                 {/* Icon nguyên liệu vector sắc nét */}
                 <div className="mt-0.5 flex items-center justify-center shrink-0 drop-shadow-2xs">
-                  <IngredientIcon id={item.id} size={24} fallbackIcon={item.icon} />
+                  <IngredientIcon id={item.id} size={30} fallbackIcon={item.icon} />
                 </div>
 
                 {/* Tên nguyên liệu */}
-                <div className="text-[9.5px] font-black text-[#5C3A33] text-center truncate max-w-full leading-none">
+                <div className="text-[10.5px] sm:text-[11px] font-black text-[#5C3A33] text-center truncate max-w-full leading-none">
                   {item.name}
                 </div>
               </div>
