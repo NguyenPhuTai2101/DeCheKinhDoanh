@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Receipt,
   DollarSign,
+  Zap,
 } from 'lucide-react';
 
 export const FranchiseModal: React.FC = () => {
@@ -29,6 +30,7 @@ export const FranchiseModal: React.FC = () => {
     switchActiveRestaurant,
     unlockRestaurantFranchise,
     upgradeBranch,
+    assignEmployeeToRestaurant,
   } = useGameStore();
 
   const currentRestId = gameState.activeRestaurantId || 'banh_mi';
@@ -38,6 +40,7 @@ export const FranchiseModal: React.FC = () => {
   const currentStage = BUSINESS_STAGES[gameState.businessStage || 'cart'] || BUSINESS_STAGES.cart;
   const maxRestaurants = currentStage.maxRestaurants ?? 1;
   const isBranchCapReached = unlockedList.length >= maxRestaurants;
+  const hasChainManager = gameState.hiredEmployees.includes('emp_quan');
 
   const handleSwitch = (id: RestaurantTypeId) => {
     soundManager.playClick();
@@ -191,13 +194,21 @@ export const FranchiseModal: React.FC = () => {
                           <span
                             className={`text-[8px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5 ${
                               hasCook
-                                ? 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : hasManager
+                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                                : branchStaff.length === 0
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
                                 : 'bg-rose-100 text-rose-800 border border-rose-300'
                             }`}
                           >
                             <CheckCircle2 className="w-2.5 h-2.5" />
                             {hasCook
                               ? `Tự động bán (${branchStaff.length} NV)`
+                              : hasManager
+                              ? `Quản lý kiêm nhiệm (${branchStaff.length} NV) ⭐`
+                              : branchStaff.length === 0
+                              ? 'Vận hành thời vụ (50% CS) ⚡'
                               : 'Thiếu Đầu Bếp ⚠️'}
                           </span>
                         )}
@@ -261,32 +272,86 @@ export const FranchiseModal: React.FC = () => {
 
                     {!isCurrent && (
                       <div className="flex flex-wrap gap-1 text-[9.5px]">
-                        {!hasCook && (
+                        {hasCook ? (
+                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>Đầu bếp đứng nấu tự động ({branchStaff.length} nhân sự)</span>
+                          </span>
+                        ) : hasManager ? (
+                          <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <Crown className="w-3 h-3 text-indigo-600 shrink-0" />
+                            <span>Quản lý kiêm nhiệm đứng bếp & điều hành (+15% Doanh thu, -10% COGS)</span>
+                          </span>
+                        ) : branchStaff.length === 0 ? (
+                          <span className="bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>Vận hành thời vụ nhượng quyền (50% công suất - hãy phân công NV để đạt 100%)</span>
+                          </span>
+                        ) : (
                           <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
-                            <span>Thiếu đầu bếp: Chi nhánh tạm ngưng tự nấu bán!</span>
+                            <span>Thiếu đầu bếp: Tốc độ bán giảm mạnh!</span>
                           </span>
                         )}
+
                         {hasCook && !hasServer && (
                           <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span>Thiếu phục vụ: Tốc độ bán giảm 50%!</span>
+                            <span>Thiếu phục vụ: Giảm 50% tốc độ khách!</span>
                           </span>
                         )}
-                        {hasCook && hasServer && (
-                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            <span>Vận hành tự động ổn định ({branchStaff.length} nhân sự)</span>
-                          </span>
-                        )}
-                        {hasManager && (
-                          <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
-                            <Crown className="w-3 h-3 text-indigo-600 shrink-0" />
-                            <span>Có Quản lý (+15% Doanh thu, -10% COGS)</span>
+
+                        {hasChainManager && (
+                          <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                            <Building2 className="w-3 h-3 text-blue-600 shrink-0" />
+                            <span>Giám đốc chuỗi Chú Quân (+25% Doanh thu toàn chuỗi) 🏢</span>
                           </span>
                         )}
                       </div>
                     )}
+
+                    {/* Phân công nhân sự trực quán nhanh */}
+                    <div className="mt-2 flex items-center justify-between bg-slate-50 border border-slate-200/90 px-2.5 py-1.5 rounded-xl text-[10px] flex-wrap gap-1.5">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <Users className="w-3 h-3 text-indigo-600 shrink-0" />
+                        <span>Nhân sự trực ({branchStaff.length} người):</span>
+                        {branchStaff.length === 0 ? (
+                          <span className="text-amber-700 italic font-medium">Chưa có ai (đang chạy thời vụ 50%)</span>
+                        ) : (
+                          <span className="font-extrabold text-slate-800">
+                            {branchStaff.map((e) => e?.name).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      {gameState.hiredEmployees.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] text-slate-500 font-semibold">Chuyển NV:</span>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                soundManager.playClick();
+                                assignEmployeeToRestaurant(e.target.value, rest.id);
+                              }
+                            }}
+                            className="bg-white border border-slate-300 rounded-lg px-1.5 py-0.5 text-[9.5px] font-bold text-slate-700 shadow-2xs outline-none cursor-pointer"
+                          >
+                            <option value="">+ Điều phối NV sang đây...</option>
+                            {gameState.hiredEmployees.map((eId) => {
+                              const emp = gameState.employeeDetails[eId] || EMPLOYEES.find((emp) => emp.id === eId);
+                              if (!emp) return null;
+                              const isAssignedHere = (emp.assignedRestaurantId || 'banh_mi') === rest.id;
+                              const currentAssignedRest = RESTAURANT_TYPES[emp.assignedRestaurantId || 'banh_mi']?.name || 'Quán khác';
+                              return (
+                                <option key={eId} value={isAssignedHere ? '' : eId} disabled={isAssignedHere}>
+                                  {emp.avatar} {emp.name} ({isAssignedHere ? 'Đang ở đây' : `Ở ${currentAssignedRest}`})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -32,12 +32,15 @@ export type IngredientId =
   | 'pork_rib'
   | 'scallion_oil';
 
+export type ShelfLifeCategory = 'fresh' | 'semi_fresh' | 'dry';
+
 export interface Ingredient {
   id: IngredientId;
   name: string;
   icon: string;
   category: 'bakery' | 'meat' | 'veg' | 'beverage';
   cost: number; // Giá mua từ chợ (VND)
+  shelfLifeCategory?: ShelfLifeCategory; // Hạn dùng: fresh (1-2 ngày), semi_fresh (3-7 ngày), dry (không hỏng)
   description: string;
 }
 
@@ -306,6 +309,32 @@ export interface BusinessMetrics {
   averageRating: number;
 }
 
+export type DayPhase = 'morning_prep' | 'operating' | 'night_audit';
+
+export type FinancialHealthLevel = 'stable' | 'stress' | 'deficit' | 'crisis' | 'bankrupt';
+
+export type BottleneckType = 'demand' | 'capacity' | 'inventory';
+
+export interface BottleneckAnalysis {
+  type: BottleneckType;
+  title: string;
+  description: string;
+  recommendation: string;
+  demandLoss: number;
+  capacityLoss: number;
+  stockLoss: number;
+}
+
+export interface MorningBriefing {
+  day: number;
+  weather: 'sunny' | 'rainy' | 'breezy';
+  weatherHeadline: string;
+  marketHeadline: string;
+  marketTrendDescription: string;
+  warningAlert?: string;
+  dailyAdvice: string;
+}
+
 export interface DailySummary {
   day: number;
   totalRevenue: number;
@@ -329,6 +358,15 @@ export interface DailySummary {
   insights?: string[];
   smartInsights?: string[];
   branchFinances?: Partial<Record<RestaurantTypeId, BranchDailyFinance>>;
+
+  // V3: Phân tích Nút cổ chai, Dự báo dòng tiền & Sức khỏe tài chính
+  primaryBottleneck?: BottleneckType;
+  bottleneckAnalysis?: BottleneckAnalysis;
+  projectedCashflow3Days?: number[];
+  financialHealth?: FinancialHealthLevel;
+  spoilageCost?: number;
+  spoilageDetails?: Array<{ ingredientId: IngredientId; name: string; count: number; cost: number }>;
+  rollingReputation?: number;
 }
 
 export interface PlayerStats {
@@ -425,13 +463,21 @@ export interface DeliveryOrder {
   status: 'pending' | 'ready' | 'delivering';
 }
 
+export type DishMatchGrade = 'perfect' | 'minor' | 'wrong' | 'allergy';
+
 export interface ActiveOrder {
   id: string;
   tableIndex: number;
   typeId: CustomerTypeId;
   neighborId?: NeighborId;
   dialogue?: string;
-  customTag?: string; // Ghi chú order ngẫu nhiên: "Không hành", "2 trứng", "Nhiều bánh phở", "Nước béo"...
+  customTag?: string; // Ghi chú order ngắn: "Không hành", "2 trứng", "Nhiều bánh phở", "Nước béo"...
+  removedIngredients?: IngredientId[]; // Nguyên liệu khách yêu cầu bỏ (ví dụ: không hành/rau)
+  extraIngredients?: IngredientId[]; // Nguyên liệu khách yêu cầu thêm (ví dụ: thêm trứng)
+  orderNotes?: string[]; // Danh sách yêu cầu chi tiết của khách
+  preparedIngredients?: IngredientId[]; // Nguyên liệu người chơi hoặc đầu bếp đã nạp vào đĩa
+  matchGrade?: DishMatchGrade; // Kết quả đánh giá độ khớp (perfect, minor, wrong, allergy)
+  matchFeedback?: string; // Lời phản hồi trực tiếp của khách khi ăn
   recipeId: RecipeId;
   patienceRemaining: number;
   maxPatience: number;
@@ -500,6 +546,18 @@ export interface GameSaveState {
   marketPrices?: Partial<Record<IngredientId, number>>;
   shopperPolicy?: ShopperPolicy;
   businessMetrics?: BusinessMetrics;
+
+  // === V3: 3 PHA NGÀY, ORDER TÙY BIẾN, SỨC KHỎE TÀI CHÍNH & DI SẢN ===
+  dayPhase?: DayPhase; // 'morning_prep' | 'operating' | 'night_audit'
+  morningBriefing?: MorningBriefing;
+  financialHealth?: FinancialHealthLevel;
+  consecutiveCrisisDays?: number;
+  loanDebt?: number;
+  rollingRatings?: number[]; // Lịch sử đánh giá 14 ngày gần nhất
+  legacyPoints?: number; // Điểm di sản tích lũy sau các lần chơi / phá sản
+  legacyPerks?: string[]; // Các đặc quyền đã mở bằng điểm di sản
+  ingredientFreshness?: Partial<Record<IngredientId, number>>; // Độ tươi nguyên liệu (0 - 100)
+  fridgeUpgradeLevel?: number; // Cấp độ tủ lạnh chống hao hụt nguyên liệu tươi
 }
 
 // ============================================================================

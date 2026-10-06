@@ -6,6 +6,7 @@
     "dev": "npm run dev --prefix client",
     "dev:all": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix client && npm run build --prefix server",
+    "test": "npm run test --prefix client",
     "server": "npm run dev --prefix server",
     "client": "npm run dev --prefix client"
   },

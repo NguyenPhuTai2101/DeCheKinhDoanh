@@ -31,6 +31,8 @@ import {
 export const CozyShopView: React.FC = () => {
   const {
     gameState,
+    isShopOpen,
+    openStoreForDay,
     completeCooking,
     serveDishOrder,
     collectPayment,
@@ -92,14 +94,23 @@ export const CozyShopView: React.FC = () => {
     }));
   };
 
-  // Nút Nấu Nhanh 1 Chạm: tự động cho đủ nguyên liệu cần của món
+  // Nút Nấu Nhanh 1 Chạm: tự động cho đủ nguyên liệu theo công thức kèm yêu cầu tùy biến của khách
   const handleQuickFill = () => {
     if (!currentRecipe) return;
     soundManager.playClick();
     const newPicked: Record<string, boolean> = {};
+    const removed = activeOrder?.removedIngredients || [];
+    const extra = activeOrder?.extraIngredients || [];
+
     for (const req of currentRecipe.requiredIngredients) {
-      newPicked[req] = true;
+      if (!removed.includes(req)) {
+        newPicked[req] = true;
+      }
     }
+    for (const ex of extra) {
+      newPicked[ex] = true;
+    }
+
     setSelectedIngredients(newPicked);
   };
 
@@ -110,20 +121,21 @@ export const CozyShopView: React.FC = () => {
 
   const hasMatchedRecipe = () => {
     if (!currentRecipe) return false;
-    for (const req of currentRecipe.requiredIngredients) {
-      if (!selectedIngredients[req]) return false;
-    }
-    for (const [key, val] of Object.entries(selectedIngredients)) {
-      if (val && !currentRecipe.requiredIngredients.includes(key as IngredientId)) {
-        return false;
-      }
-    }
-    return true;
+    const removed = activeOrder?.removedIngredients || [];
+    const extra = activeOrder?.extraIngredients || [];
+    const expected = currentRecipe.requiredIngredients
+      .filter((id) => !removed.includes(id))
+      .concat(extra);
+
+    if (Object.values(selectedIngredients).filter(Boolean).length === 0) return false;
+    return expected.every((req) => selectedIngredients[req]);
   };
 
   const isStockAvailable = () => {
     if (!currentRecipe) return false;
-    for (const req of currentRecipe.requiredIngredients) {
+    const extra = activeOrder?.extraIngredients || [];
+    const checkList = [...currentRecipe.requiredIngredients, ...extra];
+    for (const req of checkList) {
       if ((gameState.inventory[req] || 0) <= 0) return false;
     }
     return true;
@@ -133,7 +145,11 @@ export const CozyShopView: React.FC = () => {
   const handleCookCurrent = () => {
     if (!activeOrder || !currentRecipe) return;
 
-    const success = completeCooking(activeOrder.recipeId, activeOrder.tableIndex);
+    const prepList = Object.keys(selectedIngredients).filter(
+      (k) => selectedIngredients[k]
+    ) as IngredientId[];
+
+    const success = completeCooking(activeOrder.recipeId, activeOrder.tableIndex, prepList);
     if (success) {
       soundManager.playDishComplete();
       setSelectedIngredients({});
@@ -355,11 +371,18 @@ export const CozyShopView: React.FC = () => {
                 </div>
 
                 <div className="flex-1 min-w-0 text-[8.5px] sm:text-[9.5px] leading-tight">
-                  {activeOrder.customTag && (
-                    <div className="mb-0.5">
-                      <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
-                        🏷️ {activeOrder.customTag}
-                      </span>
+                  {(activeOrder.customTag || (activeOrder.orderNotes && activeOrder.orderNotes.length > 0)) && (
+                    <div className="mb-0.5 flex flex-wrap gap-1">
+                      {activeOrder.customTag && (
+                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
+                          🏷️ {activeOrder.customTag}
+                        </span>
+                      )}
+                      {activeOrder.orderNotes?.map((note, idx) => (
+                        <span key={idx} className="bg-rose-100 text-rose-800 border border-rose-300 text-[8px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
+                          {note}
+                        </span>
+                      ))}
                     </div>
                   )}
 
@@ -455,6 +478,55 @@ export const CozyShopView: React.FC = () => {
               </div>
             </div>
           </div>
+        ) : (!isShopOpen || gameState.dayPhase === 'morning_prep') ? (
+          /* PHA 1: BẢN TIN SÁNG & CHUẨN BỊ MỞ CỬA */
+          <div className="p-2 sm:p-2.5 bg-gradient-to-br from-amber-50/90 via-[#FFF9FA] to-orange-50/70 border border-amber-200 rounded-xl space-y-2 animate-fade-in">
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <div className="flex items-center gap-1.5 font-black text-amber-950 text-xs">
+                <span className="text-base animate-bounce-short">🌅</span>
+                <span>BẢN TIN SÁNG - NGÀY {gameState.day} ({gameState.shopName})</span>
+              </div>
+              <span className="text-[9px] bg-white px-2 py-0.5 rounded-full font-bold border border-amber-200 text-amber-900 shadow-2xs">
+                {gameState.weather === 'rainy' ? '🌧️ Mưa Rào' : gameState.weather === 'breezy' ? '🍃 Mát Mẻ' : '☀️ Nắng Ráo'}
+              </span>
+            </div>
+
+            <p className="text-[10px] text-amber-900 leading-snug">
+              {gameState.morningBriefing?.weatherHeadline || 'Trời nắng trong lành, buổi trưa oi bức.'}{' '}
+              <strong className="text-rose-700">{gameState.morningBriefing?.marketHeadline}</strong>
+            </p>
+
+            {gameState.morningBriefing?.warningAlert && (
+              <div className="bg-rose-50 border border-rose-300 text-rose-800 px-2 py-0.8 rounded-lg text-[9.5px] font-bold flex items-center gap-1">
+                <span>⚠️</span>
+                <span>{gameState.morningBriefing.warningAlert}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => openModal('market')}
+                  className="px-2 py-1 bg-white border border-amber-300 text-amber-900 font-bold rounded-lg hover:bg-amber-50 text-[10px] shadow-2xs cursor-pointer active:scale-95"
+                >
+                  🛒 Đi Chợ Sỉ
+                </button>
+                <button
+                  onClick={() => openModal('menuPricing')}
+                  className="px-2 py-1 bg-white border border-amber-300 text-amber-900 font-bold rounded-lg hover:bg-amber-50 text-[10px] shadow-2xs cursor-pointer active:scale-95"
+                >
+                  📋 Chỉnh Giá
+                </button>
+              </div>
+
+              <button
+                onClick={openStoreForDay}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:brightness-105 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer animate-pulse"
+              >
+                <span>🚀 MỞ CỬA BÁN HÀNG</span>
+              </button>
+            </div>
+          </div>
         ) : (
           /* TRẠNG THÁI CHỜ KHÁCH DỄ THƯƠNG */
           <div className="py-2.5 flex items-center justify-center gap-2">
@@ -463,11 +535,11 @@ export const CozyShopView: React.FC = () => {
             </div>
             <div className="text-left leading-tight">
               <div className="text-[11px] font-black text-[#5C3A33] flex items-center gap-1">
-                <span>Quầy Bàn Đang Chờ Khách</span>
+                <span>Quán Đang Mở Cửa Đón Khách</span>
                 <span className="text-pink-500 animate-bounce">🌸</span>
               </div>
               <div className="text-[9.5px] text-[#8C6258] mt-0.5">
-                Nhấn nút <span className="font-bold text-[#E91E63]">"Mở Cửa ✨"</span> ở thanh trên để đón khách ghé bàn!
+                Khách đang kéo tới bàn, chuẩn bị phục vụ nhé chủ quán!
               </div>
             </div>
           </div>

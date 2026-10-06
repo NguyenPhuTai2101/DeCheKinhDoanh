@@ -234,12 +234,12 @@ export const EmployeesModal: React.FC = () => {
                             <span
                               className={`text-[9.5px] font-black px-2 py-0.2 rounded-full border ${
                                 isShopper
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                  : isCook
-                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                  : isServer
-                                  ? 'bg-pink-100 text-pink-800 border-pink-300'
-                                  : 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : isCook
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : isServer
+                                    ? 'bg-pink-100 text-pink-800 border-pink-300'
+                                    : 'bg-indigo-100 text-indigo-800 border-indigo-300'
                               }`}
                             >
                               {isShopper
@@ -248,8 +248,13 @@ export const EmployeesModal: React.FC = () => {
                                 ? '👨‍🍳 Đầu Bếp'
                                 : isServer
                                 ? '🏃 Phục Vụ'
-                                : '👩‍💼 Quản Lý'}
+                                : '👩‍💼 Quản Lý Đa Nhiệm ⭐'}
                             </span>
+                            {isManager && (
+                              <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-extrabold px-1.5 py-0.2 rounded-full">
+                                Thu Tiền / Bưng / Nấu ⚡
+                              </span>
+                            )}
                             <span className="text-[9px] bg-slate-100 text-slate-700 font-extrabold px-1.5 py-0.2 rounded-full uppercase">
                               {promoCheck.req?.name || emp.careerTier}
                             </span>
@@ -264,6 +269,11 @@ export const EmployeesModal: React.FC = () => {
                             {isShopper && (
                               <span className="text-emerald-700 font-black">
                                 · Giảm {emp.marketSkill || 75}% giá sỉ
+                              </span>
+                            )}
+                            {isManager && (
+                              <span className="text-indigo-700 font-black">
+                                · Tự động: Thu tiền, bưng món & đứng bếp ⚡
                               </span>
                             )}
                           </div>
@@ -513,12 +523,17 @@ export const EmployeesModal: React.FC = () => {
                           ) : cand.role === 'server' ? (
                             '🏃 Phục Vụ'
                           ) : (
-                            '👩‍💼 Quản Lý'
+                            '👩‍💼 Quản Lý Đa Nhiệm ⭐'
                           )}
                         </span>
                         {isShopper && (
                           <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300 font-black px-1.5 py-0.2 rounded-full">
                             Tự Động Hoá ⚡
+                          </span>
+                        )}
+                        {cand.role === 'manager' && (
+                          <span className="text-[9px] bg-indigo-100 text-indigo-900 border border-indigo-300 font-black px-1.5 py-0.2 rounded-full">
+                            Tự Động Vận Hành Toàn Diện ⚡
                           </span>
                         )}
                       </div>
@@ -540,6 +555,11 @@ export const EmployeesModal: React.FC = () => {
                             Chiết khấu sỉ: -{cand.marketSkill || 75}%
                           </span>
                         )}
+                        {cand.role === 'manager' && (
+                          <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded-md border border-indigo-200">
+                            ⭐ Đa nhiệm: Thu tiền, bưng món, đứng bếp
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -552,6 +572,8 @@ export const EmployeesModal: React.FC = () => {
                         canHire
                           ? isShopper
                             ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-105 text-white border border-emerald-400'
+                            : cand.role === 'manager'
+                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:brightness-105 text-white border border-indigo-400'
                             : 'bg-gradient-to-r from-[#FF6584] to-[#FFA07A] hover:brightness-105 text-white border border-white/60'
                           : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
                       }`}
