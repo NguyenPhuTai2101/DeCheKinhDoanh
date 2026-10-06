@@ -396,21 +396,21 @@ export const CozyShopView: React.FC = () => {
               {/* Hàng 1: Badge Bàn, Tên Món Rõ Ràng & Giá Tiền */}
               <div className="flex items-center justify-between gap-1 pb-0.5 border-b border-[#FFEBF0]">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="bg-[#FF6584] text-white text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.2 rounded-full shrink-0">
-                    Bàn {activeOrder.tableIndex}
+                  <span className="bg-[#FF6584] text-white text-[10px] font-black px-2 py-1 rounded-full shrink-0">
+                    BÀN {activeOrder.tableIndex}
                   </span>
-                  <span className="text-[11px] sm:text-xs font-black text-[#5C3A33] truncate">
+                  <span className="text-sm sm:text-base font-black text-[#5C3A33] truncate">
                     {currentRecipe.name}
                   </span>
                 </div>
                 <span className="text-[10.5px] sm:text-[11px] font-black text-[#E91E63] shrink-0">
-                  {currentRecipe.basePrice.toLocaleString('vi-VN')}đ
+                  {playerPrice.toLocaleString('vi-VN')}đ
                 </span>
               </div>
 
-              {/* Hàng 2: Hình món & Lời thoại + Biến tấu đặc biệt */}
-              <div className="flex items-center gap-1.5">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#FFF0F5] border border-[#FFCCD9] overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+              {/* Hàng 2: Món + yêu cầu khách. Custom order là thông tin quan trọng nhất. */}
+              <div className="flex items-start gap-2.5 py-1">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#FFF0F5] border-2 border-[#FFCCD9] overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                   {activeDishImage ? (
                     <img
                       src={activeDishImage}
@@ -418,42 +418,74 @@ export const CozyShopView: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-xl">{currentRecipe.icon}</span>
+                    <span className="text-2xl">{currentRecipe.icon}</span>
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0 text-[8.5px] sm:text-[9.5px] leading-tight">
-                  {(activeOrder.customTag || (activeOrder.orderNotes && activeOrder.orderNotes.length > 0)) && (
-                    <div className="mb-0.5 flex flex-wrap gap-1">
-                      {activeOrder.customTag && (
-                        <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[8px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
-                          🏷️ {activeOrder.customTag}
-                        </span>
-                      )}
-                      {activeOrder.orderNotes?.map((note, idx) => (
-                        <span key={idx} className="bg-rose-100 text-rose-800 border border-rose-300 text-[8px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
-                          {note}
-                        </span>
-                      ))}
+                <div className="flex-1 min-w-0">
+                  {visibleOrderNotes.length > 0 ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-2 py-1.5">
+                      <div className="text-[10px] font-black uppercase tracking-wide text-rose-700 mb-1">
+                        ⚠️ Yêu cầu khách
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {visibleOrderNotes.map((note, idx) => {
+                          const lower = note.toLocaleLowerCase('vi-VN');
+                          const icon =
+                            lower.includes('không') || note.includes('❌')
+                              ? '🚫'
+                              : lower.includes('thêm') || note.includes('➕')
+                              ? '➕'
+                              : lower.includes('ít')
+                              ? '➖'
+                              : lower.includes('dị ứng')
+                              ? '🚨'
+                              : '✦';
+
+                          return (
+                            <span
+                              key={`${note}-${idx}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-white px-2 py-1 text-[11px] sm:text-xs font-black text-rose-800 shadow-2xs"
+                            >
+                              <span aria-hidden>{icon}</span>
+                              <span>{note.replace(/^[❌➕]\s*/, '')}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-2 py-1 text-[11px] font-bold text-emerald-800">
+                      ✓ Order tiêu chuẩn — làm đúng công thức của quán
                     </div>
                   )}
 
-                  {activeOrder.state === 'eating' ? (
-                    <div className="text-emerald-700 font-bold italic line-clamp-2">
-                      "Ngon quá trời luôn! Nóng sốt vừa miệng quá chú quán ơi~ 😋"
-                    </div>
-                  ) : activeOrder.state === 'paying' ? (
-                    <div className="text-amber-800 font-bold line-clamp-2">
-                      "Bữa ăn ngon lắm! Cho mình gửi tiền thanh toán nha chú quán ⭐"
-                    </div>
-                  ) : (
-                    <div className="italic text-[#8C6258] line-clamp-2">
-                      "{activeOrder.dialogue || 'Nóng giòn, vừa miệng nha chủ quán!'}"
+                  <div className="mt-1 text-[10.5px] sm:text-[11px] leading-snug italic text-[#8C6258] line-clamp-2">
+                    “{activeOrder.dialogue || 'Làm nóng giòn, vừa miệng nha chủ quán!'}”
+                  </div>
+
+                  {activeOrder.matchFeedback && activeOrder.state === 'ready' && (
+                    <div
+                      className={`mt-1 rounded-lg px-2 py-1 text-[10.5px] font-black ${
+                        activeOrder.matchGrade === 'perfect'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : activeOrder.matchGrade === 'allergy'
+                          ? 'bg-red-100 text-red-800'
+                          : activeOrder.matchGrade === 'wrong'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {activeOrder.matchGrade === 'perfect'
+                        ? '⭐⭐⭐⭐⭐ '
+                        : activeOrder.matchGrade === 'minor'
+                        ? '⭐⭐⭐ '
+                        : '⭐⭐ '}
+                      {activeOrder.matchFeedback}
                     </div>
                   )}
                 </div>
               </div>
-
               {/* Hàng 3: NÚT THU TIỀN VÀNG HOẶC THANH TIẾN ĐỘ */}
               <div className="pt-0.5 border-t border-[#FFEBF0]">
                 {activeOrder.state === 'paying' ? (
@@ -712,7 +744,7 @@ export const CozyShopView: React.FC = () => {
               >
                 <span className="text-sm animate-spin">🪙</span>
                 <span className="truncate">
-                  BẤM THU TIỀN: {((currentRecipe?.basePrice || 0) + (activeOrder.calculatedTip || 0)).toLocaleString('vi-VN')}đ (Tip: {(activeOrder.calculatedTip || 0).toLocaleString('vi-VN')}đ) ✨
+                  BẤM THU TIỀN: {(playerPrice + (activeOrder.calculatedTip || 0)).toLocaleString('vi-VN')}đ (Tip: {(activeOrder.calculatedTip || 0).toLocaleString('vi-VN')}đ) ✨
                 </span>
               </button>
             ) : activeOrder.state === 'eating' ? (
