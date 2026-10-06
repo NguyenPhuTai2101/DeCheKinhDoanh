@@ -25,7 +25,6 @@ import {
   ShoppingBag,
   RotateCcw,
   Bike,
-  Zap,
 } from 'lucide-react';
 
 export const CozyShopView: React.FC = () => {
@@ -49,8 +48,9 @@ export const CozyShopView: React.FC = () => {
   // Tab phân loại khay nguyên liệu ('food' | 'drink')
   const [activeIngredientTab, setActiveIngredientTab] = useState<'food' | 'drink'>('food');
 
-  // Khay nguyên liệu đang chọn trên thớt
-  const [selectedIngredients, setSelectedIngredients] = useState<Record<string, boolean>>({});
+  // Khay nguyên liệu đang chọn trên thớt.
+  // Lưu số lượng để hỗ trợ order kiểu "thêm 1 trứng", "2 phần thịt"...
+  const [selectedIngredients, setSelectedIngredients] = useState<Partial<Record<IngredientId, number>>>({});
 
   // Cấu hình cấp bậc & thương hiệu quán hiện tại
   const stageId = gameState.businessStage || 'cart';
@@ -85,33 +85,39 @@ export const CozyShopView: React.FC = () => {
     }
   }, [activeOrder?.id, currentRecipe?.id]);
 
-  // Chạm khay nguyên liệu để thêm/bỏ trên thớt
-  const toggleIngredient = (ingId: string) => {
+  // Manual-first: người chơi phải đọc order rồi tự chọn nguyên liệu.
+  const addIngredient = (ingId: IngredientId) => {
+    const stock = gameState.inventory[ingId] || 0;
+    const currentQty = selectedIngredients[ingId] || 0;
+
+    if (currentQty >= stock) {
+      soundManager.playClick();
+      openModal('market');
+      return;
+    }
+
     soundManager.playClick();
     setSelectedIngredients((prev) => ({
       ...prev,
-      [ingId]: !prev[ingId],
+      [ingId]: (prev[ingId] || 0) + 1,
     }));
   };
 
-  // Nút Nấu Nhanh 1 Chạm: tự động cho đủ nguyên liệu theo công thức kèm yêu cầu tùy biến của khách
-  const handleQuickFill = () => {
-    if (!currentRecipe) return;
+  const removeIngredient = (ingId: IngredientId) => {
     soundManager.playClick();
-    const newPicked: Record<string, boolean> = {};
-    const removed = activeOrder?.removedIngredients || [];
-    const extra = activeOrder?.extraIngredients || [];
-
-    for (const req of currentRecipe.requiredIngredients) {
-      if (!removed.includes(req)) {
-        newPicked[req] = true;
+    setSelectedIngredients((prev) => {
+      const currentQty = prev[ingId] || 0;
+      if (currentQty <= 1) {
+        const next = { ...prev };
+        delete next[ingId];
+        return next;
       }
-    }
-    for (const ex of extra) {
-      newPicked[ex] = true;
-    }
 
-    setSelectedIngredients(newPicked);
+      return {
+        ...prev,
+        [ingId]: currentQty - 1,
+      };
+    });
   };
 
   const clearCuttingBoard = () => {
@@ -119,24 +125,41 @@ export const CozyShopView: React.FC = () => {
     setSelectedIngredients({});
   };
 
+  const getPreparedIngredients = (): IngredientId[] =>
+    Object.entries(selectedIngredients).flatMap(([id, qty]) =>
+      Array.from({ length: qty || 0 }, () => id as IngredientId)
+    );
+
   const hasMatchedRecipe = () => {
     if (!currentRecipe) return false;
+
     const removed = activeOrder?.removedIngredients || [];
     const extra = activeOrder?.extraIngredients || [];
     const expected = currentRecipe.requiredIngredients
       .filter((id) => !removed.includes(id))
       .concat(extra);
 
-    if (Object.values(selectedIngredients).filter(Boolean).length === 0) return false;
-    return expected.every((req) => selectedIngredients[req]);
+    const expectedCounts = expected.reduce<Record<string, number>>((acc, id) => {
+      acc[id] = (acc[id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const prepared = getPreparedIngredients();
+    if (prepared.length !== expected.length) return false;
+
+    const preparedCounts = prepared.reduce<Record<string, number>>((acc, id) => {
+      acc[id] = (acc[id] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(expectedCounts).every(
+      ([id, qty]) => preparedCounts[id] === qty
+    );
   };
 
   const isStockAvailable = () => {
-    if (!currentRecipe) return false;
-    const extra = activeOrder?.extraIngredients || [];
-    const checkList = [...currentRecipe.requiredIngredients, ...extra];
-    for (const req of checkList) {
-      if ((gameState.inventory[req] || 0) <= 0) return false;
+    for (const [id, qty] of Object.entries(selectedIngredients)) {
+      if ((gameState.inventory[id as IngredientId] || 0) < (qty || 0)) return false;
     }
     return true;
   };
@@ -145,9 +168,7 @@ export const CozyShopView: React.FC = () => {
   const handleCookCurrent = () => {
     if (!activeOrder || !currentRecipe) return;
 
-    const prepList = Object.keys(selectedIngredients).filter(
-      (k) => selectedIngredients[k]
-    ) as IngredientId[];
+    const prepList = getPreparedIngredients();
 
     const success = completeCooking(activeOrder.recipeId, activeOrder.tableIndex, prepList);
     if (success) {
@@ -197,10 +218,41 @@ export const CozyShopView: React.FC = () => {
   const currentIngredientsList =
     activeIngredientTab === 'food' ? foodIngredients : drinkIngredients;
 
-  // Đếm số nguyên liệu cần đã chọn
-  const requiredCount = currentRecipe?.requiredIngredients.length || 0;
-  const pickedRequiredCount =
-    currentRecipe?.requiredIngredients.filter((id) => selectedIngredients[id]).length || 0;
+  // Đếm theo order thực tế, bao gồm cả số lượng topping khách gọi thêm.
+  const removedIngredients = activeOrder?.removedIngredients || [];
+  const extraIngredients = activeOrder?.extraIngredients || [];
+  const expectedIngredients: IngredientId[] = currentRecipe
+    ? currentRecipe.requiredIngredients
+        .filter((id) => !removedIngredients.includes(id))
+        .concat(extraIngredients)
+    : [];
+
+  const expectedCounts = expectedIngredients.reduce<Partial<Record<IngredientId, number>>>(
+    (acc, id) => {
+      acc[id] = (acc[id] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
+  const totalSelectedCount = getPreparedIngredients().length;
+  const requiredCount = expectedIngredients.length;
+  const pickedRequiredCount = Object.entries(expectedCounts).reduce((sum, [id, expectedQty]) => {
+    const pickedQty = selectedIngredients[id as IngredientId] || 0;
+    return sum + Math.min(pickedQty, expectedQty || 0);
+  }, 0);
+
+  const visibleOrderNotes =
+    activeOrder?.orderNotes && activeOrder.orderNotes.length > 0
+      ? activeOrder.orderNotes
+      : activeOrder?.customTag
+      ? [activeOrder.customTag]
+      : [];
+
+  const playerPrice =
+    activeOrder && currentRecipe
+      ? gameState.menuSettings?.[activeRestId]?.prices?.[activeOrder.recipeId] ?? currentRecipe.basePrice
+      : currentRecipe?.basePrice || 0;
 
   return (
     <div className="w-full h-full flex flex-col justify-between overflow-hidden select-none bg-gradient-to-b from-[#FFF5F8] via-[#FFF9FA] to-[#FFF0F5] text-[#5C3A33] p-1.5 sm:p-2 gap-1.5 min-h-0">
@@ -562,16 +614,6 @@ export const CozyShopView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {currentRecipe && (
-              <button
-                onClick={handleQuickFill}
-                className="px-2 py-0.5 bg-gradient-to-r from-amber-300 to-amber-400 hover:brightness-105 text-amber-950 rounded-xl text-[9px] font-black shadow-2xs flex items-center gap-0.5 active:scale-95 transition-all border border-amber-200 cursor-pointer"
-                title="Tự động cho đủ nguyên liệu món đang gọi"
-              >
-                <Zap className="w-2.5 h-2.5 fill-current text-amber-800" />
-                <span>Nấu Nhanh ⚡</span>
-              </button>
-            )}
             {Object.values(selectedIngredients).some(Boolean) && (
               <button
                 onClick={clearCuttingBoard}
@@ -786,7 +828,7 @@ export const CozyShopView: React.FC = () => {
                   if (stock <= 0) {
                     openModal('market');
                   } else {
-                    toggleIngredient(item.id);
+                    addIngredient(item.id);
                   }
                 }}
                 className={`min-w-[62px] sm:min-w-[68px] h-[62px] sm:h-[66px] rounded-xl border-2 flex flex-col items-center justify-between p-1 cursor-pointer transition-all active:scale-95 relative shrink-0 select-none shadow-[0_2px_8px_rgba(255,168,197,0.12)] ${
