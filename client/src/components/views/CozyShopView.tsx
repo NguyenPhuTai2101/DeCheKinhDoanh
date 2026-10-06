@@ -760,10 +760,10 @@ export const CozyShopView: React.FC = () => {
             ) : (
               <button
                 onClick={handleCookCurrent}
-                disabled={!hasMatchedRecipe() || !isStockAvailable()}
-                className={`w-full py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-[0_4px_14px_rgba(255,101,132,0.3)] transition-all active:scale-95 border cursor-pointer ${
-                  hasMatchedRecipe() && isStockAvailable()
-                    ? 'bg-gradient-to-r from-[#FF6584] to-[#F43F5E] hover:brightness-105 text-white border-white/60 animate-pulse'
+                disabled={totalSelectedCount === 0 || !isStockAvailable()}
+                className={`w-full min-h-11 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-[0_4px_14px_rgba(255,101,132,0.3)] transition-all active:scale-95 border cursor-pointer ${
+                  totalSelectedCount > 0 && isStockAvailable()
+                    ? 'bg-gradient-to-r from-[#FF6584] to-[#F43F5E] hover:brightness-105 text-white border-white/60'
                     : !isStockAvailable()
                     ? 'bg-[#FFF0F5] text-[#E91E63] border-[#FFCCD9]'
                     : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed shadow-none'
@@ -775,7 +775,7 @@ export const CozyShopView: React.FC = () => {
                     ? `Chạm nguyên liệu bên dưới (${pickedRequiredCount}/{requiredCount})`
                     : !isStockAvailable()
                     ? 'Kho thiếu nguyên liệu! Bấm Chợ mua sỉ 🛒'
-                    : `HOÀN THÀNH MÓN ${currentRecipe?.name.toUpperCase()} (3 ⚡)`}
+                    : `HOÀN THÀNH MÓN ${currentRecipe?.name.toUpperCase()} · ${totalSelectedCount} phần`}
                 </span>
               </button>
             )
