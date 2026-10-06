@@ -771,8 +771,8 @@ export const CozyShopView: React.FC = () => {
               >
                 <Utensils className="w-4 h-4" />
                 <span className="truncate">
-                  {!hasMatchedRecipe()
-                    ? `Chạm nguyên liệu bên dưới (${pickedRequiredCount}/{requiredCount})`
+                  {totalSelectedCount === 0
+                    ? 'Chọn nguyên liệu theo yêu cầu của khách'
                     : !isStockAvailable()
                     ? 'Kho thiếu nguyên liệu! Bấm Chợ mua sỉ 🛒'
                     : `HOÀN THÀNH MÓN ${currentRecipe?.name.toUpperCase()} · ${totalSelectedCount} phần`}
