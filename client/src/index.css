@@ -20,9 +20,11 @@
     touch-action: pan-x pan-y;
     overscroll-behavior: none;
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    -webkit-tap-highlight-color: transparent;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
 }
 
@@ -138,4 +140,23 @@
   border-radius: 20px;
   box-shadow: 0 8px 24px rgba(247, 168, 196, 0.2);
   backdrop-filter: blur(8px);
+}
+
+
+/* Mobile-first interaction: vùng chạm phản hồi trực tiếp, tránh double-tap zoom cảm giác chậm. */
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Người dùng bật Reduced Motion trên thiết bị sẽ không bị bounce/pulse liên tục. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
