@@ -24,7 +24,7 @@ export const FlashScreen: React.FC = () => {
       {/* 1. Hình nền Full Màn Hình tràn viền cực đẹp (Concept Ẩm Thực Vỉa Hè Chibi) */}
       <img
         src="/splash_art.jpg"
-        alt="Đế Chế Kinh Doanh Vỉa Hè"
+        alt="Tập Tành Làm Chủ"
         className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
       />
 

@@ -1,7 +1,7 @@
 {
-  "name": "Tiệm Nhỏ Của Tôi 🌸 Cozy Business Story",
-  "short_name": "Tiệm Nhỏ",
-  "description": "Game nhập vai kinh doanh cozy - từ quán nhỏ đến tập đoàn đa ngành",
+  "name": "Tập Tành Làm Chủ",
+  "short_name": "Tập Tành Làm Chủ",
+  "description": "Tập Tành Làm Chủ - Game nhập vai kinh doanh quán ăn cozy từ xe đẩy vỉa hè đến chuỗi nhà hàng",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFF1F6",
@@ -9,9 +9,21 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml"
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
